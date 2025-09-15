@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
@@ -13,8 +14,33 @@ import {
   Fish,
   GitBranch,
   Brain,
-  Settings
+  Settings,
+  User,
+  Palette,
+  Bell
 } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+const userSettingsSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email").optional(),
+  role: z.string().optional(),
+  theme: z.enum(["light", "dark", "system"]).default("system"),
+  notifications: z.boolean().default(true),
+  emailNotifications: z.boolean().default(true),
+  autoSave: z.boolean().default(true),
+});
+
+type UserSettingsData = z.infer<typeof userSettingsSchema>;
 
 const navigationSections = [
   {
@@ -53,6 +79,30 @@ const navigationSections = [
 
 export default function Sidebar() {
   const [location] = useLocation();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const { toast } = useToast();
+
+  const form = useForm<UserSettingsData>({
+    resolver: zodResolver(userSettingsSchema),
+    defaultValues: {
+      name: "Dr. Jane Doe",
+      email: "jane.doe@university.edu",
+      role: "PhD Candidate",
+      theme: "system",
+      notifications: true,
+      emailNotifications: true,
+      autoSave: true,
+    },
+  });
+
+  const onSettingsSubmit = (data: UserSettingsData) => {
+    // Here we would normally save to backend/local storage
+    toast({
+      title: "Settings Updated",
+      description: "Your preferences have been saved successfully!",
+    });
+    setIsSettingsOpen(false);
+  };
 
   return (
     <div className="w-64 bg-card border-r border-border flex flex-col" data-testid="sidebar">
@@ -113,10 +163,192 @@ export default function Sidebar() {
             <p className="text-sm font-medium text-foreground truncate">Dr. Jane Doe</p>
             <p className="text-xs text-muted-foreground truncate">PhD Candidate</p>
           </div>
-          <Settings 
-            className="text-muted-foreground w-4 h-4 cursor-pointer hover:text-foreground" 
-            data-testid="settings-button"
-          />
+          <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+            <SheetTrigger asChild>
+              <Settings 
+                className="text-muted-foreground w-4 h-4 cursor-pointer hover:text-foreground" 
+                data-testid="settings-button"
+              />
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[400px] sm:w-[540px]">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  User Settings
+                </SheetTitle>
+              </SheetHeader>
+              <div className="mt-6">
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSettingsSubmit)} className="space-y-6">
+                    {/* Profile Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
+                        <User className="w-4 h-4" />
+                        Profile
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Full Name</FormLabel>
+                            <FormControl>
+                              <Input data-testid="input-settings-name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input type="email" data-testid="input-settings-email" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="role"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Role</FormLabel>
+                            <FormControl>
+                              <Input data-testid="input-settings-role" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Appearance Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
+                        <Palette className="w-4 h-4" />
+                        Appearance
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="theme"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Theme</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-settings-theme">
+                                  <SelectValue placeholder="Select theme" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="light">Light</SelectItem>
+                                <SelectItem value="dark">Dark</SelectItem>
+                                <SelectItem value="system">System</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Notifications Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
+                        <Bell className="w-4 h-4" />
+                        Notifications
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="notifications"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Push Notifications</FormLabel>
+                              <div className="text-sm text-muted-foreground">
+                                Receive notifications about project updates
+                              </div>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-notifications"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="emailNotifications"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Email Notifications</FormLabel>
+                              <div className="text-sm text-muted-foreground">
+                                Receive email updates about your projects
+                              </div>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-email-notifications"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="autoSave"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Auto-save</FormLabel>
+                              <div className="text-sm text-muted-foreground">
+                                Automatically save your work while editing
+                              </div>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-auto-save"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="flex justify-end space-x-2 pt-6">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsSettingsOpen(false)}
+                        data-testid="button-cancel-settings"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        data-testid="button-save-settings"
+                      >
+                        Save Settings
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </div>
