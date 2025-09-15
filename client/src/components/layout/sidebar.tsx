@@ -52,7 +52,7 @@ const navigationSections = [
   {
     title: "PMIS Tools", 
     items: [
-      { icon: ListTodo, label: "ListTodo & Projects", path: "/tasks" },
+      { icon: ListTodo, label: "Tasks & To Do", path: "/tasks" },
       { icon: ChartGantt, label: "Gantt Charts", path: "/gantt" },
       { icon: AlertTriangle, label: "RAID Logs", path: "/raid-logs" },
       { icon: ChartBar, label: "Progress Reports", path: "/" }
