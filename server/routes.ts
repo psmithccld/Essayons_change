@@ -6,6 +6,7 @@ import {
   insertCommunicationSchema, insertSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema
 } from "@shared/schema";
 import * as openaiService from "./openai";
+import { sendTaskAssignmentNotification } from "./services/emailService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard
@@ -104,6 +105,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId: req.params.projectId
       });
       const task = await storage.createTask(validatedData);
+      
+      // Send email notification if task is assigned
+      if (task.assigneeId) {
+        try {
+          const assignee = await storage.getUser(task.assigneeId);
+          const project = await storage.getProject(req.params.projectId);
+          if (assignee && project) {
+            await sendTaskAssignmentNotification(
+              `${assignee.username}@company.com`, // Use username as email fallback
+              task.name,
+              project.name,
+              task.dueDate ? new Date(task.dueDate).toDateString() : undefined
+            );
+          }
+        } catch (emailError) {
+          console.error("Error sending task assignment email:", emailError);
+          // Don't fail the task creation if email fails
+        }
+      }
+      
       res.status(201).json(task);
     } catch (error) {
       console.error("Error creating task:", error);
@@ -113,10 +134,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/tasks/:id", async (req, res) => {
     try {
+      const oldTask = await storage.getTask(req.params.id);
       const task = await storage.updateTask(req.params.id, req.body);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
+      
+      // Send email notification if assignee changed
+      if (task.assigneeId && oldTask?.assigneeId !== task.assigneeId) {
+        try {
+          const assignee = await storage.getUser(task.assigneeId);
+          const project = await storage.getProject(task.projectId);
+          if (assignee && project) {
+            await sendTaskAssignmentNotification(
+              `${assignee.username}@company.com`, // Use username as email fallback
+              task.name,
+              project.name,
+              task.dueDate ? new Date(task.dueDate).toDateString() : undefined
+            );
+          }
+        } catch (emailError) {
+          console.error("Error sending task assignment email:", emailError);
+          // Don't fail the task update if email fails
+        }
+      }
+      
       res.json(task);
     } catch (error) {
       console.error("Error updating task:", error);
