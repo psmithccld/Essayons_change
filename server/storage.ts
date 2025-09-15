@@ -80,12 +80,7 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // Users
   async getUsers(): Promise<User[]> {
-    return await db.select({
-      id: users.id,
-      username: users.username,
-      name: users.name,
-      role: users.role
-    }).from(users).orderBy(users.name);
+    return await db.select().from(users).orderBy(users.name);
   }
 
   async getUser(id: string): Promise<User | undefined> {

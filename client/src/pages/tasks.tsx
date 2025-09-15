@@ -14,11 +14,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Calendar, User, AlertCircle, CheckCircle, Clock, Pause, X, ListChecks } from "lucide-react";
+import { Plus, Calendar, User as UserIcon, AlertCircle, CheckCircle, Clock, Pause, X, ListChecks } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
-import type { Project, Task } from "@shared/schema";
+import type { Project, Task, User } from "@shared/schema";
 
 const taskFormSchema = z.object({
   name: z.string().min(1, "Task name is required"),
@@ -71,7 +71,7 @@ export default function Tasks() {
   const queryClient = useQueryClient();
   const { currentProject, projects } = useCurrentProject();
 
-  const { data: users = [] } = useQuery({
+  const { data: users = [] } = useQuery<User[]>({
     queryKey: ['/api/users'],
   });
 
@@ -142,7 +142,14 @@ export default function Tasks() {
       });
       return;
     }
-    createTaskMutation.mutate(data);
+    
+    // Handle "unassigned" value by converting it to undefined
+    const taskData = {
+      ...data,
+      assigneeId: data.assigneeId === "unassigned" ? undefined : data.assigneeId
+    };
+    
+    createTaskMutation.mutate(taskData);
   };
 
   const addChecklistItem = () => {
@@ -289,8 +296,8 @@ export default function Tasks() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Unassigned</SelectItem>
-                          {users.map((user: any) => (
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {users.map((user: User) => (
                             <SelectItem key={user.id} value={user.id}>
                               {user.name} ({user.username})
                             </SelectItem>
@@ -547,7 +554,7 @@ export default function Tasks() {
                         )}
                         {task.assigneeId && (
                           <div className="flex items-center space-x-1">
-                            <User className="w-4 h-4" />
+                            <UserIcon className="w-4 h-4" />
                             <span>Assigned</span>
                           </div>
                         )}
