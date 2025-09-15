@@ -60,10 +60,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/projects", async (req, res) => {
     try {
-      const validatedData = insertProjectSchema.parse({
+      // Convert date strings to Date objects before validation
+      const processedData = {
         ...req.body,
-        ownerId: "550e8400-e29b-41d4-a716-446655440000"
-      });
+        ownerId: "550e8400-e29b-41d4-a716-446655440000",
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      };
+      
+      const validatedData = insertProjectSchema.parse(processedData);
       const project = await storage.createProject(validatedData);
       res.status(201).json(project);
     } catch (error) {
@@ -111,24 +116,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/projects/:projectId/tasks", async (req, res) => {
     try {
-      const validatedData = insertTaskSchema.parse({
+      // Convert date strings to Date objects before validation
+      const processedData = {
         ...req.body,
-        projectId: req.params.projectId
-      });
+        projectId: req.params.projectId,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : undefined,
+      };
+      
+      const validatedData = insertTaskSchema.parse(processedData);
       const task = await storage.createTask(validatedData);
       
-      // Send email notification if task is assigned
-      if (task.assigneeId) {
+      // Send email notification if task is assigned (internal user or external email)
+      if (task.assigneeId || task.assigneeEmail) {
         try {
-          const assignee = await storage.getUser(task.assigneeId);
           const project = await storage.getProject(req.params.projectId);
-          if (assignee && project) {
-            await sendTaskAssignmentNotification(
-              `${assignee.username}@company.com`, // Use username as email fallback
-              task.name,
-              project.name,
-              task.dueDate ? new Date(task.dueDate).toDateString() : undefined
-            );
+          if (project) {
+            let emailAddress = task.assigneeEmail;
+            
+            // If internal user assignment, get their email
+            if (task.assigneeId && !emailAddress) {
+              const assignee = await storage.getUser(task.assigneeId);
+              emailAddress = assignee ? `${assignee.username}@company.com` : undefined;
+            }
+            
+            if (emailAddress) {
+              await sendTaskAssignmentNotification(
+                emailAddress,
+                task.name,
+                project.name,
+                task.dueDate ? new Date(task.dueDate).toDateString() : undefined
+              );
+            }
           }
         } catch (emailError) {
           console.error("Error sending task assignment email:", emailError);

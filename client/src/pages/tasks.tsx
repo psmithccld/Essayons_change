@@ -26,6 +26,8 @@ const taskFormSchema = z.object({
   status: z.enum(["pending", "in_progress", "completed", "blocked"]),
   priority: z.enum(["low", "medium", "high", "critical"]),
   assigneeId: z.string().optional(),
+  assigneeEmail: z.string().email().optional(),
+  assignmentType: z.enum(["user", "external"]).default("user"),
   startDate: z.string().optional(),
   dueDate: z.string().optional(),
   checklist: z.array(z.object({
@@ -85,6 +87,8 @@ export default function Tasks() {
     defaultValues: {
       status: "pending",
       priority: "medium",
+      assignmentType: "user",
+      assigneeId: "unassigned",
     },
   });
 
@@ -143,10 +147,27 @@ export default function Tasks() {
       return;
     }
     
-    // Handle "unassigned" value by converting it to undefined
+    // Handle assignment logic: either user ID or external email
+    let assigneeId = undefined;
+    let assigneeEmail = undefined;
+    
+    if (data.assignmentType === "user" && data.assigneeId && data.assigneeId !== "unassigned") {
+      assigneeId = data.assigneeId;
+    } else if (data.assignmentType === "external" && data.assigneeEmail) {
+      assigneeEmail = data.assigneeEmail;
+    }
+    
+    // Send date strings to backend (backend will handle conversion)
     const taskData = {
-      ...data,
-      assigneeId: data.assigneeId === "unassigned" ? undefined : data.assigneeId
+      name: data.name,
+      description: data.description,
+      status: data.status,
+      priority: data.priority,
+      assigneeId,
+      assigneeEmail,
+      startDate: data.startDate || undefined,
+      dueDate: data.dueDate || undefined,
+      checklist: data.checklist,
     };
     
     createTaskMutation.mutate(taskData);
@@ -285,29 +306,71 @@ export default function Tasks() {
 
                 <FormField
                   control={form.control}
-                  name="assigneeId"
+                  name="assignmentType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Assign To</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <FormLabel>Assignment Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue="user">
                         <FormControl>
-                          <SelectTrigger data-testid="select-assignee">
-                            <SelectValue placeholder="Select team member (optional)" />
+                          <SelectTrigger data-testid="select-assignment-type">
+                            <SelectValue placeholder="Choose assignment type" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="unassigned">Unassigned</SelectItem>
-                          {users.map((user: User) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.name} ({user.username})
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="user">Select from team members</SelectItem>
+                          <SelectItem value="external">Enter external email</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                {form.watch("assignmentType") === "user" ? (
+                  <FormField
+                    control={form.control}
+                    name="assigneeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assign To Team Member</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-assignee">
+                              <SelectValue placeholder="Select team member (optional)" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="unassigned">Unassigned</SelectItem>
+                            {users.map((user: User) => (
+                              <SelectItem key={user.id} value={user.id}>
+                                {user.name} ({user.username})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="assigneeEmail"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>External Email Address</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="Enter external assignee email"
+                            data-testid="input-assignee-email"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField

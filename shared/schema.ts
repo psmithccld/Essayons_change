@@ -34,6 +34,7 @@ export const tasks = pgTable("tasks", {
   status: text("status").notNull().default("pending"), // pending, in_progress, completed, blocked
   priority: text("priority").notNull().default("medium"), // low, medium, high, critical
   assigneeId: uuid("assignee_id").references(() => users.id),
+  assigneeEmail: text("assignee_email"), // For external email assignments
   startDate: timestamp("start_date"),
   dueDate: timestamp("due_date"),
   completedDate: timestamp("completed_date"),
