@@ -12,6 +12,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { insertProjectSchema, type InsertProject } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import { z } from "zod";
 
 const projectFormSchema = insertProjectSchema.extend({
@@ -28,6 +29,7 @@ export default function Header() {
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { currentProject, setCurrentProject, projects, isLoading } = useCurrentProject();
 
   const form = useForm<ProjectFormData>({
     resolver: zodResolver(projectFormSchema),
@@ -45,13 +47,15 @@ export default function Header() {
       const response = await apiRequest("POST", "/api/projects", data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (newProject) => {
       toast({
         title: "Success",
         description: "Project created successfully!",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      // Set the newly created project as current
+      setCurrentProject(newProject);
       setIsNewProjectOpen(false);
       form.reset();
     },
@@ -71,9 +75,45 @@ export default function Header() {
   return (
     <header className="bg-card border-b border-border px-6 py-4" data-testid="header">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Change Management Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Monitor and manage organizational change initiatives</p>
+        <div className="flex items-center space-x-6">
+          <div>
+            <h1 className="text-2xl font-semibold text-foreground">Change Management Dashboard</h1>
+            <p className="text-sm text-muted-foreground">Monitor and manage organizational change initiatives</p>
+          </div>
+          
+          {/* Initiative Dropdown */}
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium text-muted-foreground">Current Initiative:</span>
+            <Select 
+              value={currentProject?.id || ""} 
+              onValueChange={(projectId) => {
+                const project = projects.find(p => p.id === projectId);
+                if (project) {
+                  setCurrentProject(project);
+                }
+              }}
+              disabled={isLoading}
+            >
+              <SelectTrigger className="w-[250px]" data-testid="select-current-initiative">
+                <SelectValue 
+                  placeholder={isLoading ? "Loading initiatives..." : "Select an initiative..."} 
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {isLoading ? (
+                  <SelectItem value="loading" disabled>Loading...</SelectItem>
+                ) : projects.length === 0 ? (
+                  <SelectItem value="none" disabled>No initiatives available</SelectItem>
+                ) : (
+                  projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id} data-testid={`option-project-${project.id}`}>
+                      {project.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="flex items-center space-x-4">
           <Button 
