@@ -8,6 +8,7 @@ import {
   Bot, Lightbulb, ChartLine, ExternalLink,
   CheckCircle, Clock, AlertCircle, Link as LinkIcon
 } from "lucide-react";
+import changeProcessFlowImage from "@assets/image_1757964076529.png";
 
 interface DashboardStats {
   activeProjects: number;
@@ -224,54 +225,13 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="relative bg-muted/30 p-8 rounded-lg">
-              {/* Organizational Actions */}
-              <div className="text-center mb-4">
-                <Badge className="bg-primary text-primary-foreground px-4 py-2">
-                  Organizational Actions
-                </Badge>
-              </div>
-              
-              {/* Process Flow */}
-              <div className="flex items-center justify-between mb-8 space-x-4">
-                {[
-                  { title: "Identify Need", subtitle: "to Change" },
-                  { title: "Identify", subtitle: "Stakeholders" },
-                  { title: "Develop the", subtitle: "Change" },
-                  { title: "Implement", subtitle: "the Change" }
-                ].map((step, index) => (
-                  <div key={index} className="flex flex-col items-center space-y-2 flex-1">
-                    <div className="bg-card border-2 border-primary p-3 rounded-lg text-center min-w-[100px]">
-                      <div className="text-xs font-medium text-foreground">{step.title}</div>
-                      <div className="text-xs font-medium text-foreground">{step.subtitle}</div>
-                    </div>
-                    {index < 3 && (
-                      <>
-                        <div className="w-0.5 h-8 bg-border"></div>
-                        <ChartLine className="text-primary w-5 h-5" />
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-              
-              {/* Individual Actions */}
-              <div className="text-center">
-                <Badge className="bg-secondary text-secondary-foreground px-4 py-2">
-                  Individual Actions
-                </Badge>
-              </div>
-              
-              {/* Communication Flows Indicator */}
-              <div className="absolute top-4 right-4 bg-secondary/10 p-3 rounded-lg">
-                <div className="text-xs font-medium text-secondary mb-1">Communication</div>
-                <div className="text-xs font-medium text-secondary">Flows</div>
-                <div className="flex space-x-1 mt-2">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="w-2 h-2 bg-secondary rounded-full"></div>
-                  ))}
-                </div>
-              </div>
+            <div className="flex justify-center p-4">
+              <img 
+                src={changeProcessFlowImage} 
+                alt="Change Process Flow - Organizational Actions and Individual Actions" 
+                className="w-full max-w-4xl h-auto"
+                data-testid="change-process-flow-image"
+              />
             </div>
           </CardContent>
         </Card>
