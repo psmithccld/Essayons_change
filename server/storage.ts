@@ -6,7 +6,7 @@ import {
   type SurveyResponse, type InsertSurveyResponse, type GptInteraction, type InsertGptInteraction
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql, count, isNull } from "drizzle-orm";
+import { eq, desc, and, sql, count, isNull, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -291,11 +291,14 @@ export class DatabaseStorage implements IStorage {
     stakeholderEngagement: number;
     changeReadiness: number;
   }> {
-    // Get active projects count
+    // Get active projects count (all projects that are not completed or cancelled)
     const [activeProjectsResult] = await db
       .select({ count: count() })
       .from(projects)
-      .where(and(eq(projects.ownerId, userId), eq(projects.status, 'active')));
+      .where(and(
+        eq(projects.ownerId, userId),
+        sql`${projects.status} NOT IN ('completed', 'cancelled')`
+      ));
 
     // Get all user's projects for further queries
     const userProjects = await db
@@ -315,13 +318,13 @@ export class DatabaseStorage implements IStorage {
       const [totalTasksResult] = await db
         .select({ count: count() })
         .from(tasks)
-        .where(sql`${tasks.projectId} = ANY(${projectIds})`);
+        .where(inArray(tasks.projectId, projectIds));
 
       const [completedTasksResult] = await db
         .select({ count: count() })
         .from(tasks)
         .where(and(
-          sql`${tasks.projectId} = ANY(${projectIds})`,
+          inArray(tasks.projectId, projectIds),
           eq(tasks.status, 'completed')
         ));
 
@@ -330,7 +333,7 @@ export class DatabaseStorage implements IStorage {
         .select({ count: count() })
         .from(raidLogs)
         .where(and(
-          sql`${raidLogs.projectId} = ANY(${projectIds})`,
+          inArray(raidLogs.projectId, projectIds),
           eq(raidLogs.type, 'risk'),
           eq(raidLogs.status, 'open')
         ));
@@ -339,7 +342,7 @@ export class DatabaseStorage implements IStorage {
         .select({ count: count() })
         .from(raidLogs)
         .where(and(
-          sql`${raidLogs.projectId} = ANY(${projectIds})`,
+          inArray(raidLogs.projectId, projectIds),
           eq(raidLogs.type, 'issue'),
           eq(raidLogs.status, 'open')
         ));
@@ -357,14 +360,14 @@ export class DatabaseStorage implements IStorage {
         .select({ count: count() })
         .from(stakeholders)
         .where(and(
-          sql`${stakeholders.projectId} = ANY(${projectIds})`,
+          inArray(stakeholders.projectId, projectIds),
           eq(stakeholders.supportLevel, 'supportive')
         ));
 
       const totalStakeholders = await db
         .select({ count: count() })
         .from(stakeholders)
-        .where(sql`${stakeholders.projectId} = ANY(${projectIds})`);
+        .where(inArray(stakeholders.projectId, projectIds));
 
       if (totalStakeholders[0].count > 0) {
         stakeholderEngagement = Math.round((supportiveStakeholders[0].count / totalStakeholders[0].count) * 100);

@@ -12,7 +12,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
       // For demo, using a default user ID - in production, get from auth
-      const userId = "default-user";
+      const userId = "550e8400-e29b-41d4-a716-446655440000";
       const stats = await storage.getDashboardStats(userId);
       res.json(stats);
     } catch (error) {
@@ -24,7 +24,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Projects
   app.get("/api/projects", async (req, res) => {
     try {
-      const userId = "default-user";
+      const userId = "550e8400-e29b-41d4-a716-446655440000";
       const projects = await storage.getProjects(userId);
       res.json(projects);
     } catch (error) {
@@ -50,7 +50,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertProjectSchema.parse({
         ...req.body,
-        ownerId: "default-user"
+        ownerId: "550e8400-e29b-41d4-a716-446655440000"
       });
       const project = await storage.createProject(validatedData);
       res.status(201).json(project);
@@ -204,7 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertRaidLogSchema.parse({
         ...req.body,
         projectId: req.params.projectId,
-        ownerId: "default-user"
+        ownerId: "550e8400-e29b-41d4-a716-446655440000"
       });
       const raidLog = await storage.createRaidLog(validatedData);
       res.status(201).json(raidLog);
@@ -256,7 +256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertCommunicationSchema.parse({
         ...req.body,
         projectId: req.params.projectId,
-        createdById: "default-user"
+        createdById: "550e8400-e29b-41d4-a716-446655440000"
       });
       const communication = await storage.createCommunication(validatedData);
       res.status(201).json(communication);
@@ -308,7 +308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertSurveySchema.parse({
         ...req.body,
         projectId: req.params.projectId,
-        createdById: "default-user"
+        createdById: "550e8400-e29b-41d4-a716-446655440000"
       });
       const survey = await storage.createSurvey(validatedData);
       res.status(201).json(survey);
@@ -383,7 +383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Save interaction
       await storage.createGptInteraction({
         projectId,
-        userId: "default-user",
+        userId: "550e8400-e29b-41d4-a716-446655440000",
         type: "communication_plan",
         prompt: `Generate communication plan for ${projectName}`,
         response: JSON.stringify(plan),
@@ -409,7 +409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Save interaction
       await storage.createGptInteraction({
         projectId,
-        userId: "default-user",
+        userId: "550e8400-e29b-41d4-a716-446655440000",
         type: "readiness_analysis",
         prompt: "Analyze change readiness",
         response: JSON.stringify(analysis),
@@ -432,7 +432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Save interaction
       await storage.createGptInteraction({
         projectId,
-        userId: "default-user",
+        userId: "550e8400-e29b-41d4-a716-446655440000",
         type: "risk_mitigation",
         prompt: "Generate risk mitigation strategies",
         response: JSON.stringify(strategies),
@@ -455,7 +455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Save interaction
       await storage.createGptInteraction({
         projectId,
-        userId: "default-user",
+        userId: "550e8400-e29b-41d4-a716-446655440000",
         type: "stakeholder_tips",
         prompt: "Get stakeholder engagement tips",
         response: JSON.stringify(tips),

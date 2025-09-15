@@ -36,7 +36,7 @@ export default function Header() {
       description: "",
       status: "identify_need",
       progress: 0,
-      ownerId: "default-user", // This should be replaced with actual user ID from auth
+      ownerId: "550e8400-e29b-41d4-a716-446655440000", // Default user UUID
     },
   });
 
@@ -51,6 +51,7 @@ export default function Header() {
         description: "Project created successfully!",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       setIsNewProjectOpen(false);
       form.reset();
     },
