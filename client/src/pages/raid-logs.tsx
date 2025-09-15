@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Toggle } from "@/components/ui/toggle";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -18,7 +18,7 @@ import { apiRequest } from "@/lib/queryClient";
 import type { Project, RaidLog } from "@shared/schema";
 
 const raidLogFormSchema = z.object({
-  type: z.enum(["risk", "action", "issue", "dependency"]),
+  type: z.enum(["risk", "action", "issue", "deficiency"]),
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
   severity: z.enum(["low", "medium", "high", "critical"]),
@@ -35,7 +35,7 @@ function getRaidTypeIcon(type: string) {
     case 'risk': return <AlertTriangle className="w-4 h-4 text-destructive" />;
     case 'action': return <CheckCircle className="w-4 h-4 text-accent" />;
     case 'issue': return <AlertCircle className="w-4 h-4 text-primary" />;
-    case 'dependency': return <LinkIcon className="w-4 h-4 text-secondary" />;
+    case 'deficiency': return <LinkIcon className="w-4 h-4 text-secondary" />;
     default: return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
   }
 }
@@ -45,7 +45,7 @@ function getRaidTypeColor(type: string) {
     case 'risk': return 'bg-destructive/10 text-destructive border-destructive/20';
     case 'action': return 'bg-accent/10 text-accent border-accent/20';
     case 'issue': return 'bg-primary/10 text-primary border-primary/20';
-    case 'dependency': return 'bg-secondary/10 text-secondary border-secondary/20';
+    case 'deficiency': return 'bg-secondary/10 text-secondary border-secondary/20';
     default: return 'bg-muted text-muted-foreground border-border';
   }
 }
@@ -156,7 +156,7 @@ export default function RaidLogs() {
     risk: raidLogs.filter(log => log.type === 'risk').length,
     action: raidLogs.filter(log => log.type === 'action').length,
     issue: raidLogs.filter(log => log.type === 'issue').length,
-    dependency: raidLogs.filter(log => log.type === 'dependency').length,
+    deficiency: raidLogs.filter(log => log.type === 'deficiency').length,
   };
 
   return (
@@ -164,7 +164,7 @@ export default function RaidLogs() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">RAID Logs</h1>
-          <p className="text-sm text-muted-foreground">Track risks, actions, issues, and dependencies</p>
+          <p className="text-sm text-muted-foreground">Track risks, actions, issues, and deficiencies</p>
         </div>
         <Dialog open={isNewLogOpen} onOpenChange={setIsNewLogOpen}>
           <DialogTrigger asChild>
@@ -196,7 +196,7 @@ export default function RaidLogs() {
                             <SelectItem value="risk">Risk</SelectItem>
                             <SelectItem value="action">Action</SelectItem>
                             <SelectItem value="issue">Issue</SelectItem>
-                            <SelectItem value="dependency">Dependency</SelectItem>
+                            <SelectItem value="deficiency">Deficiency</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -378,26 +378,82 @@ export default function RaidLogs() {
             </div>
           </CardHeader>
           <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="all" data-testid="tab-all-raids">
+            <div className="space-y-4">
+              {/* Toggle Buttons Filter */}
+              <div className="flex flex-wrap gap-2">
+                <Toggle
+                  pressed={activeTab === "all"}
+                  onPressedChange={() => setActiveTab("all")}
+                  variant="outline"
+                  className={`${
+                    activeTab === "all" 
+                      ? "bg-primary text-primary-foreground border-primary" 
+                      : "hover:bg-muted"
+                  }`}
+                  data-testid="toggle-all-raids"
+                >
                   All ({logCounts.all})
-                </TabsTrigger>
-                <TabsTrigger value="risk" data-testid="tab-risks">
+                </Toggle>
+                <Toggle
+                  pressed={activeTab === "risk"}
+                  onPressedChange={() => setActiveTab("risk")}
+                  variant="outline"
+                  className={`${
+                    activeTab === "risk" 
+                      ? "bg-destructive text-destructive-foreground border-destructive" 
+                      : "hover:bg-muted"
+                  }`}
+                  data-testid="toggle-risks"
+                >
+                  <AlertTriangle className="w-4 h-4 mr-1" />
                   Risks ({logCounts.risk})
-                </TabsTrigger>
-                <TabsTrigger value="action" data-testid="tab-actions">
+                </Toggle>
+                <Toggle
+                  pressed={activeTab === "action"}
+                  onPressedChange={() => setActiveTab("action")}
+                  variant="outline"
+                  className={`${
+                    activeTab === "action" 
+                      ? "bg-accent text-accent-foreground border-accent" 
+                      : "hover:bg-muted"
+                  }`}
+                  data-testid="toggle-actions"
+                >
+                  <CheckCircle className="w-4 h-4 mr-1" />
                   Actions ({logCounts.action})
-                </TabsTrigger>
-                <TabsTrigger value="issue" data-testid="tab-issues">
+                </Toggle>
+                <Toggle
+                  pressed={activeTab === "issue"}
+                  onPressedChange={() => setActiveTab("issue")}
+                  variant="outline"
+                  className={`${
+                    activeTab === "issue" 
+                      ? "bg-primary text-primary-foreground border-primary" 
+                      : "hover:bg-muted"
+                  }`}
+                  data-testid="toggle-issues"
+                >
+                  <AlertCircle className="w-4 h-4 mr-1" />
                   Issues ({logCounts.issue})
-                </TabsTrigger>
-                <TabsTrigger value="dependency" data-testid="tab-dependencies">
-                  Dependencies ({logCounts.dependency})
-                </TabsTrigger>
-              </TabsList>
+                </Toggle>
+                <Toggle
+                  pressed={activeTab === "deficiency"}
+                  onPressedChange={() => setActiveTab("deficiency")}
+                  variant="outline"
+                  className={`${
+                    activeTab === "deficiency" 
+                      ? "bg-secondary text-secondary-foreground border-secondary" 
+                      : "hover:bg-muted"
+                  }`}
+                  data-testid="toggle-deficiencies"
+                >
+                  <LinkIcon className="w-4 h-4 mr-1" />
+                  Deficiencies ({logCounts.deficiency})
+                </Toggle>
+              </div>
 
-              <TabsContent value={activeTab} className="space-y-4">
+              {/* Content Area */}
+              <div className="space-y-4">
                 {isLoading ? (
                   <div className="space-y-4">
                     {[...Array(3)].map((_, i) => (
@@ -488,8 +544,8 @@ export default function RaidLogs() {
                     ))}
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

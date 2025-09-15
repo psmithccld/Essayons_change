@@ -65,7 +65,7 @@ export const stakeholders = pgTable("stakeholders", {
 export const raidLogs = pgTable("raid_logs", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: uuid("project_id").references(() => projects.id).notNull(),
-  type: text("type").notNull(), // risk, action, issue, dependency
+  type: text("type").notNull(), // risk, action, issue, deficiency
   title: text("title").notNull(),
   description: text("description").notNull(),
   status: text("status").notNull().default("open"), // open, in_progress, closed

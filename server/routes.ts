@@ -412,7 +412,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/projects/:projectId/raid-logs", async (req, res) => {
     try {
       const raidLogs = await storage.getRaidLogsByProject(req.params.projectId);
-      res.json(raidLogs);
+      
+      // Add backward compatibility mapping for any legacy data
+      const normalizedRaidLogs = raidLogs.map(log => ({
+        ...log,
+        type: log.type === 'dependency' ? 'deficiency' : log.type
+      }));
+      
+      res.json(normalizedRaidLogs);
     } catch (error) {
       console.error("Error fetching RAID logs:", error);
       res.status(500).json({ error: "Failed to fetch RAID logs" });
@@ -421,13 +428,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/projects/:projectId/raid-logs", async (req, res) => {
     try {
+      // Add backward compatibility mapping
+      let processedBody = { ...req.body };
+      if (processedBody.type === 'dependency') {
+        processedBody.type = 'deficiency';
+      }
+      
+      // Additional enum validation beyond drizzle-zod
+      const allowedTypes = ['risk', 'action', 'issue', 'deficiency'];
+      if (!allowedTypes.includes(processedBody.type)) {
+        return res.status(400).json({ error: `Invalid type. Must be one of: ${allowedTypes.join(', ')}` });
+      }
+      
       const validatedData = insertRaidLogSchema.parse({
-        ...req.body,
+        ...processedBody,
         projectId: req.params.projectId,
         ownerId: "550e8400-e29b-41d4-a716-446655440000"
       });
       const raidLog = await storage.createRaidLog(validatedData);
-      res.status(201).json(raidLog);
+      
+      // Apply backward compatibility mapping to response
+      const normalizedRaidLog = {
+        ...raidLog,
+        type: raidLog.type === 'dependency' ? 'deficiency' : raidLog.type
+      };
+      
+      res.status(201).json(normalizedRaidLog);
     } catch (error) {
       console.error("Error creating RAID log:", error);
       res.status(400).json({ error: "Failed to create RAID log" });
@@ -436,11 +462,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/raid-logs/:id", async (req, res) => {
     try {
-      const raidLog = await storage.updateRaidLog(req.params.id, req.body);
+      // Add backward compatibility mapping
+      let processedBody = { ...req.body };
+      if (processedBody.type === 'dependency') {
+        processedBody.type = 'deficiency';
+      }
+      
+      // Additional enum validation if type is being updated
+      if (processedBody.type) {
+        const allowedTypes = ['risk', 'action', 'issue', 'deficiency'];
+        if (!allowedTypes.includes(processedBody.type)) {
+          return res.status(400).json({ error: `Invalid type. Must be one of: ${allowedTypes.join(', ')}` });
+        }
+      }
+      
+      const raidLog = await storage.updateRaidLog(req.params.id, processedBody);
       if (!raidLog) {
         return res.status(404).json({ error: "RAID log not found" });
       }
-      res.json(raidLog);
+      
+      // Apply backward compatibility mapping to response
+      const normalizedRaidLog = {
+        ...raidLog,
+        type: raidLog.type === 'dependency' ? 'deficiency' : raidLog.type
+      };
+      
+      res.json(normalizedRaidLog);
     } catch (error) {
       console.error("Error updating RAID log:", error);
       res.status(400).json({ error: "Failed to update RAID log" });
