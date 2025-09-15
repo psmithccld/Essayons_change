@@ -128,6 +128,29 @@ export const gptInteractions = pgTable("gpt_interactions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const milestones = pgTable("milestones", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: uuid("project_id").references(() => projects.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  targetDate: timestamp("target_date").notNull(),
+  status: text("status").notNull().default("pending"), // pending, achieved, missed
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const checklistTemplates = pgTable("checklist_templates", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // development, marketing, operations, general
+  templateItems: jsonb("template_items").notNull(), // Array of {text: string, required: boolean}
+  isActive: boolean("is_active").notNull().default(true),
+  createdById: uuid("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   ownedProjects: many(projects),
@@ -138,6 +161,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   surveys: many(surveys),
   surveyResponses: many(surveyResponses),
   gptInteractions: many(gptInteractions),
+  createdChecklistTemplates: many(checklistTemplates),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -151,6 +175,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   communications: many(communications),
   surveys: many(surveys),
   gptInteractions: many(gptInteractions),
+  milestones: many(milestones),
 }));
 
 export const tasksRelations = relations(tasks, ({ one }) => ({
@@ -231,6 +256,20 @@ export const gptInteractionsRelations = relations(gptInteractions, ({ one }) => 
   }),
 }));
 
+export const milestonesRelations = relations(milestones, ({ one }) => ({
+  project: one(projects, {
+    fields: [milestones.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const checklistTemplatesRelations = relations(checklistTemplates, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [checklistTemplates.createdById],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -283,6 +322,18 @@ export const insertGptInteractionSchema = createInsertSchema(gptInteractions).om
   createdAt: true,
 });
 
+export const insertMilestoneSchema = createInsertSchema(milestones).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertChecklistTemplateSchema = createInsertSchema(checklistTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -310,3 +361,9 @@ export type InsertSurveyResponse = z.infer<typeof insertSurveyResponseSchema>;
 
 export type GptInteraction = typeof gptInteractions.$inferSelect;
 export type InsertGptInteraction = z.infer<typeof insertGptInteractionSchema>;
+
+export type Milestone = typeof milestones.$inferSelect;
+export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
+
+export type ChecklistTemplate = typeof checklistTemplates.$inferSelect;
+export type InsertChecklistTemplate = z.infer<typeof insertChecklistTemplateSchema>;

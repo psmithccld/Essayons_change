@@ -17,7 +17,8 @@ import {
   Settings,
   User,
   Palette,
-  Bell
+  Bell,
+  ListChecks
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -53,6 +54,7 @@ const navigationSections = [
     title: "PMIS Tools", 
     items: [
       { icon: ListTodo, label: "Tasks & To Do", path: "/tasks" },
+      { icon: ListChecks, label: "Checklist Templates", path: "/checklist-templates" },
       { icon: ChartGantt, label: "Gantt Charts", path: "/gantt" },
       { icon: AlertTriangle, label: "RAID Logs", path: "/raid-logs" },
       { icon: ChartBar, label: "Progress Reports", path: "/" }

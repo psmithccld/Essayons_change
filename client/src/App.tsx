@@ -7,6 +7,7 @@ import { CurrentProjectProvider } from "@/contexts/CurrentProjectContext";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Tasks from "@/pages/tasks";
+import ChecklistTemplates from "@/pages/checklist-templates";
 import GanttChart from "@/pages/gantt";
 import RaidLogs from "@/pages/raid-logs";
 import Communications from "@/pages/communications";
@@ -26,6 +27,7 @@ function Router() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/tasks" component={Tasks} />
+            <Route path="/checklist-templates" component={ChecklistTemplates} />
             <Route path="/gantt" component={GanttChart} />
             <Route path="/raid-logs" component={RaidLogs} />
             <Route path="/communications" component={Communications} />

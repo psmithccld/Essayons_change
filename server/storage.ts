@@ -1,9 +1,10 @@
 import { 
-  users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions,
+  users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates,
   type User, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type Survey, type InsertSurvey,
-  type SurveyResponse, type InsertSurveyResponse, type GptInteraction, type InsertGptInteraction
+  type SurveyResponse, type InsertSurveyResponse, type GptInteraction, type InsertGptInteraction,
+  type Milestone, type InsertMilestone, type ChecklistTemplate, type InsertChecklistTemplate
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray } from "drizzle-orm";
@@ -64,6 +65,22 @@ export interface IStorage {
   // GPT Interactions
   getGptInteractionsByUser(userId: string): Promise<GptInteraction[]>;
   createGptInteraction(interaction: InsertGptInteraction): Promise<GptInteraction>;
+
+  // Milestones
+  getMilestonesByProject(projectId: string): Promise<Milestone[]>;
+  getMilestone(id: string): Promise<Milestone | undefined>;
+  createMilestone(milestone: InsertMilestone): Promise<Milestone>;
+  updateMilestone(id: string, milestone: Partial<InsertMilestone>): Promise<Milestone | undefined>;
+  deleteMilestone(id: string): Promise<boolean>;
+
+  // Checklist Templates
+  getChecklistTemplates(): Promise<ChecklistTemplate[]>;
+  getChecklistTemplatesByCategory(category: string): Promise<ChecklistTemplate[]>;
+  getActiveChecklistTemplates(): Promise<ChecklistTemplate[]>;
+  getChecklistTemplate(id: string): Promise<ChecklistTemplate | undefined>;
+  createChecklistTemplate(template: InsertChecklistTemplate): Promise<ChecklistTemplate>;
+  updateChecklistTemplate(id: string, template: Partial<InsertChecklistTemplate>): Promise<ChecklistTemplate | undefined>;
+  deleteChecklistTemplate(id: string): Promise<boolean>;
 
   // Dashboard Analytics
   getDashboardStats(userId: string): Promise<{
@@ -395,6 +412,74 @@ export class DatabaseStorage implements IStorage {
       stakeholderEngagement,
       changeReadiness
     };
+  }
+
+  // Milestones
+  async getMilestonesByProject(projectId: string): Promise<Milestone[]> {
+    return await db.select().from(milestones).where(eq(milestones.projectId, projectId)).orderBy(milestones.targetDate);
+  }
+
+  async getMilestone(id: string): Promise<Milestone | undefined> {
+    const [milestone] = await db.select().from(milestones).where(eq(milestones.id, id));
+    return milestone || undefined;
+  }
+
+  async createMilestone(milestone: InsertMilestone): Promise<Milestone> {
+    const [created] = await db.insert(milestones).values(milestone).returning();
+    return created;
+  }
+
+  async updateMilestone(id: string, milestone: Partial<InsertMilestone>): Promise<Milestone | undefined> {
+    const [updated] = await db.update(milestones)
+      .set({ ...milestone, updatedAt: new Date() })
+      .where(eq(milestones.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteMilestone(id: string): Promise<boolean> {
+    const result = await db.delete(milestones).where(eq(milestones.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Checklist Templates
+  async getChecklistTemplates(): Promise<ChecklistTemplate[]> {
+    return await db.select().from(checklistTemplates).orderBy(desc(checklistTemplates.createdAt));
+  }
+
+  async getChecklistTemplatesByCategory(category: string): Promise<ChecklistTemplate[]> {
+    return await db.select().from(checklistTemplates)
+      .where(eq(checklistTemplates.category, category))
+      .orderBy(desc(checklistTemplates.createdAt));
+  }
+
+  async getActiveChecklistTemplates(): Promise<ChecklistTemplate[]> {
+    return await db.select().from(checklistTemplates)
+      .where(eq(checklistTemplates.isActive, true))
+      .orderBy(desc(checklistTemplates.createdAt));
+  }
+
+  async getChecklistTemplate(id: string): Promise<ChecklistTemplate | undefined> {
+    const [template] = await db.select().from(checklistTemplates).where(eq(checklistTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createChecklistTemplate(template: InsertChecklistTemplate): Promise<ChecklistTemplate> {
+    const [created] = await db.insert(checklistTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateChecklistTemplate(id: string, template: Partial<InsertChecklistTemplate>): Promise<ChecklistTemplate | undefined> {
+    const [updated] = await db.update(checklistTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(checklistTemplates.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteChecklistTemplate(id: string): Promise<boolean> {
+    const result = await db.delete(checklistTemplates).where(eq(checklistTemplates.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 }
 

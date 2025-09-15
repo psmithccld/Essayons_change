@@ -2,11 +2,12 @@ import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Calendar } from "lucide-react";
-import type { Task } from "@shared/schema";
+import { Calendar, Diamond } from "lucide-react";
+import type { Task, Milestone } from "@shared/schema";
 
 interface GanttChartProps {
   tasks: Task[];
+  milestones?: Milestone[];
 }
 
 interface GanttTask {
@@ -17,6 +18,13 @@ interface GanttTask {
   progress: number;
   status: string;
   dependencies: string[];
+}
+
+interface GanttMilestone {
+  id: string;
+  name: string;
+  targetDate: Date;
+  status: string;
 }
 
 function getStatusColor(status: string) {
@@ -37,12 +45,25 @@ function getPriorityColor(priority: string) {
   }
 }
 
-export default function GanttChart({ tasks }: GanttChartProps) {
+function getMilestoneColor(status: string) {
+  switch (status) {
+    case 'achieved': return 'text-green-500 bg-green-100';
+    case 'missed': return 'text-red-500 bg-red-100';
+    default: return 'text-blue-500 bg-blue-100';
+  }
+}
+
+export default function GanttChart({ tasks, milestones = [] }: GanttChartProps) {
   const ganttData = useMemo(() => {
     // Filter tasks that have dates
     const validTasks = tasks.filter(task => task.startDate && task.dueDate);
     
-    if (validTasks.length === 0) return { ganttTasks: [], timelineStart: new Date(), timelineEnd: new Date(), totalDays: 0 };
+    // Filter milestones that have dates
+    const validMilestones = milestones.filter(milestone => milestone.targetDate);
+    
+    if (validTasks.length === 0 && validMilestones.length === 0) {
+      return { ganttTasks: [], ganttMilestones: [], timelineStart: new Date(), timelineEnd: new Date(), totalDays: 0 };
+    }
 
     // Convert to Gantt format
     const ganttTasks: GanttTask[] = validTasks.map(task => ({
@@ -55,8 +76,22 @@ export default function GanttChart({ tasks }: GanttChartProps) {
       dependencies: task.dependencies || [],
     }));
 
-    // Calculate timeline bounds
-    const allDates = ganttTasks.flatMap(task => [task.startDate, task.endDate]);
+    const ganttMilestones: GanttMilestone[] = validMilestones.map(milestone => ({
+      id: milestone.id,
+      name: milestone.name,
+      targetDate: new Date(milestone.targetDate!),
+      status: milestone.status,
+    }));
+
+    // Calculate timeline bounds from both tasks and milestones
+    const taskDates = ganttTasks.flatMap(task => [task.startDate, task.endDate]);
+    const milestoneDates = ganttMilestones.map(milestone => milestone.targetDate);
+    const allDates = [...taskDates, ...milestoneDates];
+    
+    if (allDates.length === 0) {
+      return { ganttTasks: [], ganttMilestones: [], timelineStart: new Date(), timelineEnd: new Date(), totalDays: 0 };
+    }
+    
     const timelineStart = new Date(Math.min(...allDates.map(d => d.getTime())));
     const timelineEnd = new Date(Math.max(...allDates.map(d => d.getTime())));
     
@@ -66,10 +101,10 @@ export default function GanttChart({ tasks }: GanttChartProps) {
     
     const totalDays = Math.ceil((timelineEnd.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24));
 
-    return { ganttTasks, timelineStart, timelineEnd, totalDays };
-  }, [tasks]);
+    return { ganttTasks, ganttMilestones, timelineStart, timelineEnd, totalDays };
+  }, [tasks, milestones]);
 
-  const { ganttTasks, timelineStart, timelineEnd, totalDays } = ganttData;
+  const { ganttTasks, ganttMilestones, timelineStart, timelineEnd, totalDays } = ganttData;
 
   const getTaskPosition = (task: GanttTask) => {
     const taskStart = Math.max(0, Math.floor((task.startDate.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)));
@@ -80,6 +115,15 @@ export default function GanttChart({ tasks }: GanttChartProps) {
     return {
       left: `${leftPercentage}%`,
       width: `${widthPercentage}%`,
+    };
+  };
+
+  const getMilestonePosition = (milestone: GanttMilestone) => {
+    const milestoneDay = Math.max(0, Math.floor((milestone.targetDate.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)));
+    const leftPercentage = (milestoneDay / totalDays) * 100;
+    
+    return {
+      left: `${leftPercentage}%`,
     };
   };
 
@@ -95,13 +139,13 @@ export default function GanttChart({ tasks }: GanttChartProps) {
     return headers;
   };
 
-  if (ganttTasks.length === 0) {
+  if (ganttTasks.length === 0 && ganttMilestones.length === 0) {
     return (
       <div className="text-center py-12" data-testid="gantt-empty">
         <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-foreground mb-2">No Timeline Data</h3>
         <p className="text-sm text-muted-foreground">
-          Tasks need start and due dates to appear in the Gantt chart.
+          Tasks need start and due dates, and milestones need target dates to appear in the Gantt chart.
         </p>
       </div>
     );
@@ -186,6 +230,38 @@ export default function GanttChart({ tasks }: GanttChartProps) {
             );
           })}
         </div>
+
+        {/* Milestones */}
+        {ganttMilestones.length > 0 && (
+          <div className="mt-6">
+            <h4 className="text-sm font-medium text-foreground mb-3">Milestones</h4>
+            <div className="relative h-8 bg-muted/20 rounded-lg">
+              {ganttMilestones.map((milestone) => {
+                const position = getMilestonePosition(milestone);
+                
+                return (
+                  <div
+                    key={milestone.id}
+                    className="absolute flex flex-col items-center"
+                    style={{ left: position.left, transform: 'translateX(-50%)' }}
+                    data-testid={`gantt-milestone-${milestone.id}`}
+                  >
+                    {/* Diamond milestone marker */}
+                    <div
+                      className={`w-3 h-3 transform rotate-45 border-2 border-current ${getMilestoneColor(milestone.status)} rounded-sm`}
+                      title={`${milestone.name} - ${milestone.targetDate.toLocaleDateString()}`}
+                    ></div>
+                    
+                    {/* Milestone label */}
+                    <div className="absolute top-4 whitespace-nowrap text-xs text-muted-foreground bg-background px-1 rounded border">
+                      {milestone.name}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Legend */}
@@ -232,6 +308,26 @@ export default function GanttChart({ tasks }: GanttChartProps) {
               </div>
             </div>
           </div>
+
+          {ganttMilestones.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <h5 className="text-sm font-medium text-foreground mb-2">Milestones</h5>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center space-x-2">
+                  <Diamond className="w-4 h-4 text-green-500" />
+                  <span className="text-sm">Achieved</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Diamond className="w-4 h-4 text-red-500" />
+                  <span className="text-sm">Missed</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Diamond className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm">Pending</span>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

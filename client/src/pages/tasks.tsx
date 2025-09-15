@@ -14,11 +14,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Calendar, User as UserIcon, AlertCircle, CheckCircle, Clock, Pause, X, ListChecks } from "lucide-react";
+import { Plus, Calendar, User as UserIcon, AlertCircle, CheckCircle, Clock, Pause, X, ListChecks, FileText, Building, Code, Megaphone, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
-import type { Project, Task, User } from "@shared/schema";
+import type { Project, Task, User, ChecklistTemplate } from "@shared/schema";
 
 const taskFormSchema = z.object({
   name: z.string().min(1, "Task name is required"),
@@ -66,9 +66,32 @@ function getStatusColor(status: string) {
   }
 }
 
+const categories = [
+  { value: "development", label: "Development", icon: Code },
+  { value: "marketing", label: "Marketing", icon: Megaphone },
+  { value: "operations", label: "Operations", icon: Settings },
+  { value: "general", label: "General", icon: Building },
+];
+
+function getCategoryIcon(category: string) {
+  const categoryData = categories.find(c => c.value === category);
+  const IconComponent = categoryData?.icon || Building;
+  return <IconComponent className="w-4 h-4" />;
+}
+
+function getCategoryColor(category: string) {
+  switch (category) {
+    case 'development': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+    case 'marketing': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+    case 'operations': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
+    default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+  }
+}
+
 export default function Tasks() {
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [newChecklistItem, setNewChecklistItem] = useState("");
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { currentProject, projects } = useCurrentProject();
@@ -80,6 +103,10 @@ export default function Tasks() {
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ['/api/projects', currentProject?.id, 'tasks'],
     enabled: !!currentProject?.id,
+  });
+
+  const { data: templates = [] } = useQuery<ChecklistTemplate[]>({
+    queryKey: ['/api/checklist-templates/active'],
   });
 
   const form = useForm<TaskFormData>({
@@ -168,6 +195,7 @@ export default function Tasks() {
       startDate: data.startDate || undefined,
       dueDate: data.dueDate || undefined,
       checklist: data.checklist,
+      assignmentType: data.assignmentType,
     };
     
     createTaskMutation.mutate(taskData);
@@ -186,6 +214,24 @@ export default function Tasks() {
   const removeChecklistItem = (itemId: string) => {
     const currentChecklist = form.getValues("checklist") || [];
     form.setValue("checklist", currentChecklist.filter(item => item.id !== itemId));
+  };
+
+  const applyTemplate = (template: ChecklistTemplate) => {
+    const templateItems = template.templateItems as { text: string; required: boolean }[];
+    const newChecklistItems = templateItems.map(item => ({
+      id: crypto.randomUUID(),
+      text: item.text,
+      completed: false
+    }));
+    
+    const currentChecklist = form.getValues("checklist") || [];
+    form.setValue("checklist", [...currentChecklist, ...newChecklistItems]);
+    setIsTemplateDialogOpen(false);
+    
+    toast({
+      title: "Template Applied",
+      description: `Added ${newChecklistItems.length} items from "${template.name}" template`,
+    });
   };
 
   const toggleChecklistItem = (taskId: string, itemId: string, completed: boolean) => {
@@ -404,7 +450,75 @@ export default function Tasks() {
 
                 {/* Checklist Section */}
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium">Task Checklist</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Task Checklist</Label>
+                    <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          data-testid="button-use-template"
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          Use Template
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle data-testid="text-template-dialog-title">Select Checklist Template</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          {templates.length === 0 ? (
+                            <div className="text-center py-8">
+                              <ListChecks className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                                No templates available
+                              </h3>
+                              <p className="text-gray-600 dark:text-gray-300">
+                                Create checklist templates to use them here
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto">
+                              {templates.map((template) => (
+                                <Card 
+                                  key={template.id} 
+                                  className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                                  onClick={() => applyTemplate(template)}
+                                  data-testid={`template-option-${template.id}`}
+                                >
+                                  <CardContent className="p-4">
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          {getCategoryIcon(template.category)}
+                                          <h3 className="font-medium" data-testid={`template-name-${template.id}`}>
+                                            {template.name}
+                                          </h3>
+                                          <Badge className={getCategoryColor(template.category)}>
+                                            {categories.find(c => c.value === template.category)?.label}
+                                          </Badge>
+                                        </div>
+                                        {template.description && (
+                                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                            {template.description}
+                                          </p>
+                                        )}
+                                        <div className="text-xs text-gray-500">
+                                          {(template.templateItems as any[])?.length || 0} items
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                   <div className="flex gap-2">
                     <Input
                       value={newChecklistItem}
@@ -594,7 +708,7 @@ export default function Tasks() {
                                       : 'text-foreground'
                                   }`}
                                 >
-                                  {item.text}
+                                  {String(item.text)}
                                 </span>
                               </div>
                             ))}

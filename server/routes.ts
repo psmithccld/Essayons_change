@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertProjectSchema, insertTaskSchema, insertStakeholderSchema, insertRaidLogSchema,
-  insertCommunicationSchema, insertSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema
+  insertCommunicationSchema, insertSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
+  insertMilestoneSchema, insertChecklistTemplateSchema
 } from "@shared/schema";
 import * as openaiService from "./openai";
 import { sendTaskAssignmentNotification } from "./services/emailService";
@@ -137,7 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // If internal user assignment, get their email
             if (task.assigneeId && !emailAddress) {
               const assignee = await storage.getUser(task.assigneeId);
-              emailAddress = assignee ? `${assignee.username}@company.com` : undefined;
+              emailAddress = assignee ? `${assignee.username}@company.com` : null;
             }
             
             if (emailAddress) {
@@ -145,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 emailAddress,
                 task.name,
                 project.name,
-                task.dueDate ? new Date(task.dueDate).toDateString() : undefined
+                task.dueDate ? new Date(task.dueDate).toDateString() : null
               );
             }
           }
@@ -206,6 +207,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting task:", error);
       res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // Milestones
+  app.get("/api/projects/:projectId/milestones", async (req, res) => {
+    try {
+      const milestones = await storage.getMilestonesByProject(req.params.projectId);
+      res.json(milestones);
+    } catch (error) {
+      console.error("Error fetching milestones:", error);
+      res.status(500).json({ error: "Failed to fetch milestones" });
+    }
+  });
+
+  app.post("/api/projects/:projectId/milestones", async (req, res) => {
+    try {
+      // Convert date strings to Date objects before validation
+      const processedData = {
+        ...req.body,
+        projectId: req.params.projectId,
+        targetDate: req.body.targetDate ? new Date(req.body.targetDate) : undefined,
+      };
+      
+      const validatedData = insertMilestoneSchema.parse(processedData);
+      const milestone = await storage.createMilestone(validatedData);
+      res.status(201).json(milestone);
+    } catch (error) {
+      console.error("Error creating milestone:", error);
+      res.status(400).json({ error: "Failed to create milestone" });
+    }
+  });
+
+  app.put("/api/milestones/:id", async (req, res) => {
+    try {
+      // Convert date strings to Date objects before updating
+      const processedData = {
+        ...req.body,
+        targetDate: req.body.targetDate ? new Date(req.body.targetDate) : undefined,
+      };
+      
+      const milestone = await storage.updateMilestone(req.params.id, processedData);
+      if (!milestone) {
+        return res.status(404).json({ error: "Milestone not found" });
+      }
+      res.json(milestone);
+    } catch (error) {
+      console.error("Error updating milestone:", error);
+      res.status(400).json({ error: "Failed to update milestone" });
+    }
+  });
+
+  app.delete("/api/milestones/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteMilestone(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Milestone not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting milestone:", error);
+      res.status(500).json({ error: "Failed to delete milestone" });
+    }
+  });
+
+  // Checklist Templates
+  app.get("/api/checklist-templates", async (req, res) => {
+    try {
+      const templates = await storage.getChecklistTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching checklist templates:", error);
+      res.status(500).json({ error: "Failed to fetch checklist templates" });
+    }
+  });
+
+  app.get("/api/checklist-templates/active", async (req, res) => {
+    try {
+      const templates = await storage.getActiveChecklistTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching active checklist templates:", error);
+      res.status(500).json({ error: "Failed to fetch active checklist templates" });
+    }
+  });
+
+  app.get("/api/checklist-templates/category/:category", async (req, res) => {
+    try {
+      const templates = await storage.getChecklistTemplatesByCategory(req.params.category);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching checklist templates by category:", error);
+      res.status(500).json({ error: "Failed to fetch checklist templates by category" });
+    }
+  });
+
+  app.get("/api/checklist-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getChecklistTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Checklist template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching checklist template:", error);
+      res.status(500).json({ error: "Failed to fetch checklist template" });
+    }
+  });
+
+  app.post("/api/checklist-templates", async (req, res) => {
+    try {
+      const processedData = {
+        ...req.body,
+        createdById: "550e8400-e29b-41d4-a716-446655440000", // For demo, using default user ID
+      };
+      
+      const validatedData = insertChecklistTemplateSchema.parse(processedData);
+      const template = await storage.createChecklistTemplate(validatedData);
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating checklist template:", error);
+      res.status(400).json({ error: "Failed to create checklist template" });
+    }
+  });
+
+  app.put("/api/checklist-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.updateChecklistTemplate(req.params.id, req.body);
+      if (!template) {
+        return res.status(404).json({ error: "Checklist template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating checklist template:", error);
+      res.status(400).json({ error: "Failed to update checklist template" });
+    }
+  });
+
+  app.delete("/api/checklist-templates/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteChecklistTemplate(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Checklist template not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting checklist template:", error);
+      res.status(500).json({ error: "Failed to delete checklist template" });
     }
   });
 
