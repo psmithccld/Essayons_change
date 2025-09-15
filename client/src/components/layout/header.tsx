@@ -17,7 +17,9 @@ import { z } from "zod";
 const projectFormSchema = insertProjectSchema.extend({
   name: z.string().min(1, "Project name is required"),
   description: z.string().optional(),
-  status: z.enum(["planning", "active", "completed", "cancelled"]).default("planning"),
+  status: z.enum(["identify_need", "identify_stakeholders", "develop_change", "implement_change", "reinforce_change"]).default("identify_need"),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
 });
 
 type ProjectFormData = z.infer<typeof projectFormSchema>;
@@ -32,7 +34,7 @@ export default function Header() {
     defaultValues: {
       name: "",
       description: "",
-      status: "planning",
+      status: "identify_need",
       progress: 0,
       ownerId: "default-user", // This should be replaced with actual user ID from auth
     },
@@ -146,10 +148,11 @@ export default function Header() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="planning">Planning</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="identify_need">Identify Need to Change</SelectItem>
+                        <SelectItem value="identify_stakeholders">Identify Stakeholders</SelectItem>
+                        <SelectItem value="develop_change">Develop the Change</SelectItem>
+                        <SelectItem value="implement_change">Implement the Change</SelectItem>
+                        <SelectItem value="reinforce_change">Reinforce the Change</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -166,9 +169,8 @@ export default function Header() {
                       <Input 
                         type="date"
                         data-testid="input-project-start-date"
-                        {...field} 
-                        value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''}
-                        onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value).toISOString() : undefined)}
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(e.target.value || undefined)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -185,9 +187,8 @@ export default function Header() {
                       <Input 
                         type="date"
                         data-testid="input-project-end-date"
-                        {...field} 
-                        value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''}
-                        onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value).toISOString() : undefined)}
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(e.target.value || undefined)}
                       />
                     </FormControl>
                     <FormMessage />
