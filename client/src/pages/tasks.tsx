@@ -7,15 +7,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Calendar, User, AlertCircle, CheckCircle, Clock, Pause } from "lucide-react";
+import { Plus, Calendar, User, AlertCircle, CheckCircle, Clock, Pause, X, ListChecks } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import type { Project, Task } from "@shared/schema";
 
 const taskFormSchema = z.object({
@@ -23,8 +25,14 @@ const taskFormSchema = z.object({
   description: z.string().optional(),
   status: z.enum(["pending", "in_progress", "completed", "blocked"]),
   priority: z.enum(["low", "medium", "high", "critical"]),
+  assigneeId: z.string().optional(),
   startDate: z.string().optional(),
   dueDate: z.string().optional(),
+  checklist: z.array(z.object({
+    id: z.string(),
+    text: z.string(),
+    completed: z.boolean()
+  })).optional().default([]),
 });
 
 type TaskFormData = z.infer<typeof taskFormSchema>;
@@ -57,18 +65,19 @@ function getStatusColor(status: string) {
 }
 
 export default function Tasks() {
-  const [selectedProject, setSelectedProject] = useState<string>("");
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
+  const [newChecklistItem, setNewChecklistItem] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { currentProject, projects } = useCurrentProject();
 
-  const { data: projects = [] } = useQuery<Project[]>({
-    queryKey: ['/api/projects'],
+  const { data: users = [] } = useQuery({
+    queryKey: ['/api/users'],
   });
 
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
-    queryKey: ['/api/projects', selectedProject, 'tasks'],
-    enabled: !!selectedProject,
+    queryKey: ['/api/projects', currentProject?.id, 'tasks'],
+    enabled: !!currentProject?.id,
   });
 
   const form = useForm<TaskFormData>({
@@ -81,11 +90,12 @@ export default function Tasks() {
 
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: TaskFormData) => {
-      const response = await apiRequest("POST", `/api/projects/${selectedProject}/tasks`, taskData);
+      if (!currentProject?.id) throw new Error("No project selected");
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, taskData);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', selectedProject, 'tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
       setIsNewTaskOpen(false);
       form.reset();
       toast({
@@ -108,7 +118,7 @@ export default function Tasks() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', selectedProject, 'tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
       toast({
         title: "Success", 
         description: "Task updated successfully",
@@ -124,7 +134,44 @@ export default function Tasks() {
   });
 
   const onSubmit = (data: TaskFormData) => {
+    if (!currentProject) {
+      toast({
+        title: "Error",
+        description: "Please select a project first",
+        variant: "destructive",
+      });
+      return;
+    }
     createTaskMutation.mutate(data);
+  };
+
+  const addChecklistItem = () => {
+    if (!newChecklistItem.trim()) return;
+    const currentChecklist = form.getValues("checklist") || [];
+    form.setValue("checklist", [
+      ...currentChecklist,
+      { id: crypto.randomUUID(), text: newChecklistItem.trim(), completed: false }
+    ]);
+    setNewChecklistItem("");
+  };
+
+  const removeChecklistItem = (itemId: string) => {
+    const currentChecklist = form.getValues("checklist") || [];
+    form.setValue("checklist", currentChecklist.filter(item => item.id !== itemId));
+  };
+
+  const toggleChecklistItem = (taskId: string, itemId: string, completed: boolean) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    
+    const updatedChecklist = (task.checklist as any[] || []).map((item: any) => 
+      item.id === itemId ? { ...item, completed } : item
+    );
+    
+    updateTaskMutation.mutate({
+      taskId,
+      data: { checklist: updatedChecklist }
+    });
   };
 
   const handleStatusChange = (taskId: string, status: string) => {
@@ -140,7 +187,7 @@ export default function Tasks() {
         </div>
         <Dialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen}>
           <DialogTrigger asChild>
-            <Button disabled={!selectedProject} data-testid="button-new-task">
+            <Button disabled={!currentProject} data-testid="button-new-task">
               <Plus className="w-4 h-4 mr-2" />
               New Task
             </Button>
@@ -229,6 +276,32 @@ export default function Tasks() {
                   />
                 </div>
 
+                <FormField
+                  control={form.control}
+                  name="assigneeId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assign To</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-assignee">
+                            <SelectValue placeholder="Select team member (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Unassigned</SelectItem>
+                          {users.map((user: any) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.name} ({user.username})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -259,6 +332,47 @@ export default function Tasks() {
                   />
                 </div>
 
+                {/* Checklist Section */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Task Checklist</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={newChecklistItem}
+                      onChange={(e) => setNewChecklistItem(e.target.value)}
+                      placeholder="Add checklist item..."
+                      data-testid="input-checklist-item"
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addChecklistItem())}
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={addChecklistItem}
+                      disabled={!newChecklistItem.trim()}
+                      data-testid="button-add-checklist-item"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  
+                  {/* Checklist Items */}
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {(form.watch("checklist") || []).map((item: any) => (
+                      <div key={item.id} className="flex items-center gap-2 p-2 bg-muted rounded">
+                        <ListChecks className="w-4 h-4 text-muted-foreground" />
+                        <span className="flex-1 text-sm">{item.text}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeChecklistItem(item.id)}
+                          data-testid={`button-remove-checklist-${item.id}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="flex justify-end space-x-2">
                   <Button 
                     type="button" 
@@ -282,29 +396,29 @@ export default function Tasks() {
         </Dialog>
       </div>
 
-      {/* Project Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Project</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-full max-w-md" data-testid="select-project">
-              <SelectValue placeholder="Choose a project to view tasks" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
+      {/* Current Project Info */}
+      {currentProject ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <span>Tasks for: {currentProject.name}</span>
+              <Badge variant="outline">{tasks.length} tasks</Badge>
+            </CardTitle>
+          </CardHeader>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>No Project Selected</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">Please select an initiative from the dropdown in the header to view tasks.</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tasks List */}
-      {selectedProject && (
+      {currentProject && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -381,6 +495,40 @@ export default function Tasks() {
                             <span className="font-medium">{task.progress}%</span>
                           </div>
                           <Progress value={task.progress} className="h-2" />
+                        </div>
+                      )}
+                      
+                      {/* Task Checklist */}
+                      {task.checklist && Array.isArray(task.checklist) && task.checklist.length > 0 && (
+                        <div className="mb-3 space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <ListChecks className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium text-muted-foreground">
+                              Checklist ({(task.checklist as any[]).filter(item => item.completed).length}/{(task.checklist as any[]).length})
+                            </span>
+                          </div>
+                          <div className="space-y-1 ml-6">
+                            {(task.checklist as any[]).map((item: any) => (
+                              <div key={item.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  checked={item.completed}
+                                  onCheckedChange={(checked) => 
+                                    toggleChecklistItem(task.id, item.id, checked as boolean)
+                                  }
+                                  data-testid={`checkbox-${task.id}-${item.id}`}
+                                />
+                                <span 
+                                  className={`text-sm ${
+                                    item.completed 
+                                      ? 'line-through text-muted-foreground' 
+                                      : 'text-foreground'
+                                  }`}
+                                >
+                                  {item.text}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                       

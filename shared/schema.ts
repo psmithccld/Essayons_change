@@ -39,6 +39,7 @@ export const tasks = pgTable("tasks", {
   completedDate: timestamp("completed_date"),
   progress: integer("progress").default(0),
   dependencies: text("dependencies").array().default([]),
+  checklist: jsonb("checklist").default([]), // Array of {id: string, text: string, completed: boolean}
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
