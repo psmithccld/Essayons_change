@@ -171,7 +171,7 @@
 
 /* Enhanced card hover effects */
 .card-hover {
-  @apply transition-all duration-200 hover:shadow-md hover:shadow-primary/5;
+  @apply transition-all duration-200 hover:shadow-md;
 }
 
 /* Status indicator styles */
