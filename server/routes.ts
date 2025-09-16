@@ -4,10 +4,60 @@ import { storage } from "./storage";
 import { 
   insertProjectSchema, insertTaskSchema, insertStakeholderSchema, insertRaidLogSchema,
   insertCommunicationSchema, insertSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
-  insertMilestoneSchema, insertChecklistTemplateSchema
+  insertMilestoneSchema, insertChecklistTemplateSchema,
+  insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema
 } from "@shared/schema";
 import * as openaiService from "./openai";
 import { sendTaskAssignmentNotification } from "./services/emailService";
+
+// Helper function to build complete RAID log from template-specific data
+function buildRaidInsertFromTemplate(type: string, baseData: any): any {
+  // Add backward compatibility mapping
+  if (type === 'dependency') {
+    type = 'deficiency';
+  }
+  
+  // Coerce date fields to Date objects
+  const processedData = {
+    ...baseData,
+    type,
+    dueDate: baseData.dueDate ? new Date(baseData.dueDate) : undefined,
+    targetResolutionDate: baseData.targetResolutionDate ? new Date(baseData.targetResolutionDate) : undefined,
+  };
+  
+  let templateValidated;
+  let description: string;
+  
+  switch (type) {
+    case 'risk':
+      templateValidated = insertRiskSchema.parse(processedData);
+      description = templateValidated.notes || templateValidated.title || 'Risk description';
+      break;
+    case 'action':
+      templateValidated = insertActionSchema.parse(processedData);
+      description = templateValidated.event || templateValidated.title || 'Action description';
+      break;
+    case 'issue':
+      templateValidated = insertIssueSchema.parse(processedData);
+      description = templateValidated.rootCause || templateValidated.title || 'Issue description';
+      break;
+    case 'deficiency':
+      templateValidated = insertDeficiencySchema.parse(processedData);
+      description = templateValidated.category || templateValidated.notes || templateValidated.title || 'Deficiency description';
+      break;
+    default:
+      // Fallback to generic schema for backward compatibility
+      return insertRaidLogSchema.parse(processedData);
+  }
+  
+  // Merge template-specific fields with required generic fields
+  return {
+    ...templateValidated,
+    description,
+    severity: 'medium', // Default for all template types
+    impact: 'medium',   // Default for all template types
+  };
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Users
@@ -440,11 +490,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: `Invalid type. Must be one of: ${allowedTypes.join(', ')}` });
       }
       
-      const validatedData = insertRaidLogSchema.parse({
+      // Use transformation helper to build complete RAID log from template data
+      const baseData = {
         ...processedBody,
         projectId: req.params.projectId,
         ownerId: "550e8400-e29b-41d4-a716-446655440000"
-      });
+      };
+      
+      const validatedData = buildRaidInsertFromTemplate(processedBody.type, baseData);
+      
       const raidLog = await storage.createRaidLog(validatedData);
       
       // Apply backward compatibility mapping to response
@@ -456,7 +510,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(normalizedRaidLog);
     } catch (error) {
       console.error("Error creating RAID log:", error);
-      res.status(400).json({ error: "Failed to create RAID log" });
+      if (error instanceof Error && error.name === 'ZodError') {
+        res.status(400).json({ error: "Validation failed", details: (error as any).errors });
+      } else {
+        res.status(400).json({ error: "Failed to create RAID log" });
+      }
     }
   });
 
@@ -476,7 +534,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const raidLog = await storage.updateRaidLog(req.params.id, processedBody);
+      // For updates, validate with appropriate partial schema if type is being updated
+      let validatedData = processedBody;
+      if (processedBody.type) {
+        // Use transformation helper for type changes to ensure complete data
+        validatedData = buildRaidInsertFromTemplate(processedBody.type, processedBody);
+      } else {
+        // For partial updates without type change, use generic partial validation
+        validatedData = insertRaidLogSchema.partial().parse(processedBody);
+      }
+      
+      const raidLog = await storage.updateRaidLog(req.params.id, validatedData);
       if (!raidLog) {
         return res.status(404).json({ error: "RAID log not found" });
       }
