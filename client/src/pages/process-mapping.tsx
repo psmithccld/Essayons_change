@@ -98,36 +98,57 @@ export default function ProcessMapping() {
   useEffect(() => {
     if (!canvasRef.current || canvas) return;
 
-    const fabricCanvas = new FabricCanvas(canvasRef.current, {
-      width: window.innerWidth - 320,
-      height: window.innerHeight - 200,
-      backgroundColor: '#ffffff',
-    });
+    try {
+      const fabricCanvas = new FabricCanvas(canvasRef.current, {
+        width: window.innerWidth - 320,
+        height: window.innerHeight - 200,
+        backgroundColor: '#ffffff',
+      });
 
-    fabricCanvas.on('selection:created', (e) => {
-      setTools(prev => ({ ...prev, selectedElement: e.selected?.[0] || null }));
-    });
+      fabricCanvas.on('selection:created', (e) => {
+        setTools(prev => ({ ...prev, selectedElement: e.selected?.[0] || null }));
+      });
 
-    fabricCanvas.on('selection:updated', (e) => {
-      setTools(prev => ({ ...prev, selectedElement: e.selected?.[0] || null }));
-    });
+      fabricCanvas.on('selection:updated', (e) => {
+        setTools(prev => ({ ...prev, selectedElement: e.selected?.[0] || null }));
+      });
 
-    fabricCanvas.on('selection:cleared', () => {
-      setTools(prev => ({ ...prev, selectedElement: null }));
-    });
+      fabricCanvas.on('selection:cleared', () => {
+        setTools(prev => ({ ...prev, selectedElement: null }));
+      });
 
-    // Handle canvas clicks for adding symbols
-    fabricCanvas.on('mouse:down', (e) => {
+
+      setCanvas(fabricCanvas);
+
+      return () => {
+        try {
+          fabricCanvas.dispose();
+        } catch (error) {
+          console.error('Error disposing canvas:', error);
+        }
+      };
+    } catch (error) {
+      console.error('Error initializing Fabric.js canvas:', error);
+    }
+  }, [canvas]);
+
+  // Separate useEffect to handle canvas clicks for adding symbols
+  useEffect(() => {
+    if (!canvas) return;
+
+    const handleCanvasClick = (e: any) => {
+      // Use ref to get current selectedSymbolType to avoid stale closure
       if (selectedSymbolType && e.pointer) {
+        console.log('Adding process element:', selectedSymbolType, 'at', e.pointer.x, e.pointer.y);
         addProcessElement(selectedSymbolType, e.pointer.x, e.pointer.y);
         setSelectedSymbolType(null);
       }
-    });
+    };
 
-    setCanvas(fabricCanvas);
+    canvas.on('mouse:down', handleCanvasClick);
 
     return () => {
-      fabricCanvas.dispose();
+      canvas.off('mouse:down', handleCanvasClick);
     };
   }, [canvas, selectedSymbolType]);
 
@@ -571,16 +592,33 @@ export default function ProcessMapping() {
     try {
       setCurrentProcessMap(processMap);
       
+      // Clear canvas first to prevent conflicts
+      canvas.clear();
+      setElements([]);
+      setConnections([]);
+      
       if (processMap.canvasData) {
-        canvas.loadFromJSON(processMap.canvasData, () => {
+        try {
+          canvas.loadFromJSON(processMap.canvasData, () => {
+            try {
+              canvas.renderAll();
+              if (processMap.elements) {
+                setElements(processMap.elements as ProcessElement[]);
+              }
+              if (processMap.connections) {
+                setConnections(processMap.connections as Connection[]);
+              }
+            } catch (renderError) {
+              console.error("Error rendering canvas after load:", renderError);
+            }
+          });
+        } catch (loadError) {
+          console.error("Error loading canvas from JSON:", loadError);
+          // If loading fails, try to ensure canvas is in a good state
+          canvas.clear();
+          canvas.backgroundColor = '#ffffff';
           canvas.renderAll();
-          if (processMap.elements) {
-            setElements(processMap.elements as ProcessElement[]);
-          }
-          if (processMap.connections) {
-            setConnections(processMap.connections as Connection[]);
-          }
-        });
+        }
       }
       
       toast({
