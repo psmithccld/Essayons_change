@@ -76,6 +76,24 @@ export const raidLogs = pgTable("raid_logs", {
   assigneeId: uuid("assignee_id").references(() => users.id),
   dueDate: timestamp("due_date"),
   resolution: text("resolution"),
+  // Template-specific fields from Excel
+  // Risk Register fields
+  likelihood: integer("likelihood"), // 1-5 scale
+  riskLevel: integer("risk_level"), // 1-5 scale  
+  potentialOutcome: text("potential_outcome"),
+  whoWillManage: text("who_will_manage"),
+  notes: text("notes"),
+  // Action Register fields
+  event: text("event"), // Event description
+  dueOut: text("due_out"), // What is due out
+  wasDeadlineMet: boolean("was_deadline_met"),
+  // Issue Register fields (custom template)
+  priority: text("priority"), // low, medium, high, critical
+  rootCause: text("root_cause"),
+  // Deficiency Register fields (custom template) 
+  category: text("category"),
+  targetResolutionDate: timestamp("target_resolution_date"),
+  resolutionStatus: text("resolution_status"), // pending, in_progress, resolved
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -300,6 +318,52 @@ export const insertRaidLogSchema = createInsertSchema(raidLogs).omit({
   updatedAt: true,
 });
 
+// Template-specific schemas for each RAID log type
+export const insertRiskSchema = insertRaidLogSchema.extend({
+  type: z.literal("risk"),
+  likelihood: z.number().min(1).max(5),
+  riskLevel: z.number().min(1).max(5),
+  potentialOutcome: z.string(),
+  whoWillManage: z.string(),
+  notes: z.string().optional(),
+}).omit({
+  description: true, // Use notes instead
+  severity: true, // Use riskLevel instead
+  impact: true, // Use riskLevel instead
+  probability: true, // Use likelihood instead
+});
+
+export const insertActionSchema = insertRaidLogSchema.extend({
+  type: z.literal("action"),
+  event: z.string(),
+  dueOut: z.string(),
+  dueDate: z.string().optional(), // deadline in template
+  wasDeadlineMet: z.boolean().optional(),
+  notes: z.string().optional(),
+}).omit({
+  description: true, // Use event instead
+  severity: true, // Not used for actions
+  impact: true, // Not used for actions
+  probability: true, // Not used for actions
+});
+
+export const insertIssueSchema = insertRaidLogSchema.extend({
+  type: z.literal("issue"),
+  priority: z.enum(["low", "medium", "high", "critical"]),
+  rootCause: z.string().optional(),
+}).omit({
+  probability: true, // Not used for issues
+});
+
+export const insertDeficiencySchema = insertRaidLogSchema.extend({
+  type: z.literal("deficiency"),
+  category: z.string(),
+  targetResolutionDate: z.string().optional(),
+  resolutionStatus: z.enum(["pending", "in_progress", "resolved"]).optional(),
+}).omit({
+  probability: true, // Not used for deficiencies
+});
+
 export const insertCommunicationSchema = createInsertSchema(communications).omit({
   id: true,
   createdAt: true,
@@ -349,6 +413,10 @@ export type InsertStakeholder = z.infer<typeof insertStakeholderSchema>;
 
 export type RaidLog = typeof raidLogs.$inferSelect;
 export type InsertRaidLog = z.infer<typeof insertRaidLogSchema>;
+export type InsertRisk = z.infer<typeof insertRiskSchema>;
+export type InsertAction = z.infer<typeof insertActionSchema>;
+export type InsertIssue = z.infer<typeof insertIssueSchema>;
+export type InsertDeficiency = z.infer<typeof insertDeficiencySchema>;
 
 export type Communication = typeof communications.$inferSelect;
 export type InsertCommunication = z.infer<typeof insertCommunicationSchema>;
