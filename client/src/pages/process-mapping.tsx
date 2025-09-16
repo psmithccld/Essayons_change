@@ -594,19 +594,47 @@ export default function ProcessMapping() {
 
   // Load process map
   const loadProcessMap = async (processMap: ProcessMap) => {
-    if (!canvas) return;
+    if (!canvas) {
+      console.error("Canvas not available for loading process map");
+      toast({
+        title: "Error",
+        description: "Canvas not ready. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     try {
       setCurrentProcessMap(processMap);
       
-      // Clear canvas first to prevent conflicts
-      canvas.clear();
+      // Clear canvas state first
       setElements([]);
       setConnections([]);
       
+      // Ensure canvas is properly initialized before operations
+      try {
+        canvas.clear();
+        canvas.backgroundColor = '#ffffff';
+        canvas.renderAll();
+      } catch (clearError) {
+        console.error("Error clearing canvas:", clearError);
+        // If basic operations fail, canvas is not properly initialized
+        toast({
+          title: "Error",
+          description: "Canvas initialization failed. Please refresh the page.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       if (processMap.canvasData) {
         try {
-          canvas.loadFromJSON(processMap.canvasData, () => {
+          // Parse canvas data first to validate it
+          const canvasData = typeof processMap.canvasData === 'string' 
+            ? JSON.parse(processMap.canvasData) 
+            : processMap.canvasData;
+          
+          canvas.loadFromJSON(canvasData, () => {
             try {
               canvas.renderAll();
               if (processMap.elements) {
@@ -615,23 +643,45 @@ export default function ProcessMapping() {
               if (processMap.connections) {
                 setConnections(processMap.connections as Connection[]);
               }
+              
+              toast({
+                title: "Success",
+                description: `Process map "${processMap.name}" loaded successfully!`,
+              });
             } catch (renderError) {
               console.error("Error rendering canvas after load:", renderError);
+              toast({
+                title: "Warning",
+                description: "Process map loaded but some elements may not display correctly.",
+                variant: "destructive",
+              });
             }
           });
         } catch (loadError) {
           console.error("Error loading canvas from JSON:", loadError);
-          // If loading fails, try to ensure canvas is in a good state
-          canvas.clear();
-          canvas.backgroundColor = '#ffffff';
-          canvas.renderAll();
+          // If loading fails, ensure canvas is in a good state
+          try {
+            canvas.clear();
+            canvas.backgroundColor = '#ffffff';
+            canvas.renderAll();
+          } catch (recoveryError) {
+            console.error("Error during canvas recovery:", recoveryError);
+          }
+          
+          toast({
+            title: "Error",
+            description: "Failed to load canvas data. Process map created with empty canvas.",
+            variant: "destructive",
+          });
         }
+      } else {
+        // No canvas data, just show success for empty process map
+        toast({
+          title: "Success",
+          description: `Process map "${processMap.name}" loaded successfully!`,
+        });
       }
       
-      toast({
-        title: "Success",
-        description: `Process map "${processMap.name}" loaded successfully!`,
-      });
     } catch (error) {
       console.error("Error loading process map:", error);
       toast({

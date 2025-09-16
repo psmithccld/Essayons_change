@@ -285,7 +285,17 @@ export default function MindMaps() {
     
     canvas.add(textbox);
     canvas.setActiveObject(textbox);
-    textbox.enterEditing();
+    
+    // Wait for the textbox to be properly rendered before entering editing mode
+    canvas.requestRenderAll();
+    setTimeout(() => {
+      try {
+        textbox.enterEditing();
+      } catch (error) {
+        console.warn('Could not enter editing mode immediately:', error);
+        // Fallback: user can double-click to edit
+      }
+    }, 50);
   };
 
   const addShape = (type: 'rectangle' | 'circle') => {
