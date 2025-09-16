@@ -12,7 +12,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, AlertTriangle, CheckCircle, AlertCircle, Link as LinkIcon, Calendar, User, Filter } from "lucide-react";
+import { Plus, AlertTriangle, CheckCircle, AlertCircle, Link as LinkIcon, Calendar, User, Filter, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
@@ -115,6 +115,7 @@ function getStatusColor(status: string) {
 export default function RaidLogs() {
   const [activeTab, setActiveTab] = useState<string>("all");
   const [isNewLogOpen, setIsNewLogOpen] = useState(false);
+  const [editingLog, setEditingLog] = useState<RaidLog | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { currentProject } = useCurrentProject();
@@ -173,6 +174,7 @@ export default function RaidLogs() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'raid-logs'] });
       setIsNewLogOpen(false);
+      setEditingLog(null);
       form.reset();
       toast({
         title: "Success",
@@ -195,6 +197,8 @@ export default function RaidLogs() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'raid-logs'] });
+      setIsNewLogOpen(false);
+      setEditingLog(null);
       toast({
         title: "Success",
         description: "RAID log updated successfully",
@@ -209,10 +213,79 @@ export default function RaidLogs() {
     },
   });
 
+  const deleteRaidLogMutation = useMutation({
+    mutationFn: async (logId: string) => {
+      const response = await apiRequest("DELETE", `/api/raid-logs/${logId}`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'raid-logs'] });
+      toast({
+        title: "Success",
+        description: "RAID log deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete RAID log",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteLog = (logId: string, logTitle: string) => {
+    if (window.confirm(`Are you sure you want to delete "${logTitle}"? This action cannot be undone.`)) {
+      deleteRaidLogMutation.mutate(logId);
+    }
+  };
+
+  const handleEditLog = (log: RaidLog) => {
+    setEditingLog(log);
+    setFormType(log.type as "risk" | "action" | "issue" | "deficiency");
+    
+    // Reset form with log data
+    form.reset({
+      type: log.type,
+      title: log.title,
+      description: log.description || "",
+      // Risk-specific fields
+      likelihood: log.likelihood || 3,
+      riskLevel: log.riskLevel || 3,
+      potentialOutcome: log.potentialOutcome || "",
+      whoWillManage: log.whoWillManage || "",
+      // Action-specific fields
+      event: log.event || "",
+      dueOut: log.dueOut || "",
+      assigneeId: log.assigneeId || "",
+      dueDate: log.dueDate ? new Date(log.dueDate).toISOString().split('T')[0] : "",
+      wasDeadlineMet: log.wasDeadlineMet || false,
+      // Issue-specific fields
+      priority: log.priority || "medium",
+      impact: log.impact || "medium",
+      severity: log.severity || "medium",
+      rootCause: log.rootCause || "",
+      // Deficiency-specific fields
+      category: log.category || "",
+      targetResolutionDate: log.targetResolutionDate ? new Date(log.targetResolutionDate).toISOString().split('T')[0] : "",
+      resolutionStatus: log.resolutionStatus || "pending",
+      // Common fields
+      notes: log.notes || "",
+    });
+    
+    setIsNewLogOpen(true);
+  };
+
   const onSubmit = (data: any) => {
     // Ensure type is set correctly from formType
     const submissionData = { ...data, type: formType };
-    createRaidLogMutation.mutate(submissionData);
+    
+    if (editingLog) {
+      updateRaidLogMutation.mutate({ logId: editingLog.id, data: submissionData });
+      setEditingLog(null);
+    } else {
+      createRaidLogMutation.mutate(submissionData);
+    }
   };
   
   // Helper function to render template-specific details
@@ -357,7 +430,7 @@ export default function RaidLogs() {
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Create RAID Log Entry</DialogTitle>
+              <DialogTitle>{editingLog ? "Edit RAID Log Entry" : "Create RAID Log Entry"}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -965,9 +1038,27 @@ export default function RaidLogs() {
                             </div>
                             
                             <div className="flex flex-col space-y-2 ml-4">
-                              <Badge className={`text-xs ${getStatusColor(log.status)}`}>
-                                {log.status.replace('_', ' ')}
-                              </Badge>
+                              <div className="flex items-center space-x-2">
+                                <Badge className={`text-xs ${getStatusColor(log.status)}`}>
+                                  {log.status.replace('_', ' ')}
+                                </Badge>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditLog(log)}
+                                  data-testid={`button-edit-raid-${log.id}`}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteLog(log.id, log.title)}
+                                  data-testid={`button-delete-raid-${log.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                               <Select
                                 value={log.status}
                                 onValueChange={(value) => handleStatusChange(log.id, value)}
