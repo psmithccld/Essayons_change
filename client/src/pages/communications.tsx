@@ -15,6 +15,7 @@ import { z } from "zod";
 import { Plus, Megaphone, Mail, Users, MessageSquare, Calendar, Send, Edit, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import type { Project, Communication } from "@shared/schema";
 
 const communicationFormSchema = z.object({
@@ -57,20 +58,16 @@ function getStatusColor(status: string) {
 }
 
 export default function Communications() {
-  const [selectedProject, setSelectedProject] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>("all");
   const [isNewCommOpen, setIsNewCommOpen] = useState(false);
   const [isGptAssistOpen, setIsGptAssistOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const { data: projects = [] } = useQuery<Project[]>({
-    queryKey: ['/api/projects'],
-  });
+  const { currentProject } = useCurrentProject();
 
   const { data: communications = [], isLoading } = useQuery<Communication[]>({
-    queryKey: ['/api/projects', selectedProject, 'communications'],
-    enabled: !!selectedProject,
+    queryKey: ['/api/projects', currentProject?.id, 'communications'],
+    enabled: !!currentProject?.id,
   });
 
   const form = useForm<CommunicationFormData>({
@@ -83,11 +80,12 @@ export default function Communications() {
 
   const createCommunicationMutation = useMutation({
     mutationFn: async (commData: CommunicationFormData) => {
-      const response = await apiRequest("POST", `/api/projects/${selectedProject}/communications`, commData);
+      if (!currentProject?.id) throw new Error("No project selected");
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/communications`, commData);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', selectedProject, 'communications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
       setIsNewCommOpen(false);
       form.reset();
       toast({
@@ -138,7 +136,14 @@ export default function Communications() {
   };
 
   const handleGenerateContent = () => {
-    const currentProject = projects.find(p => p.id === selectedProject);
+    if (!currentProject?.id) {
+      toast({
+        title: "Project Required",
+        description: "Please select a project first",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!currentProject) return;
 
     generateContentMutation.mutate({
@@ -172,7 +177,7 @@ export default function Communications() {
         <div className="flex space-x-2">
           <Dialog open={isGptAssistOpen} onOpenChange={setIsGptAssistOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" disabled={!selectedProject} data-testid="button-gpt-assist">
+              <Button variant="outline" disabled={!currentProject?.id} data-testid="button-gpt-assist">
                 <Bot className="w-4 h-4 mr-2" />
                 GPT Assist
               </Button>
@@ -199,7 +204,7 @@ export default function Communications() {
           
           <Dialog open={isNewCommOpen} onOpenChange={setIsNewCommOpen}>
             <DialogTrigger asChild>
-              <Button disabled={!selectedProject} data-testid="button-new-communication">
+              <Button disabled={!currentProject?.id} data-testid="button-new-communication">
                 <Plus className="w-4 h-4 mr-2" />
                 New Communication
               </Button>
@@ -302,29 +307,8 @@ export default function Communications() {
         </div>
       </div>
 
-      {/* Project Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Project</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-full max-w-md" data-testid="select-comm-project">
-              <SelectValue placeholder="Choose a project to manage communications" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
       {/* Communications List */}
-      {selectedProject && (
+      {currentProject && (
         <Card>
           <CardHeader>
             <CardTitle>Communication Strategy</CardTitle>
