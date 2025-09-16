@@ -39,11 +39,11 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
       break;
     case 'issue':
       templateValidated = insertIssueSchema.parse(processedData);
-      description = templateValidated.rootCause || templateValidated.title || 'Issue description';
+      description = templateValidated.description || templateValidated.title || 'Issue description';
       break;
     case 'deficiency':
       templateValidated = insertDeficiencySchema.parse(processedData);
-      description = templateValidated.category || templateValidated.notes || templateValidated.title || 'Deficiency description';
+      description = templateValidated.description || templateValidated.title || 'Deficiency description';
       break;
     default:
       // Fallback to generic schema for backward compatibility
@@ -51,11 +51,12 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
   }
   
   // Merge template-specific fields with required generic fields
+  // Only provide defaults if not already present in template data
   return {
     ...templateValidated,
     description,
-    severity: 'medium', // Default for all template types
-    impact: 'medium',   // Default for all template types
+    severity: (templateValidated as any).severity || 'medium',
+    impact: (templateValidated as any).impact || 'medium',
   };
 }
 
