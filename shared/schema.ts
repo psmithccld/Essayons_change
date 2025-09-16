@@ -169,6 +169,19 @@ export const checklistTemplates = pgTable("checklist_templates", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const mindMaps = pgTable("mind_maps", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: uuid("project_id").references(() => projects.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  canvasData: jsonb("canvas_data").notNull(), // Fabric.js canvas state
+  textBoxes: jsonb("text_boxes").default([]), // Array of text box metadata for context menus
+  isActive: boolean("is_active").notNull().default(true),
+  createdById: uuid("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   ownedProjects: many(projects),
@@ -180,6 +193,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   surveyResponses: many(surveyResponses),
   gptInteractions: many(gptInteractions),
   createdChecklistTemplates: many(checklistTemplates),
+  createdMindMaps: many(mindMaps),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -194,6 +208,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   surveys: many(surveys),
   gptInteractions: many(gptInteractions),
   milestones: many(milestones),
+  mindMaps: many(mindMaps),
 }));
 
 export const tasksRelations = relations(tasks, ({ one }) => ({
@@ -284,6 +299,17 @@ export const milestonesRelations = relations(milestones, ({ one }) => ({
 export const checklistTemplatesRelations = relations(checklistTemplates, ({ one }) => ({
   createdBy: one(users, {
     fields: [checklistTemplates.createdById],
+    references: [users.id],
+  }),
+}));
+
+export const mindMapsRelations = relations(mindMaps, ({ one }) => ({
+  project: one(projects, {
+    fields: [mindMaps.projectId],
+    references: [projects.id],
+  }),
+  createdBy: one(users, {
+    fields: [mindMaps.createdById],
     references: [users.id],
   }),
 }));
@@ -398,6 +424,12 @@ export const insertChecklistTemplateSchema = createInsertSchema(checklistTemplat
   updatedAt: true,
 });
 
+export const insertMindMapSchema = createInsertSchema(mindMaps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -435,3 +467,6 @@ export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
 
 export type ChecklistTemplate = typeof checklistTemplates.$inferSelect;
 export type InsertChecklistTemplate = z.infer<typeof insertChecklistTemplateSchema>;
+
+export type MindMap = typeof mindMaps.$inferSelect;
+export type InsertMindMap = z.infer<typeof insertMindMapSchema>;
