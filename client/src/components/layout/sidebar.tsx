@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
@@ -18,8 +18,10 @@ import {
   User,
   Palette,
   Bell,
-  ListChecks
+  ListChecks,
+  GripVertical
 } from "lucide-react";
+import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -43,46 +45,83 @@ const userSettingsSchema = z.object({
 
 type UserSettingsData = z.infer<typeof userSettingsSchema>;
 
-const navigationSections = [
-  {
-    title: "Dashboard",
-    items: [
-      { icon: ChartLine, label: "Overview", path: "/" }
-    ]
-  },
-  {
-    title: "PMIS Tools", 
-    items: [
-      { icon: ListTodo, label: "Tasks & To Do", path: "/tasks" },
-      { icon: ListChecks, label: "Checklist Templates", path: "/checklist-templates" },
-      { icon: ChartGantt, label: "Gantt Charts", path: "/gantt" },
-      { icon: AlertTriangle, label: "RAID Logs", path: "/raid-logs" },
-      { icon: ChartBar, label: "Progress Reports", path: "/" }
-    ]
-  },
-  {
-    title: "Change Management",
-    items: [
-      { icon: Megaphone, label: "Communications", path: "/communications" },
-      { icon: Users, label: "Stakeholders", path: "/stakeholders" },
-      { icon: ClipboardCheck, label: "Readiness Surveys", path: "/surveys" },
-      { icon: Bot, label: "GPT Coach", path: "/gpt-coach" }
-    ]
-  },
-  {
-    title: "Visual Tools",
-    items: [
-      { icon: Fish, label: "Fishbone Analysis", path: "/fishbone" },
-      { icon: GitBranch, label: "Process Mapping", path: "/process-mapping" },
-      { icon: Brain, label: "Mind Maps", path: "/mind-maps" }
-    ]
-  }
+type NavigationItem = {
+  id: string;
+  icon: any;
+  label: string;
+  path: string;
+};
+
+// All navigation items - Overview first (non-draggable), then draggable items
+const allNavigationItems: NavigationItem[] = [
+  { id: "overview", icon: ChartLine, label: "Overview", path: "/" },
+  { id: "tasks", icon: ListTodo, label: "Tasks & To Do", path: "/tasks" },
+  { id: "checklist-templates", icon: ListChecks, label: "Checklist Templates", path: "/checklist-templates" },
+  { id: "gantt", icon: ChartGantt, label: "Gantt Charts", path: "/gantt" },
+  { id: "raid-logs", icon: AlertTriangle, label: "RAID Logs", path: "/raid-logs" },
+  { id: "progress-reports", icon: ChartBar, label: "Progress Reports", path: "/reports" },
+  { id: "communications", icon: Megaphone, label: "Communications", path: "/communications" },
+  { id: "stakeholders", icon: Users, label: "Stakeholders", path: "/stakeholders" },
+  { id: "surveys", icon: ClipboardCheck, label: "Readiness Surveys", path: "/surveys" },
+  { id: "gpt-coach", icon: Bot, label: "GPT Coach", path: "/gpt-coach" },
+  { id: "fishbone", icon: Fish, label: "Fishbone Analysis", path: "/fishbone" },
+  { id: "process-mapping", icon: GitBranch, label: "Process Mapping", path: "/process-mapping" },
+  { id: "mind-maps", icon: Brain, label: "Mind Maps", path: "/mind-maps" }
 ];
+
+// Draggable navigation items (excluding overview)
+const defaultDraggableItems = allNavigationItems.slice(1);
+
+const SIDEBAR_ORDER_KEY = "sidebarOrder";
 
 export default function Sidebar() {
   const [location] = useLocation();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [draggableItems, setDraggableItems] = useState<NavigationItem[]>(defaultDraggableItems);
   const { toast } = useToast();
+
+  // Load saved order from localStorage on component mount
+  useEffect(() => {
+    const savedOrder = localStorage.getItem(SIDEBAR_ORDER_KEY);
+    if (savedOrder) {
+      try {
+        const savedIds = JSON.parse(savedOrder);
+        // Reorder items based on saved order (excluding overview)
+        const reorderedItems = savedIds
+          .map((id: string) => defaultDraggableItems.find(item => item.id === id))
+          .filter(Boolean);
+        
+        // Add any new items that weren't in the saved order
+        const existingIds = new Set(savedIds);
+        const newItems = defaultDraggableItems.filter(item => !existingIds.has(item.id));
+        
+        setDraggableItems([...reorderedItems, ...newItems]);
+      } catch (error) {
+        console.error('Failed to parse saved sidebar order:', error);
+        setDraggableItems(defaultDraggableItems);
+      }
+    }
+  }, []);
+
+  // Save order to localStorage whenever items change
+  const saveOrder = (items: NavigationItem[]) => {
+    const itemIds = items.map(item => item.id);
+    localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(itemIds));
+  };
+
+  // Handle drag end event (only for draggable items)
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) {
+      return;
+    }
+
+    const items = Array.from(draggableItems);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    setDraggableItems(items);
+    saveOrder(items);
+  };
 
   const form = useForm<UserSettingsData>({
     resolver: zodResolver(userSettingsSchema),
@@ -106,6 +145,69 @@ export default function Sidebar() {
     setIsSettingsOpen(false);
   };
 
+  // Render a draggable navigation item
+  const renderDraggableItem = (item: NavigationItem, index: number) => {
+    const isActive = location === item.path;
+    const IconComponent = item.icon;
+
+    return (
+      <Draggable key={item.id} draggableId={item.id} index={index}>
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            {...provided.dragHandleProps}
+            className={cn(
+              "mb-1",
+              snapshot.isDragging && "shadow-lg"
+            )}
+          >
+            <Link href={item.path}>
+              <div 
+                className={cn(
+                  "flex items-center space-x-3 p-2 rounded-md text-sm font-medium transition-colors group cursor-pointer",
+                  isActive 
+                    ? "bg-primary text-primary-foreground" 
+                    : "text-foreground hover:bg-muted"
+                )}
+                data-testid={`nav-${item.label.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')}`}
+              >
+                <GripVertical className="w-4 h-4 text-muted-foreground group-hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                <IconComponent className="w-4 h-4" />
+                <span className="flex-1">{item.label}</span>
+              </div>
+            </Link>
+          </div>
+        )}
+      </Draggable>
+    );
+  };
+
+  // Render a non-draggable navigation item
+  const renderNavigationItem = (item: NavigationItem) => {
+    const isActive = location === item.path;
+    const IconComponent = item.icon;
+
+    return (
+      <div key={item.id} className="mb-1">
+        <Link href={item.path}>
+          <div 
+            className={cn(
+              "flex items-center space-x-3 p-2 rounded-md text-sm font-medium transition-colors cursor-pointer",
+              isActive 
+                ? "bg-primary text-primary-foreground" 
+                : "text-foreground hover:bg-muted"
+            )}
+            data-testid={`nav-${item.label.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')}`}
+          >
+            <IconComponent className="w-4 h-4" />
+            <span>{item.label}</span>
+          </div>
+        </Link>
+      </div>
+    );
+  };
+
   return (
     <div className="w-64 bg-card border-r border-border flex flex-col" data-testid="sidebar">
       {/* Logo Header */}
@@ -122,37 +224,30 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation Menu */}
-      <nav className="flex-1 p-4 space-y-2">
-        {navigationSections.map((section, sectionIndex) => (
-          <div key={sectionIndex} className="mb-4">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              {section.title}
-            </h3>
-            <div className="space-y-1">
-              {section.items.map((item, itemIndex) => {
-                const isActive = location === item.path;
-                const IconComponent = item.icon;
-                
-                return (
-                  <Link key={itemIndex} href={item.path}>
-                    <a 
-                      className={cn(
-                        "flex items-center space-x-3 p-2 rounded-md text-sm font-medium transition-colors",
-                        isActive 
-                          ? "bg-primary text-primary-foreground" 
-                          : "text-foreground hover:bg-muted"
-                      )}
-                      data-testid={`nav-${item.label.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')}`}
-                    >
-                      <IconComponent className="w-4 h-4" />
-                      <span>{item.label}</span>
-                    </a>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+      <nav className="flex-1 p-4">
+        {/* Overview - Fixed at Top */}
+        {renderNavigationItem(allNavigationItems[0])}
+        
+        {/* Draggable Navigation Items */}
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="navigation">
+            {(provided, snapshot) => (
+              <div
+                {...provided.droppableProps}
+                ref={provided.innerRef}
+                className={cn(
+                  "space-y-1 mt-1",
+                  snapshot.isDraggingOver && "bg-muted/50 rounded-md p-1"
+                )}
+              >
+                {draggableItems.map((item, index) => 
+                  renderDraggableItem(item, index)
+                )}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
       </nav>
 
       {/* User Profile */}
