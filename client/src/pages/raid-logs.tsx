@@ -138,8 +138,8 @@ export default function RaidLogs() {
     }
   };
   
-  const form = useForm<any>({
-    resolver: zodResolver(getFormSchema(formType)),
+  const form = useForm<RaidLogFormData>({
+    resolver: zodResolver(raidLogFormSchema),
     defaultValues: {
       type: formType,
       likelihood: 3,
@@ -154,15 +154,53 @@ export default function RaidLogs() {
   // Reset form when type changes
   const handleTypeChange = (newType: "risk" | "action" | "issue" | "deficiency") => {
     setFormType(newType);
-    form.reset({
+    
+    // Reset form with appropriate defaults for the new type
+    const baseDefaults = {
       type: newType,
-      likelihood: 3,
-      riskLevel: 3,
-      priority: "medium",
-      severity: "medium",
-      impact: "medium",
-      resolutionStatus: "pending",
-    });
+      title: "",
+      notes: "",
+    };
+    
+    const typeSpecificDefaults = {
+      risk: {
+        ...baseDefaults,
+        likelihood: 3,
+        riskLevel: 3,
+        potentialOutcome: "",
+        whoWillManage: "",
+      },
+      action: {
+        ...baseDefaults,
+        event: "",
+        dueOut: "",
+        assigneeId: "",
+        dueDate: "",
+        wasDeadlineMet: false,
+      },
+      issue: {
+        ...baseDefaults,
+        description: "",
+        priority: "medium" as const,
+        impact: "medium" as const,
+        severity: "medium" as const,
+        assigneeId: "",
+        dueDate: "",
+        rootCause: "",
+      },
+      deficiency: {
+        ...baseDefaults,
+        description: "",
+        category: "",
+        severity: "medium" as const,
+        impact: "medium" as const,
+        assigneeId: "",
+        targetResolutionDate: "",
+        resolutionStatus: "pending" as const,
+      },
+    };
+    
+    form.reset(typeSpecificDefaults[newType]);
   };
 
   const createRaidLogMutation = useMutation({
@@ -276,15 +314,13 @@ export default function RaidLogs() {
     setIsNewLogOpen(true);
   };
 
-  const onSubmit = (data: any) => {
-    // Ensure type is set correctly from formType
-    const submissionData = { ...data, type: formType };
-    
+  const onSubmit = (data: RaidLogFormData) => {
+    // The union schema validates the data correctly based on the type discriminant
     if (editingLog) {
-      updateRaidLogMutation.mutate({ logId: editingLog.id, data: submissionData });
+      updateRaidLogMutation.mutate({ logId: editingLog.id, data });
       setEditingLog(null);
     } else {
-      createRaidLogMutation.mutate(submissionData);
+      createRaidLogMutation.mutate(data);
     }
   };
   
