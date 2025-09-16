@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,14 +10,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, ClipboardCheck, Calendar, Users, BarChart3, Trash2, Bot } from "lucide-react";
+import { Plus, ClipboardCheck, Calendar, Users, BarChart3, Trash2, Bot, BookOpen, UserCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
-import type { Project, Survey, SurveyResponse } from "@shared/schema";
+import { PREBUILT_SURVEYS, getPrebuiltSurveyById, type PrebuiltSurveyTemplate } from "@/lib/prebuilt-surveys";
+import type { Project, Survey, SurveyResponse, Stakeholder } from "@shared/schema";
 
 const questionSchema = z.object({
   id: z.string(),
@@ -33,9 +35,18 @@ const surveyFormSchema = z.object({
   questions: z.array(questionSchema).min(1, "At least one question is required"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  targetStakeholders: z.array(z.string()).optional(),
+});
+
+const prebuiltSurveyFormSchema = z.object({
+  templateId: z.string().min(1, "Template selection is required"),
+  targetStakeholders: z.array(z.string()).min(1, "At least one stakeholder must be selected"),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
 });
 
 type SurveyFormData = z.infer<typeof surveyFormSchema>;
+type PrebuiltSurveyFormData = z.infer<typeof prebuiltSurveyFormSchema>;
 
 function getStatusColor(status: string) {
   switch (status) {
@@ -49,9 +60,11 @@ function getStatusColor(status: string) {
 export default function Surveys() {
   const [activeTab, setActiveTab] = useState<string>("surveys");
   const [isNewSurveyOpen, setIsNewSurveyOpen] = useState(false);
+  const [isPrebuiltSurveyOpen, setIsPrebuiltSurveyOpen] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState<string>("");
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<PrebuiltSurveyTemplate | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { currentProject } = useCurrentProject();
@@ -66,6 +79,11 @@ export default function Surveys() {
     enabled: !!selectedSurvey,
   });
 
+  const { data: stakeholders = [] } = useQuery<Stakeholder[]>({
+    queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
+    enabled: !!currentProject?.id,
+  });
+
   const form = useForm<SurveyFormData>({
     resolver: zodResolver(surveyFormSchema),
     defaultValues: {
@@ -75,6 +93,15 @@ export default function Surveys() {
         question: "How ready do you feel for this change initiative?",
         required: true,
       }],
+      targetStakeholders: [],
+    },
+  });
+
+  const prebuiltForm = useForm<PrebuiltSurveyFormData>({
+    resolver: zodResolver(prebuiltSurveyFormSchema),
+    defaultValues: {
+      templateId: "",
+      targetStakeholders: [],
     },
   });
 
@@ -102,6 +129,43 @@ export default function Surveys() {
       toast({
         title: "Error",
         description: "Failed to create survey",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createPrebuiltSurveyMutation = useMutation({
+    mutationFn: async (data: PrebuiltSurveyFormData) => {
+      if (!currentProject?.id) throw new Error("No project selected");
+      const template = getPrebuiltSurveyById(data.templateId);
+      if (!template) throw new Error("Template not found");
+      
+      const surveyData: SurveyFormData = {
+        title: template.title,
+        description: template.description,
+        questions: template.questions,
+        targetStakeholders: data.targetStakeholders,
+        startDate: data.startDate,
+        endDate: data.endDate,
+      };
+      
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/surveys`, surveyData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'surveys'] });
+      setIsPrebuiltSurveyOpen(false);
+      prebuiltForm.reset();
+      setSelectedTemplate(null);
+      toast({
+        title: "Success",
+        description: "Survey created from template successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create survey from template",
         variant: "destructive",
       });
     },
@@ -256,6 +320,205 @@ export default function Surveys() {
                     </Card>
                   </>
                 ) : null}
+              </div>
+            </DialogContent>
+          </Dialog>
+          
+          <Dialog open={isPrebuiltSurveyOpen} onOpenChange={setIsPrebuiltSurveyOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" disabled={!currentProject?.id} data-testid="button-use-template">
+                <BookOpen className="w-4 h-4 mr-2" />
+                Use Template
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Create Survey from Template</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+                {!selectedTemplate ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">Choose from professionally designed survey templates based on change management phases:</p>
+                    <div className="grid grid-cols-1 gap-4">
+                      {PREBUILT_SURVEYS.map((template) => (
+                        <Card key={template.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => {
+                          setSelectedTemplate(template);
+                          prebuiltForm.setValue('templateId', template.id);
+                        }}>
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <CardTitle className="text-base">{template.title}</CardTitle>
+                                <Badge variant="secondary" className="mt-1">{template.phaseName}</Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {template.questions.length} questions
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-muted-foreground">{template.description}</p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {template.questions.slice(0, 3).map((q, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  {q.type === 'scale' ? 'Likert Scale' : 
+                                   q.type === 'text' ? 'Open Text' : 
+                                   q.type === 'multiple_choice' ? 'Multiple Choice' : 
+                                   'Yes/No'}
+                                </Badge>
+                              ))}
+                              {template.questions.length > 3 && (
+                                <Badge variant="outline" className="text-xs">+{template.questions.length - 3} more</Badge>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <Form {...prebuiltForm}>
+                    <form onSubmit={prebuiltForm.handleSubmit((data) => createPrebuiltSurveyMutation.mutate(data))} className="space-y-6">
+                      <Card>
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <CardTitle className="text-lg">{selectedTemplate.title}</CardTitle>
+                              <Badge variant="secondary" className="mt-1">{selectedTemplate.phaseName}</Badge>
+                            </div>
+                            <Button type="button" variant="outline" size="sm" onClick={() => {
+                              setSelectedTemplate(null);
+                              prebuiltForm.reset();
+                            }}>
+                              Change Template
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground mb-4">{selectedTemplate.description}</p>
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-medium">Survey Questions ({selectedTemplate.questions.length})</h4>
+                            {selectedTemplate.questions.map((question, idx) => (
+                              <div key={question.id} className="p-3 bg-muted/50 rounded-lg">
+                                <div className="flex items-start justify-between mb-2">
+                                  <span className="text-sm font-medium">Q{idx + 1}. {question.question}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {question.type === 'scale' ? 'Likert Scale (1-5)' : 
+                                     question.type === 'text' ? 'Open Text' : 
+                                     question.type === 'multiple_choice' ? 'Multiple Choice' : 
+                                     'Yes/No'}
+                                  </Badge>
+                                </div>
+                                {question.options && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {question.options.map((option, optIdx) => (
+                                      <Badge key={optIdx} variant="secondary" className="text-xs">{option}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-base flex items-center">
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            Target Stakeholders
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <FormField
+                            control={prebuiltForm.control}
+                            name="targetStakeholders"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Select stakeholders to survey</FormLabel>
+                                <FormControl>
+                                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                                    {stakeholders.length === 0 ? (
+                                      <p className="text-sm text-muted-foreground">No stakeholders available. Please add stakeholders to your project first.</p>
+                                    ) : (
+                                      stakeholders.map((stakeholder) => (
+                                        <div key={stakeholder.id} className="flex items-center space-x-2">
+                                          <Checkbox
+                                            checked={field.value?.includes(stakeholder.id) || false}
+                                            onCheckedChange={(checked) => {
+                                              const currentValue = field.value || [];
+                                              if (checked) {
+                                                field.onChange([...currentValue, stakeholder.id]);
+                                              } else {
+                                                field.onChange(currentValue.filter(id => id !== stakeholder.id));
+                                              }
+                                            }}
+                                          />
+                                          <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-sm font-medium">{stakeholder.name}</span>
+                                              <Badge variant="outline" className="text-xs">{stakeholder.role}</Badge>
+                                            </div>
+                                            {stakeholder.email && (
+                                              <p className="text-xs text-muted-foreground">{stakeholder.email}</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </CardContent>
+                      </Card>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={prebuiltForm.control}
+                          name="startDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Start Date (Optional)</FormLabel>
+                              <FormControl>
+                                <Input type="datetime-local" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={prebuiltForm.control}
+                          name="endDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>End Date (Optional)</FormLabel>
+                              <FormControl>
+                                <Input type="datetime-local" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="flex justify-end space-x-2">
+                        <Button type="button" variant="outline" onClick={() => setIsPrebuiltSurveyOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="submit" 
+                          disabled={createPrebuiltSurveyMutation.isPending || stakeholders.length === 0}
+                          data-testid="button-create-from-template"
+                        >
+                          {createPrebuiltSurveyMutation.isPending ? "Creating..." : "Create Survey"}
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                )}
               </div>
             </DialogContent>
           </Dialog>
