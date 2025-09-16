@@ -76,6 +76,7 @@ export default function ProcessMapping() {
   const [elements, setElements] = useState<ProcessElement[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [selectedSymbolType, setSelectedSymbolType] = useState<string | null>(null);
+  const selectedSymbolTypeRef = useRef<string | null>(null);
   
   const [tools, setTools] = useState<CanvasTools>({
     mode: 'select',
@@ -132,15 +133,21 @@ export default function ProcessMapping() {
     }
   }, [canvas]);
 
+  // Update ref when selectedSymbolType changes
+  useEffect(() => {
+    selectedSymbolTypeRef.current = selectedSymbolType;
+  }, [selectedSymbolType]);
+
   // Separate useEffect to handle canvas clicks for adding symbols
   useEffect(() => {
     if (!canvas) return;
 
     const handleCanvasClick = (e: any) => {
       // Use ref to get current selectedSymbolType to avoid stale closure
-      if (selectedSymbolType && e.pointer) {
-        console.log('Adding process element:', selectedSymbolType, 'at', e.pointer.x, e.pointer.y);
-        addProcessElement(selectedSymbolType, e.pointer.x, e.pointer.y);
+      const currentSymbolType = selectedSymbolTypeRef.current;
+      if (currentSymbolType && e.pointer) {
+        console.log('Adding process element:', currentSymbolType, 'at', e.pointer.x, e.pointer.y);
+        addProcessElement(currentSymbolType, e.pointer.x, e.pointer.y);
         setSelectedSymbolType(null);
       }
     };
@@ -150,7 +157,7 @@ export default function ProcessMapping() {
     return () => {
       canvas.off('mouse:down', handleCanvasClick);
     };
-  }, [canvas, selectedSymbolType]);
+  }, [canvas]);
 
   // Resize canvas when window resizes
   useEffect(() => {
@@ -968,7 +975,7 @@ export default function ProcessMapping() {
           <canvas
             ref={canvasRef}
             className="border-0"
-            data-testid="canvas-process-mapping"
+            data-testid="process-canvas"
           />
           
           {/* Canvas Instructions */}
