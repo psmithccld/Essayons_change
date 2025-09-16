@@ -15,6 +15,7 @@ import { z } from "zod";
 import { Plus, AlertTriangle, CheckCircle, AlertCircle, Link as LinkIcon, Calendar, User, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import type { Project, RaidLog } from "@shared/schema";
 
 // Template-specific form schemas matching Excel templates
@@ -112,19 +113,15 @@ function getStatusColor(status: string) {
 }
 
 export default function RaidLogs() {
-  const [selectedProject, setSelectedProject] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>("all");
   const [isNewLogOpen, setIsNewLogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const { data: projects = [] } = useQuery<Project[]>({
-    queryKey: ['/api/projects'],
-  });
+  const { currentProject } = useCurrentProject();
 
   const { data: raidLogs = [], isLoading } = useQuery<RaidLog[]>({
-    queryKey: ['/api/projects', selectedProject, 'raid-logs'],
-    enabled: !!selectedProject,
+    queryKey: ['/api/projects', currentProject?.id, 'raid-logs'],
+    enabled: !!currentProject?.id,
   });
 
   const [formType, setFormType] = useState<"risk" | "action" | "issue" | "deficiency">("risk");
@@ -169,11 +166,12 @@ export default function RaidLogs() {
 
   const createRaidLogMutation = useMutation({
     mutationFn: async (logData: RaidLogFormData) => {
-      const response = await apiRequest("POST", `/api/projects/${selectedProject}/raid-logs`, logData);
+      if (!currentProject?.id) throw new Error("No project selected");
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/raid-logs`, logData);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', selectedProject, 'raid-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'raid-logs'] });
       setIsNewLogOpen(false);
       form.reset();
       toast({
@@ -196,7 +194,7 @@ export default function RaidLogs() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', selectedProject, 'raid-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'raid-logs'] });
       toast({
         title: "Success",
         description: "RAID log updated successfully",
@@ -352,7 +350,7 @@ export default function RaidLogs() {
         </div>
         <Dialog open={isNewLogOpen} onOpenChange={setIsNewLogOpen}>
           <DialogTrigger asChild>
-            <Button disabled={!selectedProject} data-testid="button-new-raid-log">
+            <Button disabled={!currentProject?.id} data-testid="button-new-raid-log">
               <Plus className="w-4 h-4 mr-2" />
               New Entry
             </Button>
@@ -830,29 +828,8 @@ export default function RaidLogs() {
         </Dialog>
       </div>
 
-      {/* Project Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Project</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-full max-w-md" data-testid="select-raid-project">
-              <SelectValue placeholder="Choose a project to view RAID logs" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
       {/* RAID Logs */}
-      {selectedProject && (
+      {currentProject && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
