@@ -16,6 +16,7 @@ import { z } from "zod";
 import { Plus, ClipboardCheck, Calendar, Users, BarChart3, Trash2, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import type { Project, Survey, SurveyResponse } from "@shared/schema";
 
 const questionSchema = z.object({
@@ -46,7 +47,6 @@ function getStatusColor(status: string) {
 }
 
 export default function Surveys() {
-  const [selectedProject, setSelectedProject] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>("surveys");
   const [isNewSurveyOpen, setIsNewSurveyOpen] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState<string>("");
@@ -54,14 +54,11 @@ export default function Surveys() {
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const { data: projects = [] } = useQuery<Project[]>({
-    queryKey: ['/api/projects'],
-  });
+  const { currentProject } = useCurrentProject();
 
   const { data: surveys = [], isLoading: surveysLoading } = useQuery<Survey[]>({
-    queryKey: ['/api/projects', selectedProject, 'surveys'],
-    enabled: !!selectedProject,
+    queryKey: ['/api/projects', currentProject?.id, 'surveys'],
+    enabled: !!currentProject?.id,
   });
 
   const { data: responses = [], isLoading: responsesLoading } = useQuery<SurveyResponse[]>({
@@ -88,11 +85,12 @@ export default function Surveys() {
 
   const createSurveyMutation = useMutation({
     mutationFn: async (surveyData: SurveyFormData) => {
-      const response = await apiRequest("POST", `/api/projects/${selectedProject}/surveys`, surveyData);
+      if (!currentProject?.id) throw new Error("No project selected");
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/surveys`, surveyData);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', selectedProject, 'surveys'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'surveys'] });
       setIsNewSurveyOpen(false);
       form.reset();
       toast({
@@ -126,7 +124,7 @@ export default function Surveys() {
       ];
 
       const response = await apiRequest("POST", "/api/gpt/readiness-analysis", {
-        projectId: selectedProject,
+        projectId: currentProject?.id,
         surveyResponses: mockResponses,
         stakeholderData: mockStakeholderData,
       });
@@ -180,7 +178,7 @@ export default function Surveys() {
             <DialogTrigger asChild>
               <Button 
                 variant="outline" 
-                disabled={!selectedProject || surveys.length === 0}
+                disabled={!currentProject?.id || surveys.length === 0}
                 onClick={handleAnalyze}
                 data-testid="button-analyze-readiness"
               >
@@ -264,7 +262,7 @@ export default function Surveys() {
           
           <Dialog open={isNewSurveyOpen} onOpenChange={setIsNewSurveyOpen}>
             <DialogTrigger asChild>
-              <Button disabled={!selectedProject} data-testid="button-new-survey">
+              <Button disabled={!currentProject?.id} data-testid="button-new-survey">
                 <Plus className="w-4 h-4 mr-2" />
                 New Survey
               </Button>
@@ -438,29 +436,8 @@ export default function Surveys() {
         </div>
       </div>
 
-      {/* Project Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Project</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-full max-w-md" data-testid="select-survey-project">
-              <SelectValue placeholder="Choose a project to manage surveys" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
       {/* Surveys & Responses */}
-      {selectedProject && (
+      {currentProject && (
         <Card>
           <CardHeader>
             <CardTitle>Survey Management</CardTitle>
