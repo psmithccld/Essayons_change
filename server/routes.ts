@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertProjectSchema, insertTaskSchema, insertStakeholderSchema, insertRaidLogSchema,
-  insertCommunicationSchema, insertSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
+  insertCommunicationSchema, insertSurveySchema, baseSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
   insertMilestoneSchema, insertChecklistTemplateSchema, insertMindMapSchema, insertProcessMapSchema,
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema
 } from "@shared/schema";
@@ -682,7 +682,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/surveys/:id", async (req, res) => {
     try {
-      const survey = await storage.updateSurvey(req.params.id, req.body);
+      // Validate the update data using a partial schema (omit required fields like projectId and createdById)
+      const updateSchema = baseSurveySchema.omit({ projectId: true, createdById: true }).partial();
+      const validatedData = updateSchema.parse(req.body);
+      
+      const survey = await storage.updateSurvey(req.params.id, validatedData);
       if (!survey) {
         return res.status(404).json({ error: "Survey not found" });
       }

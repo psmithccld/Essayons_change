@@ -121,6 +121,7 @@ export const surveys = pgTable("surveys", {
   status: text("status").notNull().default("draft"), // draft, active, completed
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
+  targetStakeholders: text("target_stakeholders").array().default([]),
   createdById: uuid("created_by_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -423,10 +424,40 @@ export const insertCommunicationSchema = createInsertSchema(communications).omit
   updatedAt: true,
 });
 
-export const insertSurveySchema = createInsertSchema(surveys).omit({
+// Base schema without refinements for operations that need .omit()
+export const baseSurveySchema = createInsertSchema(surveys).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  startDate: z.string().optional().transform((val) => {
+    if (!val) return undefined;
+    const date = new Date(val);
+    if (isNaN(date.getTime())) {
+      throw new Error("Invalid start date format");
+    }
+    return date;
+  }),
+  endDate: z.string().optional().transform((val) => {
+    if (!val) return undefined;
+    const date = new Date(val);
+    if (isNaN(date.getTime())) {
+      throw new Error("Invalid end date format");
+    }
+    return date;
+  }),
+});
+
+// Final schema with date validation refinements
+export const insertSurveySchema = baseSurveySchema.refine((data) => {
+  // Ensure endDate >= startDate when both are provided
+  if (data.startDate && data.endDate) {
+    return data.endDate >= data.startDate;
+  }
+  return true;
+}, {
+  message: "End date must be greater than or equal to start date",
+  path: ["endDate"],
 });
 
 export const insertSurveyResponseSchema = createInsertSchema(surveyResponses).omit({
