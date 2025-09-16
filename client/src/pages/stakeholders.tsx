@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Users, Mail, Phone, Building, TrendingUp, TrendingDown, Minus, MessageSquare, Bot } from "lucide-react";
+import { Plus, Users, Mail, Phone, Building, TrendingUp, TrendingDown, Minus, MessageSquare, Bot, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
@@ -71,14 +72,22 @@ function getEngagementColor(level: string) {
 export default function Stakeholders() {
   const [isNewStakeholderOpen, setIsNewStakeholderOpen] = useState(false);
   const [isGptTipsOpen, setIsGptTipsOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<string>("");
+  const [selectedStakeholders, setSelectedStakeholders] = useState<string[]>([]);
   const [gptTips, setGptTips] = useState<any>(null);
   const { toast } = useToast();
-  const { currentProject } = useCurrentProject();
+  const { currentProject, projects } = useCurrentProject();
   const queryClient = useQueryClient();
 
   const { data: stakeholders = [], isLoading } = useQuery<Stakeholder[]>({
     queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
     enabled: !!currentProject?.id,
+  });
+
+  const { data: sourceStakeholders = [] } = useQuery<Stakeholder[]>({
+    queryKey: ['/api/projects', selectedProject, 'stakeholders'],
+    enabled: !!selectedProject && selectedProject !== currentProject?.id,
   });
 
   const form = useForm<StakeholderFormData>({
@@ -109,6 +118,34 @@ export default function Stakeholders() {
       toast({
         title: "Error",
         description: "Failed to add stakeholder",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const importStakeholdersMutation = useMutation({
+    mutationFn: async ({ sourceProjectId, stakeholderIds }: { sourceProjectId: string; stakeholderIds: string[] }) => {
+      if (!currentProject?.id) throw new Error("No project selected");
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/stakeholders/import`, {
+        sourceProjectId,
+        stakeholderIds,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'stakeholders'] });
+      setIsImportOpen(false);
+      setSelectedProject("");
+      setSelectedStakeholders([]);
+      toast({
+        title: "Success",
+        description: `Imported ${data.imported} stakeholder(s) successfully`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to import stakeholders",
         variant: "destructive",
       });
     },
@@ -153,6 +190,36 @@ export default function Stakeholders() {
     setIsGptTipsOpen(true);
   };
 
+  const handleImportStakeholders = () => {
+    if (selectedStakeholders.length === 0) {
+      toast({
+        title: "No stakeholders selected",
+        description: "Please select stakeholders to import",
+        variant: "destructive",
+      });
+      return;
+    }
+    importStakeholdersMutation.mutate({
+      sourceProjectId: selectedProject,
+      stakeholderIds: selectedStakeholders,
+    });
+  };
+
+  const toggleStakeholderSelection = (stakeholderId: string) => {
+    setSelectedStakeholders(prev =>
+      prev.includes(stakeholderId)
+        ? prev.filter(id => id !== stakeholderId)
+        : [...prev, stakeholderId]
+    );
+  };
+
+  const selectAllStakeholders = () => {
+    const allIds = sourceStakeholders.map(s => s.id);
+    setSelectedStakeholders(
+      selectedStakeholders.length === sourceStakeholders.length ? [] : allIds
+    );
+  };
+
   // Calculate engagement metrics
   const engagementStats = {
     totalStakeholders: stakeholders.length,
@@ -171,6 +238,118 @@ export default function Stakeholders() {
           <p className="text-sm text-muted-foreground">Manage stakeholder relationships and engagement</p>
         </div>
         <div className="flex space-x-2">
+          <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={!currentProject?.id || projects.filter(p => p.id !== currentProject?.id).length === 0}
+                data-testid="button-import-stakeholders"
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Import from Other Initiatives
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Import Stakeholders from Other Initiatives</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Select Initiative</label>
+                  <Select value={selectedProject} onValueChange={setSelectedProject}>
+                    <SelectTrigger data-testid="select-source-project">
+                      <SelectValue placeholder="Choose an initiative to import from" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.filter(p => p.id !== currentProject?.id).map(project => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {selectedProject && sourceStakeholders.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-medium">Select Stakeholders to Import</label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={selectAllStakeholders}
+                        data-testid="button-select-all-stakeholders"
+                      >
+                        {selectedStakeholders.length === sourceStakeholders.length ? "Deselect All" : "Select All"}
+                      </Button>
+                    </div>
+                    <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-3">
+                      {sourceStakeholders.map(stakeholder => (
+                        <div 
+                          key={stakeholder.id}
+                          className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50"
+                        >
+                          <Checkbox
+                            id={stakeholder.id}
+                            checked={selectedStakeholders.includes(stakeholder.id)}
+                            onCheckedChange={() => toggleStakeholderSelection(stakeholder.id)}
+                            data-testid={`checkbox-stakeholder-${stakeholder.id}`}
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <span className="font-medium text-sm">{stakeholder.name}</span>
+                              <Badge className={getSupportColor(stakeholder.supportLevel)}>
+                                {stakeholder.supportLevel}
+                              </Badge>
+                              <Badge className={getInfluenceColor(stakeholder.influenceLevel)}>
+                                {stakeholder.influenceLevel} influence
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{stakeholder.role}</p>
+                            {stakeholder.department && (
+                              <p className="text-xs text-muted-foreground">{stakeholder.department}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedProject && sourceStakeholders.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="w-8 h-8 mx-auto mb-2" />
+                    <p>No stakeholders found in the selected initiative</p>
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsImportOpen(false);
+                      setSelectedProject("");
+                      setSelectedStakeholders([]);
+                    }}
+                    data-testid="button-cancel-import"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleImportStakeholders}
+                    disabled={selectedStakeholders.length === 0 || importStakeholdersMutation.isPending}
+                    data-testid="button-confirm-import"
+                  >
+                    {importStakeholdersMutation.isPending 
+                      ? `Importing ${selectedStakeholders.length} stakeholder(s)...` 
+                      : `Import ${selectedStakeholders.length} Stakeholder(s)`
+                    }
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          
           <Dialog open={isGptTipsOpen} onOpenChange={setIsGptTipsOpen}>
             <DialogTrigger asChild>
               <Button 

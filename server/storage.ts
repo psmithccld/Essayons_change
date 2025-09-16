@@ -37,6 +37,7 @@ export interface IStorage {
   createStakeholder(stakeholder: InsertStakeholder): Promise<Stakeholder>;
   updateStakeholder(id: string, stakeholder: Partial<InsertStakeholder>): Promise<Stakeholder | undefined>;
   deleteStakeholder(id: string): Promise<boolean>;
+  importStakeholders(targetProjectId: string, sourceProjectId: string, stakeholderIds: string[]): Promise<{ imported: number; skipped: number }>;
 
   // RAID Logs
   getRaidLogsByProject(projectId: string): Promise<RaidLog[]>;
@@ -212,6 +213,53 @@ export class DatabaseStorage implements IStorage {
   async deleteStakeholder(id: string): Promise<boolean> {
     const result = await db.delete(stakeholders).where(eq(stakeholders.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async importStakeholders(targetProjectId: string, sourceProjectId: string, stakeholderIds: string[]): Promise<{ imported: number; skipped: number }> {
+    // Get the stakeholders to import
+    const sourceStakeholders = await db
+      .select()
+      .from(stakeholders)
+      .where(
+        and(
+          eq(stakeholders.projectId, sourceProjectId),
+          inArray(stakeholders.id, stakeholderIds)
+        )
+      );
+
+    // Get existing stakeholders in target project to check for duplicates (by name and role)
+    const existingStakeholders = await db
+      .select()
+      .from(stakeholders)
+      .where(eq(stakeholders.projectId, targetProjectId));
+
+    let imported = 0;
+    let skipped = 0;
+
+    for (const stakeholder of sourceStakeholders) {
+      // Check if stakeholder with same name and role already exists in target project
+      const duplicate = existingStakeholders.find(
+        existing => 
+          existing.name.toLowerCase() === stakeholder.name.toLowerCase() && 
+          existing.role.toLowerCase() === stakeholder.role.toLowerCase()
+      );
+
+      if (duplicate) {
+        skipped++;
+        continue;
+      }
+
+      // Create new stakeholder in target project
+      const { id, projectId, createdAt, updatedAt, ...stakeholderData } = stakeholder;
+      await db.insert(stakeholders).values({
+        ...stakeholderData,
+        projectId: targetProjectId,
+      });
+      
+      imported++;
+    }
+
+    return { imported, skipped };
   }
 
   // RAID Logs

@@ -470,6 +470,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/projects/:projectId/stakeholders/import", async (req, res) => {
+    try {
+      const { sourceProjectId, stakeholderIds } = req.body;
+      if (!sourceProjectId || !Array.isArray(stakeholderIds) || stakeholderIds.length === 0) {
+        return res.status(400).json({ error: "Invalid request: sourceProjectId and stakeholderIds array required" });
+      }
+      
+      const result = await storage.importStakeholders(req.params.projectId, sourceProjectId, stakeholderIds);
+      res.json({ imported: result.imported, skipped: result.skipped });
+    } catch (error) {
+      console.error("Error importing stakeholders:", error);
+      res.status(500).json({ error: "Failed to import stakeholders" });
+    }
+  });
+
   // RAID Logs
   app.get("/api/projects/:projectId/raid-logs", async (req, res) => {
     try {
