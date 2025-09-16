@@ -1,11 +1,11 @@
 import { 
-  users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, mindMaps,
+  users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, mindMaps, processMaps,
   type User, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type Survey, type InsertSurvey,
   type SurveyResponse, type InsertSurveyResponse, type GptInteraction, type InsertGptInteraction,
   type Milestone, type InsertMilestone, type ChecklistTemplate, type InsertChecklistTemplate,
-  type MindMap, type InsertMindMap
+  type MindMap, type InsertMindMap, type ProcessMap, type InsertProcessMap
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray } from "drizzle-orm";
@@ -89,6 +89,13 @@ export interface IStorage {
   createMindMap(mindMap: InsertMindMap): Promise<MindMap>;
   updateMindMap(id: string, mindMap: Partial<InsertMindMap>): Promise<MindMap | undefined>;
   deleteMindMap(id: string): Promise<boolean>;
+
+  // Process Maps
+  getProcessMapsByProject(projectId: string): Promise<ProcessMap[]>;
+  getProcessMap(id: string): Promise<ProcessMap | undefined>;
+  createProcessMap(processMap: InsertProcessMap): Promise<ProcessMap>;
+  updateProcessMap(id: string, processMap: Partial<InsertProcessMap>): Promise<ProcessMap | undefined>;
+  deleteProcessMap(id: string): Promise<boolean>;
 
   // Dashboard Analytics
   getDashboardStats(userId: string): Promise<{
@@ -517,6 +524,36 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMindMap(id: string): Promise<boolean> {
     const result = await db.delete(mindMaps).where(eq(mindMaps.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Process Maps
+  async getProcessMapsByProject(projectId: string): Promise<ProcessMap[]> {
+    return await db.select().from(processMaps)
+      .where(and(eq(processMaps.projectId, projectId), eq(processMaps.isActive, true)))
+      .orderBy(desc(processMaps.createdAt));
+  }
+
+  async getProcessMap(id: string): Promise<ProcessMap | undefined> {
+    const [processMap] = await db.select().from(processMaps).where(eq(processMaps.id, id));
+    return processMap || undefined;
+  }
+
+  async createProcessMap(insertProcessMap: InsertProcessMap): Promise<ProcessMap> {
+    const [processMap] = await db.insert(processMaps).values(insertProcessMap).returning();
+    return processMap;
+  }
+
+  async updateProcessMap(id: string, updateData: Partial<InsertProcessMap>): Promise<ProcessMap | undefined> {
+    const [processMap] = await db.update(processMaps)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(processMaps.id, id))
+      .returning();
+    return processMap || undefined;
+  }
+
+  async deleteProcessMap(id: string): Promise<boolean> {
+    const result = await db.delete(processMaps).where(eq(processMaps.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 }

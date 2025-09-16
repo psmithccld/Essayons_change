@@ -15,6 +15,7 @@ import Stakeholders from "@/pages/stakeholders";
 import Surveys from "@/pages/surveys";
 import GptCoach from "@/pages/gpt-coach";
 import MindMaps from "@/pages/mind-maps";
+import ProcessMapping from "@/pages/process-mapping";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 
@@ -36,6 +37,7 @@ function Router() {
             <Route path="/surveys" component={Surveys} />
             <Route path="/gpt-coach" component={GptCoach} />
             <Route path="/mind-maps" component={MindMaps} />
+            <Route path="/process-mapping" component={ProcessMapping} />
             <Route component={NotFound} />
           </Switch>
         </main>

@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { 
   insertProjectSchema, insertTaskSchema, insertStakeholderSchema, insertRaidLogSchema,
   insertCommunicationSchema, insertSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
-  insertMilestoneSchema, insertChecklistTemplateSchema, insertMindMapSchema,
+  insertMilestoneSchema, insertChecklistTemplateSchema, insertMindMapSchema, insertProcessMapSchema,
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema
 } from "@shared/schema";
 import * as openaiService from "./openai";
@@ -885,6 +885,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting mind map:", error);
       res.status(500).json({ error: "Failed to delete mind map" });
+    }
+  });
+
+  // Process Maps
+  app.get("/api/projects/:projectId/process-maps", async (req, res) => {
+    try {
+      const processMaps = await storage.getProcessMapsByProject(req.params.projectId);
+      res.json(processMaps);
+    } catch (error) {
+      console.error("Error fetching process maps:", error);
+      res.status(500).json({ error: "Failed to fetch process maps" });
+    }
+  });
+
+  app.get("/api/process-maps/:id", async (req, res) => {
+    try {
+      const processMap = await storage.getProcessMap(req.params.id);
+      if (!processMap) {
+        return res.status(404).json({ error: "Process map not found" });
+      }
+      res.json(processMap);
+    } catch (error) {
+      console.error("Error fetching process map:", error);
+      res.status(500).json({ error: "Failed to fetch process map" });
+    }
+  });
+
+  app.post("/api/projects/:projectId/process-maps", async (req, res) => {
+    try {
+      const validatedData = insertProcessMapSchema.parse({
+        ...req.body,
+        projectId: req.params.projectId,
+        createdById: "550e8400-e29b-41d4-a716-446655440000", // For demo, using default user ID
+      });
+      const processMap = await storage.createProcessMap(validatedData);
+      res.status(201).json(processMap);
+    } catch (error) {
+      console.error("Error creating process map:", error);
+      res.status(400).json({ error: "Failed to create process map" });
+    }
+  });
+
+  app.put("/api/process-maps/:id", async (req, res) => {
+    try {
+      const processMap = await storage.updateProcessMap(req.params.id, req.body);
+      if (!processMap) {
+        return res.status(404).json({ error: "Process map not found" });
+      }
+      res.json(processMap);
+    } catch (error) {
+      console.error("Error updating process map:", error);
+      res.status(400).json({ error: "Failed to update process map" });
+    }
+  });
+
+  app.delete("/api/process-maps/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteProcessMap(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Process map not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting process map:", error);
+      res.status(500).json({ error: "Failed to delete process map" });
     }
   });
 

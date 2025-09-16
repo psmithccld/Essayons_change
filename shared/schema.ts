@@ -182,6 +182,20 @@ export const mindMaps = pgTable("mind_maps", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const processMaps = pgTable("process_maps", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: uuid("project_id").references(() => projects.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  canvasData: jsonb("canvas_data").notNull(), // Fabric.js canvas state
+  elements: jsonb("elements").default([]), // Array of process elements metadata
+  connections: jsonb("connections").default([]), // Array of connection data between elements
+  isActive: boolean("is_active").notNull().default(true),
+  createdById: uuid("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   ownedProjects: many(projects),
@@ -194,6 +208,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   gptInteractions: many(gptInteractions),
   createdChecklistTemplates: many(checklistTemplates),
   createdMindMaps: many(mindMaps),
+  createdProcessMaps: many(processMaps),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -209,6 +224,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   gptInteractions: many(gptInteractions),
   milestones: many(milestones),
   mindMaps: many(mindMaps),
+  processMaps: many(processMaps),
 }));
 
 export const tasksRelations = relations(tasks, ({ one }) => ({
@@ -310,6 +326,17 @@ export const mindMapsRelations = relations(mindMaps, ({ one }) => ({
   }),
   createdBy: one(users, {
     fields: [mindMaps.createdById],
+    references: [users.id],
+  }),
+}));
+
+export const processMapsRelations = relations(processMaps, ({ one }) => ({
+  project: one(projects, {
+    fields: [processMaps.projectId],
+    references: [projects.id],
+  }),
+  createdBy: one(users, {
+    fields: [processMaps.createdById],
     references: [users.id],
   }),
 }));
@@ -430,6 +457,12 @@ export const insertMindMapSchema = createInsertSchema(mindMaps).omit({
   updatedAt: true,
 });
 
+export const insertProcessMapSchema = createInsertSchema(processMaps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -470,3 +503,6 @@ export type InsertChecklistTemplate = z.infer<typeof insertChecklistTemplateSche
 
 export type MindMap = typeof mindMaps.$inferSelect;
 export type InsertMindMap = z.infer<typeof insertMindMapSchema>;
+
+export type ProcessMap = typeof processMaps.$inferSelect;
+export type InsertProcessMap = z.infer<typeof insertProcessMapSchema>;
