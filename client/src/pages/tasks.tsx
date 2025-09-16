@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Calendar, User as UserIcon, AlertCircle, CheckCircle, Clock, Pause, X, ListChecks, FileText, Building, Code, Megaphone, Settings } from "lucide-react";
+import { Plus, Calendar, User as UserIcon, AlertCircle, CheckCircle, Clock, Pause, X, ListChecks, FileText, Building, Code, Megaphone, Settings, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
@@ -90,6 +90,7 @@ function getCategoryColor(category: string) {
 
 export default function Tasks() {
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -128,6 +129,7 @@ export default function Tasks() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
       setIsNewTaskOpen(false);
+      setEditingTask(null);
       form.reset();
       toast({
         title: "Success",
@@ -150,6 +152,8 @@ export default function Tasks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
+      setIsNewTaskOpen(false);
+      setEditingTask(null);
       toast({
         title: "Success", 
         description: "Task updated successfully",
@@ -163,6 +167,50 @@ export default function Tasks() {
       });
     },
   });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const response = await apiRequest("DELETE", `/api/tasks/${taskId}`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
+      toast({
+        title: "Success",
+        description: "Task deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete task",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteTask = (taskId: string, taskName: string) => {
+    if (window.confirm(`Are you sure you want to delete "${taskName}"? This action cannot be undone.`)) {
+      deleteTaskMutation.mutate(taskId);
+    }
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    form.reset({
+      name: task.name,
+      description: task.description || "",
+      status: task.status,
+      priority: task.priority,
+      assigneeId: task.assigneeId || "unassigned",
+      assigneeEmail: task.assigneeEmail || "",
+      assignmentType: task.assigneeId ? "user" : task.assigneeEmail ? "external" : "user",
+      startDate: task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : "",
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "",
+      checklist: task.checklist || [],
+    });
+    setIsNewTaskOpen(true);
+  };
 
   const onSubmit = (data: TaskFormData) => {
     if (!currentProject) {
@@ -198,7 +246,12 @@ export default function Tasks() {
       assignmentType: data.assignmentType,
     };
     
-    createTaskMutation.mutate(taskData);
+    if (editingTask) {
+      updateTaskMutation.mutate({ taskId: editingTask.id, data: taskData });
+      setEditingTask(null);
+    } else {
+      createTaskMutation.mutate(taskData);
+    }
   };
 
   const addChecklistItem = () => {
@@ -268,7 +321,7 @@ export default function Tasks() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create New Task</DialogTitle>
+              <DialogTitle>{editingTask ? "Edit Task" : "Create New Task"}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -652,9 +705,27 @@ export default function Tasks() {
                           )}
                         </div>
                         <div className="flex flex-col space-y-2 ml-4">
-                          <Badge className={getPriorityColor(task.priority)}>
-                            {task.priority}
-                          </Badge>
+                          <div className="flex items-center space-x-2">
+                            <Badge className={getPriorityColor(task.priority)}>
+                              {task.priority}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditTask(task)}
+                              data-testid={`button-edit-task-${task.id}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteTask(task.id, task.name)}
+                              data-testid={`button-delete-task-${task.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                           <Select
                             value={task.status}
                             onValueChange={(value) => handleStatusChange(task.id, value)}
