@@ -122,9 +122,19 @@ export default function MindMaps() {
   useEffect(() => {
     if (!canvasRef.current || canvas) return;
 
-    const fabricCanvas = new FabricCanvas(canvasRef.current, {
-      width: window.innerWidth - 300,
-      height: window.innerHeight - 200,
+    const canvasElement = canvasRef.current;
+    const width = window.innerWidth - 300;
+    const height = window.innerHeight - 200;
+    
+    // Set explicit dimensions on the HTML canvas element
+    canvasElement.width = width;
+    canvasElement.height = height;
+    canvasElement.style.width = width + 'px';
+    canvasElement.style.height = height + 'px';
+
+    const fabricCanvas = new FabricCanvas(canvasElement, {
+      width: width,
+      height: height,
       backgroundColor: '#ffffff',
     });
 
@@ -150,13 +160,30 @@ export default function MindMaps() {
   // Resize canvas when window resizes
   useEffect(() => {
     const handleResize = () => {
-      if (canvas) {
-        const newWidth = window.innerWidth - 300;
-        const newHeight = window.innerHeight - 200;
-        canvas.setDimensions({
-          width: newWidth,
-          height: newHeight
-        });
+      if (canvas && canvasRef.current && canvas.getElement && canvas.lowerCanvasEl) {
+        try {
+          const newWidth = window.innerWidth - 300;
+          const newHeight = window.innerHeight - 200;
+          
+          // Update HTML canvas element dimensions
+          canvasRef.current.width = newWidth;
+          canvasRef.current.height = newHeight;
+          canvasRef.current.style.width = newWidth + 'px';
+          canvasRef.current.style.height = newHeight + 'px';
+          
+          // Safely update Fabric.js canvas dimensions with validation
+          if (typeof canvas.setDimensions === 'function') {
+            canvas.setDimensions({
+              width: newWidth,
+              height: newHeight
+            });
+            
+            // Force canvas to render after resize
+            canvas.requestRenderAll();
+          }
+        } catch (error) {
+          // Silently handle resize errors
+        }
       }
     };
 
@@ -215,13 +242,14 @@ export default function MindMaps() {
 
   // Drawing tool functions
   const setDrawingMode = (enabled: boolean) => {
-    if (!canvas) return;
+    if (!canvas) {
+      return;
+    }
     
     canvas.isDrawingMode = enabled;
+    
     if (enabled) {
-      canvas.freeDrawingBrush.color = tools.strokeColor;
-      canvas.freeDrawingBrush.width = tools.strokeWidth;
-      
+      // Initialize the brush first before setting properties
       if (tools.drawingTool === 'eraser') {
         canvas.freeDrawingBrush = new PencilBrush(canvas);
         canvas.freeDrawingBrush.color = '#ffffff'; // Background color for eraser effect
@@ -231,6 +259,14 @@ export default function MindMaps() {
         canvas.freeDrawingBrush.color = tools.strokeColor;
         canvas.freeDrawingBrush.width = tools.strokeWidth;
       }
+      
+      // Add path created event listener
+      canvas.on('path:created', function(event) {
+        // Path was created successfully
+      });
+    } else {
+      // Remove event listeners when drawing is disabled
+      canvas.off('path:created');
     }
   };
 
@@ -334,22 +370,19 @@ export default function MindMaps() {
       const canvasData = saveCanvasData();
       const textBoxes = canvas?.getObjects().filter(obj => obj.type === 'i-text' || obj.type === 'text') || [];
       
-      return apiRequest('/api/projects/' + currentProject?.id + '/mind-maps', {
-        method: 'POST',
-        body: {
-          ...data,
-          projectId: currentProject?.id,
-          createdById: "550e8400-e29b-41d4-a716-446655440000",
-          canvasData,
-          textBoxes: textBoxes.map(obj => ({
-            id: obj.id || 'text-' + Math.random().toString(36),
-            text: obj.type === 'i-text' ? (obj as any).text : '',
-            x: obj.left || 0,
-            y: obj.top || 0,
-            width: obj.width || 100,
-            height: obj.height || 50,
-          })),
-        }
+      return apiRequest('POST', '/api/projects/' + currentProject?.id + '/mind-maps', {
+        ...data,
+        projectId: currentProject?.id,
+        createdById: "550e8400-e29b-41d4-a716-446655440000",
+        canvasData,
+        textBoxes: textBoxes.map(obj => ({
+          id: (obj as any).id || 'text-' + Math.random().toString(36),
+          text: obj.type === 'i-text' ? (obj as any).text : '',
+          x: obj.left || 0,
+          y: obj.top || 0,
+          width: obj.width || 100,
+          height: obj.height || 50,
+        })),
       });
     },
     onSuccess: () => {
@@ -367,19 +400,16 @@ export default function MindMaps() {
     mutationFn: async (data: { id: string; canvasData: string }) => {
       const textBoxes = canvas?.getObjects().filter(obj => obj.type === 'i-text' || obj.type === 'text') || [];
       
-      return apiRequest('/api/mind-maps/' + data.id, {
-        method: 'PUT',
-        body: {
-          canvasData: data.canvasData,
-          textBoxes: textBoxes.map(obj => ({
-            id: obj.id || 'text-' + Math.random().toString(36),
-            text: obj.type === 'i-text' ? (obj as any).text : '',
-            x: obj.left || 0,
-            y: obj.top || 0,
-            width: obj.width || 100,
-            height: obj.height || 50,
-          })),
-        }
+      return apiRequest('PUT', '/api/mind-maps/' + data.id, {
+        canvasData: data.canvasData,
+        textBoxes: textBoxes.map(obj => ({
+          id: (obj as any).id || 'text-' + Math.random().toString(36),
+          text: obj.type === 'i-text' ? (obj as any).text : '',
+          x: obj.left || 0,
+          y: obj.top || 0,
+          width: obj.width || 100,
+          height: obj.height || 50,
+        })),
       });
     },
     onSuccess: () => {
@@ -392,9 +422,8 @@ export default function MindMaps() {
   });
 
   const createTaskMutation = useMutation({
-    mutationFn: async (data: TaskFormData) => apiRequest('/api/projects/' + currentProject?.id + '/tasks', {
-      method: 'POST',
-      body: { ...data, projectId: currentProject?.id }
+    mutationFn: async (data: TaskFormData) => apiRequest('POST', '/api/projects/' + currentProject?.id + '/tasks', {
+      ...data, projectId: currentProject?.id
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
@@ -404,9 +433,8 @@ export default function MindMaps() {
   });
 
   const createRaidLogMutation = useMutation({
-    mutationFn: async (data: RaidLogFormData) => apiRequest('/api/projects/' + currentProject?.id + '/raid-logs', {
-      method: 'POST',
-      body: { ...data, projectId: currentProject?.id, ownerId: "550e8400-e29b-41d4-a716-446655440000" }
+    mutationFn: async (data: RaidLogFormData) => apiRequest('POST', '/api/projects/' + currentProject?.id + '/raid-logs', {
+      ...data, projectId: currentProject?.id, ownerId: "550e8400-e29b-41d4-a716-446655440000"
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'raid-logs'] });
@@ -416,9 +444,8 @@ export default function MindMaps() {
   });
 
   const createCommunicationMutation = useMutation({
-    mutationFn: async (data: CommunicationFormData) => apiRequest('/api/projects/' + currentProject?.id + '/communications', {
-      method: 'POST',
-      body: { ...data, projectId: currentProject?.id, createdById: "550e8400-e29b-41d4-a716-446655440000" }
+    mutationFn: async (data: CommunicationFormData) => apiRequest('POST', '/api/projects/' + currentProject?.id + '/communications', {
+      ...data, projectId: currentProject?.id, createdById: "550e8400-e29b-41d4-a716-446655440000"
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
@@ -428,9 +455,8 @@ export default function MindMaps() {
   });
 
   const createStakeholderMutation = useMutation({
-    mutationFn: async (data: StakeholderFormData) => apiRequest('/api/projects/' + currentProject?.id + '/stakeholders', {
-      method: 'POST',
-      body: { ...data, projectId: currentProject?.id }
+    mutationFn: async (data: StakeholderFormData) => apiRequest('POST', '/api/projects/' + currentProject?.id + '/stakeholders', {
+      ...data, projectId: currentProject?.id
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'stakeholders'] });
@@ -440,9 +466,8 @@ export default function MindMaps() {
   });
 
   const createMilestoneMutation = useMutation({
-    mutationFn: async (data: MilestoneFormData) => apiRequest('/api/projects/' + currentProject?.id + '/milestones', {
-      method: 'POST',
-      body: { ...data, projectId: currentProject?.id, targetDate: new Date(data.targetDate) }
+    mutationFn: async (data: MilestoneFormData) => apiRequest('POST', '/api/projects/' + currentProject?.id + '/milestones', {
+      ...data, projectId: currentProject?.id, targetDate: new Date(data.targetDate)
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'milestones'] });
