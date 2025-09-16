@@ -14,6 +14,7 @@ import { z } from "zod";
 import { Plus, Users, Mail, Phone, Building, TrendingUp, TrendingDown, Minus, MessageSquare, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import type { Project, Stakeholder } from "@shared/schema";
 
 const stakeholderFormSchema = z.object({
@@ -68,20 +69,16 @@ function getEngagementColor(level: string) {
 }
 
 export default function Stakeholders() {
-  const [selectedProject, setSelectedProject] = useState<string>("");
   const [isNewStakeholderOpen, setIsNewStakeholderOpen] = useState(false);
   const [isGptTipsOpen, setIsGptTipsOpen] = useState(false);
   const [gptTips, setGptTips] = useState<any>(null);
   const { toast } = useToast();
+  const { currentProject } = useCurrentProject();
   const queryClient = useQueryClient();
 
-  const { data: projects = [] } = useQuery<Project[]>({
-    queryKey: ['/api/projects'],
-  });
-
   const { data: stakeholders = [], isLoading } = useQuery<Stakeholder[]>({
-    queryKey: ['/api/projects', selectedProject, 'stakeholders'],
-    enabled: !!selectedProject,
+    queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
+    enabled: !!currentProject?.id,
   });
 
   const form = useForm<StakeholderFormData>({
@@ -95,11 +92,12 @@ export default function Stakeholders() {
 
   const createStakeholderMutation = useMutation({
     mutationFn: async (stakeholderData: StakeholderFormData) => {
-      const response = await apiRequest("POST", `/api/projects/${selectedProject}/stakeholders`, stakeholderData);
+      if (!currentProject?.id) throw new Error("No project selected");
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/stakeholders`, stakeholderData);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', selectedProject, 'stakeholders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'stakeholders'] });
       setIsNewStakeholderOpen(false);
       form.reset();
       toast({
@@ -119,7 +117,7 @@ export default function Stakeholders() {
   const getStakeholderTipsMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/gpt/stakeholder-tips", {
-        projectId: selectedProject,
+        projectId: currentProject?.id,
         stakeholders: stakeholders.map(s => ({
           name: s.name,
           role: s.role,
@@ -177,7 +175,7 @@ export default function Stakeholders() {
             <DialogTrigger asChild>
               <Button 
                 variant="outline" 
-                disabled={!selectedProject || stakeholders.length === 0}
+                disabled={!currentProject?.id || stakeholders.length === 0}
                 onClick={handleGetTips}
                 data-testid="button-gpt-tips"
               >
@@ -231,7 +229,7 @@ export default function Stakeholders() {
           
           <Dialog open={isNewStakeholderOpen} onOpenChange={setIsNewStakeholderOpen}>
             <DialogTrigger asChild>
-              <Button disabled={!selectedProject} data-testid="button-new-stakeholder">
+              <Button disabled={!currentProject?.id} data-testid="button-new-stakeholder">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Stakeholder
               </Button>
@@ -448,29 +446,8 @@ export default function Stakeholders() {
         </div>
       </div>
 
-      {/* Project Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Project</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-full max-w-md" data-testid="select-stakeholder-project">
-              <SelectValue placeholder="Choose a project to manage stakeholders" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
       {/* Engagement Overview */}
-      {selectedProject && stakeholders.length > 0 && (
+      {currentProject && stakeholders.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-4">
@@ -529,7 +506,7 @@ export default function Stakeholders() {
       )}
 
       {/* Stakeholders List */}
-      {selectedProject && (
+      {currentProject && (
         <Card>
           <CardHeader>
             <CardTitle>Stakeholder Directory</CardTitle>
