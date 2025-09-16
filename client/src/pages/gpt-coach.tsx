@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Bot, Send, Lightbulb, ChartLine, AlertTriangle, Users, MessageSquare, FileText, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import type { Project, Stakeholder, RaidLog } from "@shared/schema";
 
 interface GPTResponse {
@@ -50,35 +51,30 @@ const coachingPrompts = [
 ];
 
 export default function GptCoach() {
-  const [selectedProject, setSelectedProject] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>("quick-actions");
   const [customPrompt, setCustomPrompt] = useState<string>("");
   const [responses, setResponses] = useState<GPTResponse[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentResponse, setCurrentResponse] = useState<any>(null);
   const { toast } = useToast();
-
-  const { data: projects = [] } = useQuery<Project[]>({
-    queryKey: ['/api/projects'],
-  });
+  const { currentProject } = useCurrentProject();
 
   const { data: stakeholders = [] } = useQuery<Stakeholder[]>({
-    queryKey: ['/api/projects', selectedProject, 'stakeholders'],
-    enabled: !!selectedProject,
+    queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
+    enabled: !!currentProject?.id,
   });
 
   const { data: raidLogs = [] } = useQuery<RaidLog[]>({
-    queryKey: ['/api/projects', selectedProject, 'raid-logs'],
-    enabled: !!selectedProject,
+    queryKey: ['/api/projects', currentProject?.id, 'raid-logs'],
+    enabled: !!currentProject?.id,
   });
 
   const generateCommunicationPlanMutation = useMutation({
     mutationFn: async () => {
-      const currentProject = projects.find(p => p.id === selectedProject);
-      if (!currentProject) throw new Error("Project not found");
+      if (!currentProject?.id) throw new Error("No project selected");
 
       const response = await apiRequest("POST", "/api/gpt/communication-plan", {
-        projectId: selectedProject,
+        projectId: currentProject.id,
         projectName: currentProject.name,
         description: currentProject.description || "",
         stakeholders: stakeholders.map(s => ({
@@ -129,7 +125,7 @@ export default function GptCoach() {
       };
 
       const response = await apiRequest("POST", "/api/gpt/readiness-analysis", {
-        projectId: selectedProject,
+        projectId: currentProject?.id,
         ...mockSurveyData
       });
       return response.json();
@@ -168,7 +164,7 @@ export default function GptCoach() {
       }));
 
       const response = await apiRequest("POST", "/api/gpt/risk-mitigation", {
-        projectId: selectedProject,
+        projectId: currentProject?.id,
         risks
       });
       return response.json();
@@ -199,7 +195,7 @@ export default function GptCoach() {
   const stakeholderTipsMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/gpt/stakeholder-tips", {
-        projectId: selectedProject,
+        projectId: currentProject?.id,
         stakeholders: stakeholders.map(s => ({
           name: s.name,
           role: s.role,
@@ -234,7 +230,7 @@ export default function GptCoach() {
   });
 
   const handleQuickAction = (actionId: string) => {
-    if (!selectedProject) {
+    if (!currentProject?.id) {
       toast({
         title: "Project Required",
         description: "Please select a project first",
@@ -323,26 +319,6 @@ export default function GptCoach() {
         </div>
       </div>
 
-      {/* Project Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Project</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-full max-w-md" data-testid="select-coach-project">
-              <SelectValue placeholder="Choose a project for AI coaching" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
 
       {/* Main Interface */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -389,7 +365,7 @@ export default function GptCoach() {
                                 <Button
                                   size="sm"
                                   onClick={() => handleQuickAction(prompt.id)}
-                                  disabled={!selectedProject || isLoading}
+                                  disabled={!currentProject?.id || isLoading}
                                   data-testid={`button-${prompt.id}`}
                                 >
                                   {isLoading ? "Generating..." : "Generate"}
