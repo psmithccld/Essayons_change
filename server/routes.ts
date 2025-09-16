@@ -17,12 +17,13 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
     type = 'deficiency';
   }
   
-  // Coerce date fields to Date objects
+  // Keep date fields as strings for Zod validation
   const processedData = {
     ...baseData,
     type,
-    dueDate: baseData.dueDate ? new Date(baseData.dueDate) : undefined,
-    targetResolutionDate: baseData.targetResolutionDate ? new Date(baseData.targetResolutionDate) : undefined,
+    // Date fields should remain as strings since schemas expect strings
+    dueDate: baseData.dueDate || undefined,
+    targetResolutionDate: baseData.targetResolutionDate || undefined,
   };
   
   let templateValidated;
@@ -51,13 +52,23 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
   }
   
   // Merge template-specific fields with required generic fields
-  // Only provide defaults if not already present in template data
-  return {
+  // Convert string dates to Date objects for database insertion
+  const finalData = {
     ...templateValidated,
     description,
     severity: (templateValidated as any).severity || 'medium',
     impact: (templateValidated as any).impact || 'medium',
   };
+  
+  // Convert date strings to Date objects for database timestamp fields
+  if (finalData.dueDate && typeof finalData.dueDate === 'string') {
+    finalData.dueDate = new Date(finalData.dueDate);
+  }
+  if (finalData.targetResolutionDate && typeof finalData.targetResolutionDate === 'string') {
+    finalData.targetResolutionDate = new Date(finalData.targetResolutionDate);
+  }
+  
+  return finalData;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
