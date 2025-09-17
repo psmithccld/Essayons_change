@@ -156,26 +156,70 @@ export default function ProcessMapping() {
     selectedSymbolTypeRef.current = selectedSymbolType;
   }, [selectedSymbolType]);
 
-  // Separate useEffect to handle canvas clicks for adding symbols
+  // Handle canvas interactions - symbol placement and connections
   useEffect(() => {
     if (!canvas) return;
 
     const handleCanvasClick = (e: any) => {
-      // Use ref to get current selectedSymbolType to avoid stale closure
       const currentSymbolType = selectedSymbolTypeRef.current;
+      
+      // Handle symbol placement
       if (currentSymbolType && e.pointer) {
         console.log('Adding process element:', currentSymbolType, 'at', e.pointer.x, e.pointer.y);
         addProcessElement(currentSymbolType, e.pointer.x, e.pointer.y);
         setSelectedSymbolType(null);
+        return;
+      }
+      
+      // Handle connection mode - clicking on objects to connect them
+      if (tools.mode === 'connect' && e.target && (e.target as any).processId) {
+        const clickedElement = e.target;
+        
+        if (!tools.connecting || !tools.connectionStart) {
+          // First click - start connection
+          setTools(prev => ({
+            ...prev,
+            connecting: true,
+            connectionStart: clickedElement
+          }));
+          toast({
+            title: "Connection Started",
+            description: "Click another symbol to complete the connection",
+          });
+        } else {
+          // Second click - complete connection
+          if (tools.connectionStart !== clickedElement) {
+            createConnection(tools.connectionStart, clickedElement);
+            toast({
+              title: "Connection Created",
+              description: "Symbols connected successfully!",
+            });
+          }
+          // Reset connection state
+          setTools(prev => ({
+            ...prev,
+            connecting: false,
+            connectionStart: null
+          }));
+        }
+      }
+    };
+
+    const handleDoubleClick = (e: any) => {
+      // Handle text editing on double-click
+      if (e.target && (e.target as any).processId) {
+        editSymbolText(e.target);
       }
     };
 
     canvas.on('mouse:down', handleCanvasClick);
+    canvas.on('mouse:dblclick', handleDoubleClick);
 
     return () => {
       canvas.off('mouse:down', handleCanvasClick);
+      canvas.off('mouse:dblclick', handleDoubleClick);
     };
-  }, [canvas]);
+  }, [canvas, tools.mode, tools.connecting, tools.connectionStart]);
 
   // Resize canvas when window resizes
   useEffect(() => {
@@ -448,8 +492,17 @@ export default function ProcessMapping() {
     const endX = endBounds.left + endBounds.width / 2;
     const endY = endBounds.top + endBounds.height / 2;
 
+    // Calculate arrow direction for proper arrowhead positioning
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const angle = Math.atan2(dy, dx);
+    
+    // Adjust end point to touch the symbol edge rather than center
+    const adjustedEndX = endX - Math.cos(angle) * 30;
+    const adjustedEndY = endY - Math.sin(angle) * 30;
+
     // Create arrow line
-    const line = new Path(`M ${startX} ${startY} L ${endX} ${endY}`, {
+    const line = new Path(`M ${startX} ${startY} L ${adjustedEndX} ${adjustedEndY}`, {
       stroke: '#374151',
       strokeWidth: 2,
       selectable: true,
@@ -458,11 +511,12 @@ export default function ProcessMapping() {
       hasBorders: false,
     });
 
-    // Create arrow head
+    // Create arrow head positioned at the adjusted end point
+    const arrowSize = 10;
     const arrowHead = new Polygon([
-      { x: endX - 10, y: endY - 5 },
-      { x: endX, y: endY },
-      { x: endX - 10, y: endY + 5 }
+      { x: adjustedEndX - arrowSize * Math.cos(angle - Math.PI / 6), y: adjustedEndY - arrowSize * Math.sin(angle - Math.PI / 6) },
+      { x: adjustedEndX, y: adjustedEndY },
+      { x: adjustedEndX - arrowSize * Math.cos(angle + Math.PI / 6), y: adjustedEndY - arrowSize * Math.sin(angle + Math.PI / 6) }
     ], {
       fill: '#374151',
       selectable: false,
@@ -476,18 +530,68 @@ export default function ProcessMapping() {
       hasBorders: true,
     });
 
+    // Add custom properties to identify this as a connection
+    (connection as any).isConnection = true;
+    (connection as any).connectionId = `connection-${Date.now()}`;
+
     canvas.add(connection);
     canvas.renderAll();
 
     // Add to connections state
     const newConnection: Connection = {
-      id: `connection-${Date.now()}`,
+      id: (connection as any).connectionId,
       fromId: (startElement as any).processId,
       toId: (endElement as any).processId,
-      points: [startX, startY, endX, endY],
+      points: [startX, startY, adjustedEndX, adjustedEndY],
     };
 
     setConnections(prev => [...prev, newConnection]);
+  };
+
+  // Edit text in symbol
+  const editSymbolText = (symbolGroup: any) => {
+    if (!canvas || !symbolGroup) return;
+
+    // Find the text object within the group
+    const textObject = symbolGroup.getObjects().find((obj: any) => obj.type === 'i-text');
+    if (!textObject) return;
+
+    // Temporarily make the text object editable
+    textObject.selectable = true;
+    textObject.evented = true;
+    
+    // Set the text object as active and enter editing mode
+    canvas.setActiveObject(textObject);
+    canvas.requestRenderAll();
+    
+    setTimeout(() => {
+      try {
+        (textObject as any).enterEditing();
+        
+        // When editing ends, update the element state
+        textObject.on('editing:exited', () => {
+          const processId = (symbolGroup as any).processId;
+          if (processId) {
+            setElements(prev => prev.map(el => 
+              el.id === processId 
+                ? { ...el, text: textObject.text || el.text }
+                : el
+            ));
+          }
+          
+          // Make text non-selectable again
+          textObject.selectable = false;
+          textObject.evented = false;
+          canvas.discardActiveObject();
+          canvas.requestRenderAll();
+        });
+      } catch (error) {
+        console.warn('Could not enter text editing mode:', error);
+        // Fallback: still make text temporarily selectable
+        textObject.selectable = false;
+        textObject.evented = false;
+      }
+    }, 50);
   };
 
   // Handle symbol selection from toolbar
@@ -991,7 +1095,7 @@ export default function ProcessMapping() {
                     variant={tools.mode === 'select' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => {
-                      setTools(prev => ({ ...prev, mode: 'select' }));
+                      setTools(prev => ({ ...prev, mode: 'select', connecting: false, connectionStart: null }));
                       setSelectedSymbolType(null);
                       if (canvas) {
                         canvas.defaultCursor = 'default';
@@ -1002,6 +1106,28 @@ export default function ProcessMapping() {
                     <MousePointer2 className="w-4 h-4 mr-1" />
                     Select
                   </Button>
+                  <Button
+                    variant={tools.mode === 'connect' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setTools(prev => ({ ...prev, mode: 'connect', connecting: false, connectionStart: null }));
+                      setSelectedSymbolType(null);
+                      if (canvas) {
+                        canvas.defaultCursor = 'crosshair';
+                      }
+                      toast({
+                        title: "Connect Mode",
+                        description: "Click two symbols to connect them with an arrow",
+                      });
+                    }}
+                    data-testid="button-tool-connect"
+                  >
+                    <ArrowRight className="w-4 h-4 mr-1" />
+                    Connect
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-2">
                   <Button
                     variant="outline"
                     size="sm"
