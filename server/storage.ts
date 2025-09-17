@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { 
   users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, mindMaps, processMaps, roles, userInitiativeAssignments,
-  type User, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
+  type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type Survey, type InsertSurvey,
   type SurveyResponse, type InsertSurveyResponse, type GptInteraction, type InsertGptInteraction,
@@ -29,6 +29,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, user: Partial<Omit<InsertUser, 'password'> & { passwordHash?: string }>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
   verifyPassword(username: string, password: string): Promise<User | null>;
 
   // Projects
@@ -185,6 +186,15 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
+    if (!user) return undefined;
+    // SECURITY: Remove passwordHash from response
+    const { passwordHash, ...userWithoutHash } = user;
+    return userWithoutHash as User;
+  }
+
+  // SECURITY: Internal method that includes passwordHash for authentication
+  private async getUserByUsernameWithPassword(username: string): Promise<UserWithPassword | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
     return user || undefined;
   }
 
@@ -216,14 +226,24 @@ export class DatabaseStorage implements IStorage {
     return userWithoutHash as User;
   }
 
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
   async verifyPassword(username: string, password: string): Promise<User | null> {
-    const user = await this.getUserByUsername(username);
-    if (!user || !user.isActive) {
+    // SECURITY: Use internal method that includes passwordHash for authentication
+    const userWithPassword = await this.getUserByUsernameWithPassword(username);
+    if (!userWithPassword || !userWithPassword.isActive) {
       return null;
     }
     
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-    return isValid ? user : null;
+    const isValid = await bcrypt.compare(password, userWithPassword.passwordHash);
+    if (!isValid) return null;
+    
+    // SECURITY: Remove passwordHash from response
+    const { passwordHash, ...userWithoutHash } = userWithPassword;
+    return userWithoutHash as User;
   }
 
   // Projects
@@ -676,6 +696,7 @@ export class DatabaseStorage implements IStorage {
     if (result.length === 0 || !result[0].permissions) {
       // Return default permissions with all false if user/role not found
       return {
+        canViewUsers: false,
         canCreateUsers: false,
         canEditUsers: false,
         canDeleteUsers: false,
@@ -683,6 +704,7 @@ export class DatabaseStorage implements IStorage {
         canEditAllProjects: false,
         canDeleteProjects: false,
         canViewAllProjects: false,
+        canViewRoles: false,
         canCreateRoles: false,
         canEditRoles: false,
         canDeleteRoles: false,

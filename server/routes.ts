@@ -107,7 +107,7 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Roles
-  app.get("/api/roles", requirePermission('canCreateRoles'), async (req, res) => {
+  app.get("/api/roles", requirePermission('canViewRoles'), async (req, res) => {
     try {
       const roles = await storage.getRoles();
       res.json(roles);
@@ -137,10 +137,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "User role not found" });
       }
       
-      // Return user info without password
-      const { passwordHash, ...userInfo } = user;
+      // User already has passwordHash removed by storage layer
       res.json({
-        user: userInfo,
+        user: user,
         role,
         permissions: role.permissions
       });
@@ -150,8 +149,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // RBAC: User permissions endpoint for frontend permission gating
+  app.get("/api/users/me/permissions", async (req: AuthenticatedRequest, res) => {
+    try {
+      // For demo purposes, using a hardcoded user ID - in production, get from session/token
+      const userId = req.userId || DEMO_USER_ID;
+      
+      const permissions = await storage.getUserPermissions(userId);
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json({
+        user: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          roleId: user.roleId,
+          isActive: user.isActive
+        },
+        permissions
+      });
+    } catch (error) {
+      console.error("Error fetching user permissions:", error);
+      res.status(500).json({ error: "Failed to fetch user permissions" });
+    }
+  });
+
   // Users
-  app.get("/api/users", requirePermission('canCreateUsers'), async (req, res) => {
+  app.get("/api/users", requirePermission('canViewUsers'), async (req, res) => {
     try {
       const users = await storage.getUsers();
       res.json(users);
@@ -1103,7 +1131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User-Initiative Assignment Routes
-  app.get("/api/users/:userId/initiatives", async (req, res) => {
+  app.get("/api/users/:userId/initiatives", requirePermission('canViewUsers'), async (req, res) => {
     try {
       const assignments = await storage.getUserInitiativeAssignments(req.params.userId);
       res.json(assignments);
@@ -1168,7 +1196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Enhanced User Management Routes
-  app.get("/api/users/with-roles", requirePermission('canCreateUsers'), async (req, res) => {
+  app.get("/api/users/with-roles", requirePermission('canViewUsers'), async (req, res) => {
     try {
       const usersWithRoles = await storage.getUsersWithRoles();
       res.json(usersWithRoles);
@@ -1183,9 +1211,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertUserSchema.parse(req.body);
       const user = await storage.createUser(validatedData);
       
-      // Remove password hash from response
-      const { passwordHash, ...userResponse } = user;
-      res.status(201).json(userResponse);
+      // User already has passwordHash removed by storage layer
+      res.status(201).json(user);
     } catch (error) {
       console.error("Error creating user:", error);
       res.status(400).json({ error: "Failed to create user" });
@@ -1202,9 +1229,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
       
-      // Remove password hash from response
-      const { passwordHash, ...userResponse } = user;
-      res.json(userResponse);
+      // User already has passwordHash removed by storage layer
+      res.json(user);
     } catch (error) {
       console.error("Error updating user:", error);
       res.status(400).json({ error: "Failed to update user" });
@@ -1223,21 +1249,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
       
-      // Remove password hash from response
-      const { passwordHash, ...userResponse } = user;
-      res.json(userResponse);
+      // User already has passwordHash removed by storage layer
+      res.json(user);
     } catch (error) {
       console.error("Error updating user role:", error);
       res.status(400).json({ error: "Failed to update user role" });
     }
   });
 
-  app.get("/api/users/by-role/:roleId", async (req, res) => {
+  app.delete("/api/users/:id", requirePermission('canDeleteUsers'), async (req, res) => {
+    try {
+      // Check if user has dependencies (assigned tasks, initiatives, etc.)
+      const userInitiatives = await storage.getUserInitiativeAssignments(req.params.id);
+      if (userInitiatives.length > 0) {
+        return res.status(400).json({ 
+          error: "Cannot delete user with active initiative assignments. Please reassign or remove assignments first." 
+        });
+      }
+
+      // Note: Could add more dependency checks (assigned tasks, owned projects, etc.)
+      // For now, implementing basic deletion
+      const success = await storage.deleteUser(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+
+  app.get("/api/users/by-role/:roleId", requirePermission('canViewUsers'), async (req, res) => {
     try {
       const users = await storage.getUsersByRole(req.params.roleId);
-      // Remove password hashes from response
-      const usersResponse = users.map(({ passwordHash, ...user }) => user);
-      res.json(usersResponse);
+      // Users already have passwordHash removed by storage layer
+      res.json(users);
     } catch (error) {
       console.error("Error fetching users by role:", error);
       res.status(500).json({ error: "Failed to fetch users by role" });
@@ -1245,7 +1294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Permission Check Routes
-  app.get("/api/users/:userId/permissions", async (req, res) => {
+  app.get("/api/users/:userId/permissions", requirePermission('canViewUsers'), async (req, res) => {
     try {
       const permissions = await storage.getUserPermissions(req.params.userId);
       res.json(permissions);
@@ -1255,7 +1304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/users/:userId/permissions/:permission", async (req, res) => {
+  app.get("/api/users/:userId/permissions/:permission", requirePermission('canViewUsers'), async (req, res) => {
     try {
       const hasPermission = await storage.checkUserPermission(
         req.params.userId, 

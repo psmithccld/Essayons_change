@@ -6,6 +6,7 @@ import { z } from "zod";
 
 // Define permissions structure for type safety
 export const permissionsSchema = z.object({
+  canViewUsers: z.boolean().default(false), // RBAC: View user lists and profiles
   canCreateUsers: z.boolean().default(false),
   canEditUsers: z.boolean().default(false),
   canDeleteUsers: z.boolean().default(false),
@@ -13,6 +14,7 @@ export const permissionsSchema = z.object({
   canEditAllProjects: z.boolean().default(false),
   canDeleteProjects: z.boolean().default(false),
   canViewAllProjects: z.boolean().default(false),
+  canViewRoles: z.boolean().default(false), // RBAC: View roles for assignment
   canCreateRoles: z.boolean().default(false),
   canEditRoles: z.boolean().default(false),
   canDeleteRoles: z.boolean().default(false),
@@ -585,6 +587,7 @@ export const insertProcessMapSchema = createInsertSchema(processMaps).omit({
 // Default role permissions for seeding
 export const DEFAULT_PERMISSIONS = {
   SUPER_ADMIN: {
+    canViewUsers: true,
     canCreateUsers: true,
     canEditUsers: true,
     canDeleteUsers: true,
@@ -592,6 +595,7 @@ export const DEFAULT_PERMISSIONS = {
     canEditAllProjects: true,
     canDeleteProjects: true,
     canViewAllProjects: true,
+    canViewRoles: true,
     canCreateRoles: true,
     canEditRoles: true,
     canDeleteRoles: true,
@@ -599,6 +603,7 @@ export const DEFAULT_PERMISSIONS = {
     canManageSystem: true,
   },
   PROJECT_MANAGER: {
+    canViewUsers: true, // Can view users for assignment purposes
     canCreateUsers: false,
     canEditUsers: false,
     canDeleteUsers: false,
@@ -606,6 +611,7 @@ export const DEFAULT_PERMISSIONS = {
     canEditAllProjects: false,
     canDeleteProjects: false,
     canViewAllProjects: false,
+    canViewRoles: true, // Can view roles for assignment purposes
     canCreateRoles: false,
     canEditRoles: false,
     canDeleteRoles: false,
@@ -613,6 +619,7 @@ export const DEFAULT_PERMISSIONS = {
     canManageSystem: false,
   },
   TEAM_MEMBER: {
+    canViewUsers: false, // Team members don't need to view all users
     canCreateUsers: false,
     canEditUsers: false,
     canDeleteUsers: false,
@@ -620,6 +627,7 @@ export const DEFAULT_PERMISSIONS = {
     canEditAllProjects: false,
     canDeleteProjects: false,
     canViewAllProjects: false,
+    canViewRoles: false, // Team members don't need to assign roles
     canCreateRoles: false,
     canEditRoles: false,
     canDeleteRoles: false,
@@ -632,7 +640,10 @@ export const DEFAULT_PERMISSIONS = {
 export type Role = typeof roles.$inferSelect;
 export type InsertRole = z.infer<typeof insertRoleSchema>;
 
-export type User = typeof users.$inferSelect;
+// SECURITY: User type excludes passwordHash to prevent exposure
+export type User = Omit<typeof users.$inferSelect, 'passwordHash'>;
+// Internal type for authentication operations (never exported to frontend)
+export type UserWithPassword = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export type UserInitiativeAssignment = typeof userInitiativeAssignments.$inferSelect;
