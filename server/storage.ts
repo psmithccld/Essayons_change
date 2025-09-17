@@ -1,21 +1,34 @@
+import bcrypt from 'bcrypt';
 import { 
-  users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, mindMaps, processMaps,
+  users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, mindMaps, processMaps, roles,
   type User, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type Survey, type InsertSurvey,
   type SurveyResponse, type InsertSurveyResponse, type GptInteraction, type InsertGptInteraction,
   type Milestone, type InsertMilestone, type ChecklistTemplate, type InsertChecklistTemplate,
-  type MindMap, type InsertMindMap, type ProcessMap, type InsertProcessMap
+  type MindMap, type InsertMindMap, type ProcessMap, type InsertProcessMap,
+  type Role, type InsertRole
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray } from "drizzle-orm";
 
+const SALT_ROUNDS = 12;
+
 export interface IStorage {
+  // Roles
+  getRoles(): Promise<Role[]>;
+  getRole(id: string): Promise<Role | undefined>;
+  createRole(role: InsertRole): Promise<Role>;
+  updateRole(id: string, role: Partial<InsertRole>): Promise<Role | undefined>;
+  deleteRole(id: string): Promise<boolean>;
+  
   // Users
   getUsers(): Promise<User[]>;
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<Omit<InsertUser, 'password'> & { passwordHash?: string }>): Promise<User | undefined>;
+  verifyPassword(username: string, password: string): Promise<User | null>;
 
   // Projects
   getProjects(userId: string): Promise<Project[]>;
@@ -111,6 +124,33 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Roles
+  async getRoles(): Promise<Role[]> {
+    return await db.select().from(roles).orderBy(roles.name);
+  }
+
+  async getRole(id: string): Promise<Role | undefined> {
+    const [role] = await db.select().from(roles).where(eq(roles.id, id));
+    return role || undefined;
+  }
+
+  async createRole(insertRole: InsertRole): Promise<Role> {
+    const [role] = await db.insert(roles).values(insertRole).returning();
+    return role;
+  }
+
+  async updateRole(id: string, role: Partial<InsertRole>): Promise<Role | undefined> {
+    const [updated] = await db.update(roles)
+      .set({ ...role, updatedAt: new Date() })
+      .where(eq(roles.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteRole(id: string): Promise<boolean> {
+    const result = await db.delete(roles).where(eq(roles.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
   // Users
   async getUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(users.name);
@@ -127,8 +167,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
+    // Hash the password before storing
+    const hashedPassword = await bcrypt.hash(insertUser.password, SALT_ROUNDS);
+    
+    // Remove the plain password and add the hashed one
+    const { password, ...userDataWithoutPassword } = insertUser;
+    const userData = {
+      ...userDataWithoutPassword,
+      passwordHash: hashedPassword,
+    };
+    
+    const [user] = await db.insert(users).values(userData).returning();
     return user;
+  }
+
+  async updateUser(id: string, userData: Partial<Omit<InsertUser, 'password'> & { passwordHash?: string }>): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set(userData)
+      .where(eq(users.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async verifyPassword(username: string, password: string): Promise<User | null> {
+    const user = await this.getUserByUsername(username);
+    if (!user || !user.isActive) {
+      return null;
+    }
+    
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    return isValid ? user : null;
   }
 
   // Projects

@@ -72,6 +72,50 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Roles
+  app.get("/api/roles", async (req, res) => {
+    try {
+      const roles = await storage.getRoles();
+      res.json(roles);
+    } catch (error) {
+      console.error("Error fetching roles:", error);
+      res.status(500).json({ error: "Failed to fetch roles" });
+    }
+  });
+
+  // Authentication
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password are required" });
+      }
+      
+      const user = await storage.verifyPassword(username, password);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
+      
+      // Get user role information
+      const role = await storage.getRole(user.roleId);
+      if (!role) {
+        return res.status(500).json({ error: "User role not found" });
+      }
+      
+      // Return user info without password
+      const { passwordHash, ...userInfo } = user;
+      res.json({
+        user: userInfo,
+        role,
+        permissions: role.permissions
+      });
+    } catch (error) {
+      console.error("Error during login:", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
   // Users
   app.get("/api/users", async (req, res) => {
     try {
