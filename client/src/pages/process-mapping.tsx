@@ -23,6 +23,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import type { ProcessMap } from "@shared/schema";
 import { insertProcessMapSchema, type InsertProcessMap } from "@shared/schema";
+import { PermissionGate } from "@/components/auth/PermissionGate";
+import { usePermissions } from "@/hooks/use-permissions";
 
 // Form schema for creating/editing process maps
 const processMapFormSchema = insertProcessMapSchema.omit({ projectId: true, createdById: true, canvasData: true, elements: true, connections: true });
@@ -89,6 +91,7 @@ export default function ProcessMapping() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { currentProject } = useCurrentProject();
+  const { canCreateContent, canDeleteContent, hasPermission } = usePermissions();
 
   const { data: processMaps = [], isLoading } = useQuery<ProcessMap[]>({
     queryKey: ['/api/projects', currentProject?.id, 'process-maps'],
@@ -665,7 +668,7 @@ export default function ProcessMapping() {
       
       return apiRequest('POST', `/api/projects/${currentProject.id}/process-maps`, processMapData);
     },
-    onSuccess: (createdProcessMap) => {
+    onSuccess: (createdProcessMap: ProcessMap) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'process-maps'] });
       setIsNewProcessMapOpen(false);
       processMapForm.reset();
@@ -827,13 +830,14 @@ export default function ProcessMapping() {
         </div>
         
         <div className="flex items-center gap-2">
-          <Dialog open={isNewProcessMapOpen} onOpenChange={setIsNewProcessMapOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-new-process-map">
-                <Plus className="w-4 h-4 mr-2" />
-                New Process Map
-              </Button>
-            </DialogTrigger>
+          <PermissionGate customCheck={canCreateContent}>
+            <Dialog open={isNewProcessMapOpen} onOpenChange={setIsNewProcessMapOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-new-process-map">
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Process Map
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create New Process Map</DialogTitle>
@@ -870,25 +874,30 @@ export default function ProcessMapping() {
                     <Button type="button" variant="outline" onClick={() => setIsNewProcessMapOpen(false)}>
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={createProcessMapMutation.isPending} data-testid="button-create-process-map">
-                      {createProcessMapMutation.isPending ? "Creating..." : "Create"}
-                    </Button>
+                    <PermissionGate customCheck={canCreateContent}>
+                      <Button type="submit" disabled={createProcessMapMutation.isPending} data-testid="button-create-process-map">
+                        {createProcessMapMutation.isPending ? "Creating..." : "Create"}
+                      </Button>
+                    </PermissionGate>
                   </div>
                 </form>
               </Form>
             </DialogContent>
           </Dialog>
+          </PermissionGate>
           
-          {currentProcessMap && (
-            <Button 
-              onClick={() => saveProcessMapMutation.mutate()} 
-              disabled={saveProcessMapMutation.isPending}
-              data-testid="button-save-process-map"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              {saveProcessMapMutation.isPending ? "Saving..." : "Save"}
-            </Button>
-          )}
+          <PermissionGate permissions={["canEditAllProjects"]}>
+            {currentProcessMap && (
+              <Button 
+                onClick={() => saveProcessMapMutation.mutate()} 
+                disabled={saveProcessMapMutation.isPending}
+                data-testid="button-save-process-map"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {saveProcessMapMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            )}
+          </PermissionGate>
         </div>
       </div>
 
@@ -1128,16 +1137,18 @@ export default function ProcessMapping() {
                 </div>
                 
                 <div className="grid grid-cols-1 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={deleteSelected}
-                    disabled={!tools.selectedElement}
-                    data-testid="button-delete-selected"
-                  >
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    Delete
-                  </Button>
+                  <PermissionGate customCheck={canDeleteContent}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={deleteSelected}
+                      disabled={!tools.selectedElement}
+                      data-testid="button-delete-selected"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Delete
+                    </Button>
+                  </PermissionGate>
                 </div>
                 
                 <Separator />

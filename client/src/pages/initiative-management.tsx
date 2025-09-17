@@ -23,6 +23,9 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { insertProjectSchema, type Project, type User, type UserInitiativeAssignment, type Role } from "@shared/schema";
+import { RouteGuard } from "@/components/auth/RouteGuard";
+import { PermissionGate } from "@/components/auth/PermissionGate";
+import { usePermissions } from "@/hooks/use-permissions";
 
 // Form validation schemas
 const createInitiativeSchema = insertProjectSchema.extend({
@@ -55,7 +58,7 @@ type ProjectWithAssignments = Project & {
   owner?: User;
 };
 
-export default function InitiativeManagement() {
+function InitiativeManagementContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -959,5 +962,15 @@ export default function InitiativeManagement() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function InitiativeManagement() {
+  const { canAccessInitiativeManagement } = usePermissions();
+  
+  return (
+    <RouteGuard customCheck={canAccessInitiativeManagement}>
+      <InitiativeManagementContent />
+    </RouteGuard>
   );
 }

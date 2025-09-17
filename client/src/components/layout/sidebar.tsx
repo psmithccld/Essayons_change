@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
@@ -23,6 +23,7 @@ import {
   Briefcase,
   Shield
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -33,7 +34,9 @@ import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/use-permissions";
 import { z } from "zod";
+import type { Permissions } from "@shared/schema";
 
 const userSettingsSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -52,80 +55,93 @@ type NavigationItem = {
   icon: any;
   label: string;
   path: string;
+  permissions?: (keyof Permissions)[];
+  requireAll?: boolean; // If true, user must have ALL permissions. If false, user needs ANY permission
+  customCheck?: () => boolean;
 };
 
-// All navigation items - Overview first (non-draggable), then draggable items
+// All navigation items with permission requirements
 const allNavigationItems: NavigationItem[] = [
   { id: "overview", icon: ChartLine, label: "Overview", path: "/" },
   { id: "tasks", icon: ListTodo, label: "Tasks & To Do", path: "/tasks" },
   { id: "checklist-templates", icon: ListChecks, label: "Checklist Templates", path: "/checklist-templates" },
   { id: "gantt", icon: ChartGantt, label: "Gantt Charts", path: "/gantt" },
   { id: "raid-logs", icon: AlertTriangle, label: "RAID Logs", path: "/raid-logs" },
-  { id: "progress-reports", icon: ChartBar, label: "Progress Reports", path: "/reports" },
+  { id: "progress-reports", icon: ChartBar, label: "Progress Reports", path: "/reports", permissions: ["canViewReports"] },
   { id: "communications", icon: Megaphone, label: "Communications", path: "/communications" },
   { id: "stakeholders", icon: Users, label: "Stakeholders", path: "/stakeholders" },
   { id: "surveys", icon: ClipboardCheck, label: "Readiness Surveys", path: "/surveys" },
   { id: "gpt-coach", icon: Bot, label: "GPT Coach", path: "/gpt-coach" },
-  { id: "user-management", icon: Users, label: "User Management", path: "/users" },
-  { id: "initiative-management", icon: Briefcase, label: "Initiative Management", path: "/initiatives" },
-  { id: "security-management", icon: Shield, label: "Security & Roles", path: "/security" },
+  { id: "user-management", icon: Users, label: "User Management", path: "/users", permissions: ["canViewUsers"] },
+  { id: "initiative-management", icon: Briefcase, label: "Initiative Management", path: "/initiatives", permissions: ["canViewAllProjects", "canCreateProjects", "canEditAllProjects"], requireAll: false },
+  { id: "security-management", icon: Shield, label: "Security & Roles", path: "/security", permissions: ["canViewRoles"] },
   { id: "fishbone", icon: Fish, label: "Fishbone Analysis", path: "/fishbone" },
-  { id: "process-mapping", icon: GitBranch, label: "Process Mapping", path: "/process-mapping" },
-  { id: "mind-maps", icon: Brain, label: "Mind Maps", path: "/mind-maps" }
+  { id: "process-mapping", icon: GitBranch, label: "Process Mapping", path: "/process-mapping", permissions: ["canViewAllProjects", "canCreateProjects"], requireAll: false },
+  { id: "mind-maps", icon: Brain, label: "Mind Maps", path: "/mind-maps", permissions: ["canViewAllProjects", "canCreateProjects"], requireAll: false }
 ];
-
-// Draggable navigation items (excluding overview)
-const defaultDraggableItems = allNavigationItems.slice(1);
 
 const SIDEBAR_ORDER_KEY = "sidebarOrder";
 
 export default function Sidebar() {
   const [location] = useLocation();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [draggableItems, setDraggableItems] = useState<NavigationItem[]>(defaultDraggableItems);
+  const [dragOrder, setDragOrder] = useState<string[]>([]);
   const { toast } = useToast();
+  const { isLoading: permissionsLoading, hasAllPermissions, hasAnyPermission, user } = usePermissions();
 
-  // Load saved order from localStorage on component mount
-  useEffect(() => {
-    const savedOrder = localStorage.getItem(SIDEBAR_ORDER_KEY);
-    if (savedOrder) {
-      try {
-        const savedIds = JSON.parse(savedOrder);
-        // Reorder items based on saved order (excluding overview)
-        const reorderedItems = savedIds
-          .map((id: string) => defaultDraggableItems.find(item => item.id === id))
-          .filter(Boolean);
-        
-        // Add any new items that weren't in the saved order
-        const existingIds = new Set(savedIds);
-        const newItems = defaultDraggableItems.filter(item => !existingIds.has(item.id));
-        
-        setDraggableItems([...reorderedItems, ...newItems]);
-      } catch (error) {
-        console.error('Failed to parse saved sidebar order:', error);
-        setDraggableItems(defaultDraggableItems);
-      }
+  // Get ordered draggable items (excluding overview)
+  const orderedDraggableItems = useMemo(() => {
+    const baseDraggableItems = allNavigationItems.slice(1);
+    
+    // If we have a drag order, use it
+    if (dragOrder.length > 0) {
+      const ordered = dragOrder
+        .map(id => baseDraggableItems.find(item => item.id === id))
+        .filter(Boolean) as NavigationItem[];
+      
+      // Add any new items not in the order
+      const existingIds = new Set(dragOrder);
+      const newItems = baseDraggableItems.filter(item => !existingIds.has(item.id));
+      
+      return [...ordered, ...newItems];
     }
-  }, []);
+    
+    // Otherwise try to load from localStorage
+    try {
+      const savedOrder = localStorage.getItem(SIDEBAR_ORDER_KEY);
+      if (savedOrder) {
+        const savedIds = JSON.parse(savedOrder);
+        const ordered = savedIds
+          .map((id: string) => baseDraggableItems.find(item => item.id === id))
+          .filter(Boolean) as NavigationItem[];
+        
+        const existingIds = new Set(savedIds);
+        const newItems = baseDraggableItems.filter(item => !existingIds.has(item.id));
+        
+        return [...ordered, ...newItems];
+      }
+    } catch (error) {
+      console.error('Failed to parse saved sidebar order:', error);
+    }
+    
+    return baseDraggableItems;
+  }, [dragOrder]);
 
-  // Save order to localStorage whenever items change
-  const saveOrder = (items: NavigationItem[]) => {
-    const itemIds = items.map(item => item.id);
-    localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(itemIds));
-  };
-
-  // Handle drag end event (only for draggable items)
+  // Handle drag end event
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) {
       return;
     }
 
-    const items = Array.from(draggableItems);
+    const items = Array.from(orderedDraggableItems);
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
 
-    setDraggableItems(items);
-    saveOrder(items);
+    const newOrder = items.map(item => item.id);
+    setDragOrder(newOrder);
+    
+    // Save to localStorage
+    localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(newOrder));
   };
 
   const form = useForm<UserSettingsData>({
@@ -142,7 +158,6 @@ export default function Sidebar() {
   });
 
   const onSettingsSubmit = (data: UserSettingsData) => {
-    // Here we would normally save to backend/local storage
     toast({
       title: "Settings Updated",
       description: "Your preferences have been saved successfully!",
@@ -150,10 +165,44 @@ export default function Sidebar() {
     setIsSettingsOpen(false);
   };
 
+  // Check if user has permission for a navigation item
+  const hasPermissionForItem = (item: NavigationItem): boolean => {
+    if (!item.permissions || item.permissions.length === 0) {
+      return true;
+    }
+
+    if (item.customCheck) {
+      return item.customCheck();
+    }
+
+    if (item.requireAll) {
+      return hasAllPermissions(...item.permissions);
+    } else {
+      return hasAnyPermission(...item.permissions);
+    }
+  };
+
   // Render a draggable navigation item
   const renderDraggableItem = (item: NavigationItem, index: number) => {
+    // Check permissions at render time
+    if (!hasPermissionForItem(item) && !permissionsLoading) {
+      return null;
+    }
+
     const isActive = location === item.path;
     const IconComponent = item.icon;
+
+    // Show skeleton while loading permissions
+    if (permissionsLoading) {
+      return (
+        <div key={item.id} className="mb-1">
+          <div className="flex items-center space-x-3 p-2">
+            <Skeleton className="w-4 h-4 rounded" />
+            <Skeleton className="h-4 flex-1" />
+          </div>
+        </div>
+      );
+    }
 
     return (
       <Draggable key={item.id} draggableId={item.id} index={index}>
@@ -188,10 +237,22 @@ export default function Sidebar() {
     );
   };
 
-  // Render a non-draggable navigation item
+  // Render a non-draggable navigation item (overview)
   const renderNavigationItem = (item: NavigationItem) => {
     const isActive = location === item.path;
     const IconComponent = item.icon;
+
+    // Show skeleton while loading permissions
+    if (permissionsLoading) {
+      return (
+        <div key={item.id} className="mb-1">
+          <div className="flex items-center space-x-3 p-2">
+            <Skeleton className="w-4 h-4 rounded" />
+            <Skeleton className="h-4 flex-1" />
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div key={item.id} className="mb-1">
@@ -246,9 +307,9 @@ export default function Sidebar() {
                     snapshot.isDraggingOver && "bg-muted/50 rounded-md p-1"
                   )}
                 >
-                  {draggableItems.map((item, index) => 
+                  {orderedDraggableItems.map((item, index) => 
                     renderDraggableItem(item, index)
-                  )}
+                  ).filter(Boolean)}
                   {provided.placeholder}
                 </div>
               )}
@@ -264,8 +325,8 @@ export default function Sidebar() {
             <span className="text-xs font-medium text-secondary-foreground">JD</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">Dr. Jane Doe</p>
-            <p className="text-xs text-muted-foreground truncate">PhD Candidate</p>
+            <p className="text-sm font-medium text-foreground truncate">{user?.name || "Loading..."}</p>
+            <p className="text-xs text-muted-foreground truncate">{user?.username || "Loading..."}</p>
           </div>
           <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             <SheetTrigger asChild>
@@ -371,19 +432,20 @@ export default function Sidebar() {
                         control={form.control}
                         name="notifications"
                         render={({ field }) => (
-                          <FormItem className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border p-4 space-y-3 sm:space-y-0">
-                            <div className="space-y-0.5 flex-1 min-w-0">
-                              <FormLabel className="text-base">Push Notifications</FormLabel>
+                          <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">
+                                Push Notifications
+                              </FormLabel>
                               <div className="text-sm text-muted-foreground">
-                                Receive notifications about project updates
+                                Get notified about important updates
                               </div>
                             </div>
                             <FormControl>
                               <Switch
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
-                                data-testid="switch-notifications"
-                                className="flex-shrink-0"
+                                data-testid="switch-settings-notifications"
                               />
                             </FormControl>
                           </FormItem>
@@ -393,19 +455,20 @@ export default function Sidebar() {
                         control={form.control}
                         name="emailNotifications"
                         render={({ field }) => (
-                          <FormItem className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border p-4 space-y-3 sm:space-y-0">
-                            <div className="space-y-0.5 flex-1 min-w-0">
-                              <FormLabel className="text-base">Email Notifications</FormLabel>
+                          <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">
+                                Email Notifications
+                              </FormLabel>
                               <div className="text-sm text-muted-foreground">
-                                Receive email updates about your projects
+                                Receive updates via email
                               </div>
                             </div>
                             <FormControl>
                               <Switch
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
-                                data-testid="switch-email-notifications"
-                                className="flex-shrink-0"
+                                data-testid="switch-settings-email-notifications"
                               />
                             </FormControl>
                           </FormItem>
@@ -415,19 +478,20 @@ export default function Sidebar() {
                         control={form.control}
                         name="autoSave"
                         render={({ field }) => (
-                          <FormItem className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border p-4 space-y-3 sm:space-y-0">
-                            <div className="space-y-0.5 flex-1 min-w-0">
-                              <FormLabel className="text-base">Auto-save</FormLabel>
+                          <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">
+                                Auto Save
+                              </FormLabel>
                               <div className="text-sm text-muted-foreground">
-                                Automatically save your work while editing
+                                Automatically save your work
                               </div>
                             </div>
                             <FormControl>
                               <Switch
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
-                                data-testid="switch-auto-save"
-                                className="flex-shrink-0"
+                                data-testid="switch-settings-auto-save"
                               />
                             </FormControl>
                           </FormItem>
@@ -435,22 +499,17 @@ export default function Sidebar() {
                       />
                     </div>
 
-                    <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-2 pt-6">
-                      <Button
-                        type="button"
-                        variant="outline"
+                    <div className="flex gap-2 pt-4">
+                      <Button type="submit" data-testid="button-save-settings">
+                        Save Changes
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
                         onClick={() => setIsSettingsOpen(false)}
                         data-testid="button-cancel-settings"
-                        className="w-full sm:w-auto"
                       >
                         Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        data-testid="button-save-settings"
-                        className="w-full sm:w-auto"
-                      >
-                        Save Settings
                       </Button>
                     </div>
                   </form>

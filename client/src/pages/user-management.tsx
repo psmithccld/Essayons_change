@@ -18,6 +18,9 @@ import { z } from "zod";
 import { Users, Plus, Shield, UserCheck, Search, MoreHorizontal, Edit, Trash2, UserPlus, Eye, EyeOff } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { insertUserSchema, type User, type Role, type UserInitiativeAssignment, type Permissions } from "@shared/schema";
+import { RouteGuard } from "@/components/auth/RouteGuard";
+import { PermissionGate } from "@/components/auth/PermissionGate";
+import { usePermissions } from "@/hooks/use-permissions";
 
 // Form validation schemas
 const createUserSchema = insertUserSchema.extend({
@@ -38,7 +41,7 @@ const editUserSchema = z.object({
 type CreateUserFormData = z.infer<typeof createUserSchema>;
 type EditUserFormData = z.infer<typeof editUserSchema>;
 
-export default function UserManagement() {
+function UserManagementContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRole, setSelectedRole] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -649,5 +652,13 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function UserManagement() {
+  return (
+    <RouteGuard permission="canViewUsers">
+      <UserManagementContent />
+    </RouteGuard>
   );
 }

@@ -18,6 +18,9 @@ import { Shield, Plus, Lock, Users, Key, AlertTriangle, Edit, Trash2, Search, Us
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertRoleSchema, type Role, type User, type Permissions, type InsertRole, permissionsSchema } from "@shared/schema";
+import { RouteGuard } from "@/components/auth/RouteGuard";
+import { PermissionGate } from "@/components/auth/PermissionGate";
+import { usePermissions } from "@/hooks/use-permissions";
 
 // Permission categories for better organization
 const PERMISSION_CATEGORIES = {
@@ -426,7 +429,7 @@ function RoleCard({ role, userCount, onEdit, onDelete, userPermissions }: RoleCa
   );
 }
 
-export default function SecurityManagement() {
+function SecurityManagementContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | undefined>();
@@ -675,5 +678,13 @@ export default function SecurityManagement() {
         userPermissions={userPermissions}
       />
     </div>
+  );
+}
+
+export default function SecurityManagement() {
+  return (
+    <RouteGuard permission="canViewRoles">
+      <SecurityManagementContent />
+    </RouteGuard>
   );
 }
