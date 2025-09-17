@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Briefcase, Plus, Target, TrendingUp, Calendar as CalendarIcon, Search, MoreHorizontal, Edit, Trash2, Users, UserPlus, Clock, AlertCircle, CheckCircle } from "lucide-react";
+import { Briefcase, Plus, Target, TrendingUp, Calendar as CalendarIcon, Search, MoreHorizontal, Edit, Trash2, Users, UserPlus, Clock, AlertCircle, CheckCircle, Copy, Filter, ArrowUpDown, Star, Zap, Shield, Settings, TrendingDown, DollarSign, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -27,19 +28,66 @@ import { RouteGuard } from "@/components/auth/RouteGuard";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { usePermissions } from "@/hooks/use-permissions";
 
-// Form validation schemas
+// Priority and Category options
+const PRIORITY_OPTIONS = [
+  { value: "high", label: "High", color: "destructive" },
+  { value: "medium", label: "Medium", color: "default" },
+  { value: "low", label: "Low", color: "secondary" }
+] as const;
+
+const CATEGORY_OPTIONS = [
+  { value: "strategic", label: "Strategic", color: "default" },
+  { value: "operational", label: "Operational", color: "secondary" },
+  { value: "compliance", label: "Compliance", color: "destructive" },
+  { value: "technology", label: "Technology", color: "outline" },
+  { value: "hr", label: "HR", color: "default" },
+  { value: "finance", label: "Finance", color: "secondary" }
+] as const;
+
+// Enhanced form validation schemas
 const createInitiativeSchema = insertProjectSchema.extend({
   startDate: z.string().optional(),
-  endDate: z.string().optional()
+  endDate: z.string().optional(),
+  deliverables: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().optional(),
+    targetDate: z.string().optional()
+  })).optional().default([])
 });
 
 const editInitiativeSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
   status: z.enum(["planning", "active", "completed", "cancelled"]),
+  priority: z.enum(["high", "medium", "low"]).optional(),
+  category: z.string().optional(),
+  objectives: z.string().optional(),
+  scope: z.string().optional(),
+  successCriteria: z.string().optional(),
+  budget: z.coerce.number().optional(),
+  assumptions: z.string().optional(),
+  constraints: z.string().optional(),
+  risks: z.string().optional(),
+  stakeholderRequirements: z.string().optional(),
+  businessJustification: z.string().optional(),
+  deliverables: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().optional(),
+    targetDate: z.string().optional()
+  })).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   progress: z.number().min(0).max(100).optional()
+});
+
+const copyInitiativeSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  copyAssignments: z.boolean().default(false),
+  copyTasks: z.boolean().default(false),
+  newStartDate: z.string().optional(),
+  newEndDate: z.string().optional()
 });
 
 const assignUserSchema = z.object({
@@ -50,7 +98,16 @@ const assignUserSchema = z.object({
 
 type CreateInitiativeFormData = z.infer<typeof createInitiativeSchema>;
 type EditInitiativeFormData = z.infer<typeof editInitiativeSchema>;
+type CopyInitiativeFormData = z.infer<typeof copyInitiativeSchema>;
 type AssignUserFormData = z.infer<typeof assignUserSchema>;
+
+// Enhanced initiative type with calculated fields
+type EnhancedInitiative = Project & {
+  assignments?: UserInitiativeAssignment[];
+  owner?: User;
+  priorityInfo?: typeof PRIORITY_OPTIONS[number];
+  categoryInfo?: typeof CATEGORY_OPTIONS[number];
+};
 
 // Enhanced project type with assignments
 type ProjectWithAssignments = Project & {
@@ -61,21 +118,40 @@ type ProjectWithAssignments = Project & {
 function InitiativeManagementContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<string>("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingInitiative, setEditingInitiative] = useState<Project | null>(null);
+  const [copyingInitiative, setCopyingInitiative] = useState<Project | null>(null);
+  const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [managingAssignments, setManagingAssignments] = useState<Project | null>(null);
   const [isAssignUserDialogOpen, setIsAssignUserDialogOpen] = useState(false);
+  const [currentTab, setCurrentTab] = useState("basic");
+  const [editCurrentTab, setEditCurrentTab] = useState("basic");
+  const [deliverables, setDeliverables] = useState<Array<{id: string, title: string, description?: string, targetDate?: string}>>([]);
+  const [editDeliverables, setEditDeliverables] = useState<Array<{id: string, title: string, description?: string, targetDate?: string}>>([]);
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [editStartDate, setEditStartDate] = useState<Date>();
   const [editEndDate, setEditEndDate] = useState<Date>();
+  const [copyStartDate, setCopyStartDate] = useState<Date>();
+  const [copyEndDate, setCopyEndDate] = useState<Date>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Fetch initiatives/projects
-  const { data: initiatives = [], isLoading: initiativesLoading } = useQuery<ProjectWithAssignments[]>({
+  const { data: initiatives = [], isLoading: initiativesLoading } = useQuery<EnhancedInitiative[]>({
     queryKey: ["/api/projects"],
-    refetchInterval: 30000
+    refetchInterval: 30000,
+    select: (data: Project[]) => {
+      return data.map(initiative => ({
+        ...initiative,
+        priorityInfo: PRIORITY_OPTIONS.find(p => p.value === initiative.priority),
+        categoryInfo: CATEGORY_OPTIONS.find(c => c.value === initiative.category)
+      }));
+    }
   });
 
   // Fetch users for dropdowns
@@ -145,6 +221,23 @@ function InitiativeManagementContent() {
     }
   });
 
+  // Copy initiative mutation
+  const copyInitiativeMutation = useMutation({
+    mutationFn: (copyData: CopyInitiativeFormData & { originalId: string }) => 
+      apiRequest("POST", `/api/projects/${copyData.originalId}/copy`, copyData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      setIsCopyDialogOpen(false);
+      setCopyingInitiative(null);
+      setCopyStartDate(undefined);
+      setCopyEndDate(undefined);
+      toast({ title: "Success", description: "Initiative copied successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to copy initiative", variant: "destructive" });
+    }
+  });
+
   // Assign user mutation
   const assignUserMutation = useMutation({
     mutationFn: (assignmentData: AssignUserFormData) => apiRequest("POST", "/api/assignments", assignmentData),
@@ -195,42 +288,146 @@ function InitiativeManagementContent() {
     }
   });
 
-  // Filter initiatives
-  const filteredInitiatives = initiatives.filter((initiative) => {
-    const matchesSearch = initiative.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (initiative.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
-    const matchesStatus = selectedStatus === "all" || initiative.status === selectedStatus;
-    
-    return matchesSearch && matchesStatus;
+  const copyForm = useForm<CopyInitiativeFormData>({
+    resolver: zodResolver(copyInitiativeSchema),
+    defaultValues: {
+      copyAssignments: false,
+      copyTasks: false
+    }
   });
 
-  // Calculate metrics
+  // Enhanced filtering and sorting
+  const filteredAndSortedInitiatives = initiatives
+    .filter((initiative) => {
+      const matchesSearch = searchTerm === "" || [
+        initiative.name,
+        initiative.description,
+        initiative.objectives,
+        initiative.scope,
+        initiative.businessJustification,
+        initiative.category
+      ].some(field => field?.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesStatus = selectedStatus === "all" || initiative.status === selectedStatus;
+      const matchesPriority = selectedPriorities.length === 0 || selectedPriorities.includes(initiative.priority || "medium");
+      const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(initiative.category || "");
+      
+      return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
+    })
+    .sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+      
+      switch (sortBy) {
+        case "priority":
+          const priorityOrder = { high: 3, medium: 2, low: 1 };
+          aValue = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
+          bValue = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
+          break;
+        case "category":
+          aValue = a.category || "";
+          bValue = b.category || "";
+          break;
+        case "budget":
+          aValue = Number(a.budget) || 0;
+          bValue = Number(b.budget) || 0;
+          break;
+        case "progress":
+          aValue = a.progress || 0;
+          bValue = b.progress || 0;
+          break;
+        case "startDate":
+          aValue = a.startDate ? new Date(a.startDate).getTime() : 0;
+          bValue = b.startDate ? new Date(b.startDate).getTime() : 0;
+          break;
+        case "endDate":
+          aValue = a.endDate ? new Date(a.endDate).getTime() : 0;
+          bValue = b.endDate ? new Date(b.endDate).getTime() : 0;
+          break;
+        default: // name
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+      }
+      
+      if (sortOrder === "asc") {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      }
+    });
+
+  // Calculate enhanced metrics
   const totalInitiatives = initiatives.length;
   const activeInitiatives = initiatives.filter(i => i.status === "active").length;
   const completedInitiatives = initiatives.filter(i => i.status === "completed").length;
+  const highPriorityInitiatives = initiatives.filter(i => i.priority === "high").length;
   const averageProgress = initiatives.length > 0 
     ? Math.round(initiatives.reduce((acc, i) => acc + (i.progress || 0), 0) / initiatives.length)
     : 0;
+  const totalBudget = initiatives.reduce((acc, i) => acc + (Number(i.budget) || 0), 0);
 
   const handleCreateInitiative = (data: CreateInitiativeFormData) => {
-    createInitiativeMutation.mutate(data);
+    const processedData = {
+      ...data,
+      deliverables: deliverables.length > 0 ? deliverables : undefined
+    };
+    createInitiativeMutation.mutate(processedData);
+  };
+  
+  const handleCopyInitiative = (data: CopyInitiativeFormData) => {
+    if (!copyingInitiative) return;
+    const processedData = {
+      ...data,
+      originalId: copyingInitiative.id,
+      newStartDate: copyStartDate?.toISOString(),
+      newEndDate: copyEndDate?.toISOString()
+    };
+    copyInitiativeMutation.mutate(processedData);
+  };
+  
+  const handleStartCopyInitiative = (initiative: Project) => {
+    setCopyingInitiative(initiative);
+    copyForm.reset({
+      name: `Copy of ${initiative.name}`,
+      copyAssignments: false,
+      copyTasks: false
+    });
+    setIsCopyDialogOpen(true);
   };
 
   const handleEditInitiative = (initiative: Project) => {
     setEditingInitiative(initiative);
     setEditStartDate(initiative.startDate ? new Date(initiative.startDate) : undefined);
     setEditEndDate(initiative.endDate ? new Date(initiative.endDate) : undefined);
+    setEditDeliverables(Array.isArray(initiative.deliverables) ? initiative.deliverables : []);
+    setEditCurrentTab("basic");
     editForm.reset({
       name: initiative.name,
       description: initiative.description || "",
       status: initiative.status as "planning" | "active" | "completed" | "cancelled",
+      priority: initiative.priority as "high" | "medium" | "low" || "medium",
+      category: initiative.category || "",
+      objectives: initiative.objectives || "",
+      scope: initiative.scope || "",
+      successCriteria: initiative.successCriteria || "",
+      budget: initiative.budget ? Number(initiative.budget) : undefined,
+      assumptions: initiative.assumptions || "",
+      constraints: initiative.constraints || "",
+      risks: initiative.risks || "",
+      stakeholderRequirements: initiative.stakeholderRequirements || "",
+      businessJustification: initiative.businessJustification || "",
       progress: initiative.progress || 0
     });
   };
 
   const handleUpdateInitiative = (data: EditInitiativeFormData) => {
     if (!editingInitiative) return;
-    updateInitiativeMutation.mutate({ ...data, id: editingInitiative.id });
+    const processedData = {
+      ...data,
+      id: editingInitiative.id,
+      deliverables: editDeliverables.length > 0 ? editDeliverables : undefined
+    };
+    updateInitiativeMutation.mutate(processedData);
   };
 
   const handleDeleteInitiative = (initiativeId: string) => {
@@ -250,6 +447,7 @@ function InitiativeManagementContent() {
     removeAssignmentMutation.mutate({ userId, projectId });
   };
 
+  // Helper functions for badges and icons
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "active": return "default";
@@ -270,11 +468,160 @@ function InitiativeManagementContent() {
     }
   };
 
+  const getPriorityBadgeVariant = (priority: string) => {
+    switch (priority) {
+      case "high": return "destructive";
+      case "medium": return "default";
+      case "low": return "secondary";
+      default: return "outline";
+    }
+  };
+
+  const getPriorityIcon = (priority: string) => {
+    switch (priority) {
+      case "high": return <AlertCircle className="w-3 h-3" />;
+      case "medium": return <Clock className="w-3 h-3" />;
+      case "low": return <CheckCircle className="w-3 h-3" />;
+      default: return <TrendingDown className="w-3 h-3" />;
+    }
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case "strategic": return <Star className="w-3 h-3" />;
+      case "operational": return <Settings className="w-3 h-3" />;
+      case "compliance": return <Shield className="w-3 h-3" />;
+      case "technology": return <Zap className="w-3 h-3" />;
+      case "hr": return <Users className="w-3 h-3" />;
+      case "finance": return <DollarSign className="w-3 h-3" />;
+      default: return <Briefcase className="w-3 h-3" />;
+    }
+  };
+
+  const formatCurrency = (amount: number | string | null) => {
+    if (!amount) return "Not set";
+    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(num);
+  };
+
+  const addDeliverable = () => {
+    const newDeliverable = {
+      id: `deliverable-${Date.now()}`,
+      title: "",
+      description: "",
+      targetDate: ""
+    };
+    setDeliverables([...deliverables, newDeliverable]);
+  };
+
+  const addEditDeliverable = () => {
+    const newDeliverable = {
+      id: `deliverable-${Date.now()}`,
+      title: "",
+      description: "",
+      targetDate: ""
+    };
+    setEditDeliverables([...editDeliverables, newDeliverable]);
+  };
+
+  const removeDeliverable = (id: string) => {
+    setDeliverables(deliverables.filter(d => d.id !== id));
+  };
+
+  const removeEditDeliverable = (id: string) => {
+    setEditDeliverables(editDeliverables.filter(d => d.id !== id));
+  };
+
+  const updateDeliverable = (id: string, field: string, value: string) => {
+    setDeliverables(deliverables.map(d => 
+      d.id === id ? { ...d, [field]: value } : d
+    ));
+  };
+
+  const updateEditDeliverable = (id: string, field: string, value: string) => {
+    setEditDeliverables(editDeliverables.map(d => 
+      d.id === id ? { ...d, [field]: value } : d
+    ));
+  };
+
   const formatDate = (dateValue: string | Date | null) => {
     if (!dateValue) return "Not set";
     const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
     return format(date, "MMM dd, yyyy");
   };
+
+  const resetCreateForm = () => {
+    setStartDate(undefined);
+    setEndDate(undefined);
+    setDeliverables([]);
+    setCurrentTab("basic");
+    createForm.reset({
+      name: "",
+      description: "",
+      status: "planning",
+      priority: "medium",
+      category: "",
+      objectives: "",
+      scope: "",
+      successCriteria: "",
+      budget: undefined,
+      assumptions: "",
+      constraints: "",
+      risks: "",
+      stakeholderRequirements: "",
+      businessJustification: "",
+      progress: 0
+    });
+  };
+
+  const handleTabChange = (tab: string) => {
+    setCurrentTab(tab);
+  };
+
+  const handleEditTabChange = (tab: string) => {
+    setEditCurrentTab(tab);
+  };
+
+  const togglePriorityFilter = (priority: string) => {
+    setSelectedPriorities(prev => 
+      prev.includes(priority) 
+        ? prev.filter(p => p !== priority)
+        : [...prev, priority]
+    );
+  };
+
+  const toggleCategoryFilter = (category: string) => {
+    setSelectedCategories(prev => 
+      prev.includes(category) 
+        ? prev.filter(c => c !== category)
+        : [...prev, category]
+    );
+  };
+
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    setSelectedStatus("all");
+    setSelectedPriorities([]);
+    setSelectedCategories([]);
+  };
+
+  const handleSortChange = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(field);
+      setSortOrder("asc");
+    }
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = searchTerm !== "" || selectedStatus !== "all" || 
+    selectedPriorities.length > 0 || selectedCategories.length > 0;
 
   return (
     <div className="space-y-6" data-testid="initiative-management-page">
@@ -290,153 +637,525 @@ function InitiativeManagementContent() {
               Create Initiative
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Initiative</DialogTitle>
+              <p className="text-sm text-muted-foreground">Complete the project charter with comprehensive initiative details</p>
             </DialogHeader>
             <Form {...createForm}>
-              <form onSubmit={createForm.handleSubmit(handleCreateInitiative)} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={createForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem className="md:col-span-2">
-                        <FormLabel>Initiative Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Digital Transformation" {...field} data-testid="input-initiative-name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+              <form onSubmit={createForm.handleSubmit(handleCreateInitiative)} className="space-y-6">
+                <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="basic" data-testid="tab-basic">
+                      <Target className="w-4 h-4 mr-2" />
+                      Basic Info
+                    </TabsTrigger>
+                    <TabsTrigger value="objectives" data-testid="tab-objectives">
+                      <Briefcase className="w-4 h-4 mr-2" />
+                      Objectives & Scope
+                    </TabsTrigger>
+                    <TabsTrigger value="planning" data-testid="tab-planning">
+                      <DollarSign className="w-4 h-4 mr-2" />
+                      Planning & Resources
+                    </TabsTrigger>
+                    <TabsTrigger value="risk" data-testid="tab-risk">
+                      <Shield className="w-4 h-4 mr-2" />
+                      Risk & Constraints
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="basic" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={createForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Initiative Name *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Digital Transformation Initiative" {...field} data-testid="input-initiative-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Description</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Brief overview of the initiative..."
+                                className="h-20"
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-initiative-description" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="priority"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Priority *</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value || "medium"} data-testid="select-initiative-priority">
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select priority" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {PRIORITY_OPTIONS.map((priority) => (
+                                  <SelectItem key={priority.value} value={priority.value}>
+                                    <div className="flex items-center gap-2">
+                                      {getPriorityIcon(priority.value)}
+                                      {priority.label}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="category"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Category</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""} data-testid="select-initiative-category">
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {CATEGORY_OPTIONS.map((category) => (
+                                  <SelectItem key={category.value} value={category.value}>
+                                    <div className="flex items-center gap-2">
+                                      {getCategoryIcon(category.value)}
+                                      {category.label}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Status</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value} data-testid="select-initiative-status">
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="planning">Planning</SelectItem>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="progress"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Progress (%)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                placeholder="0"
+                                {...field}
+                                value={field.value || 0}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                data-testid="input-initiative-progress"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Start Date</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !startDate && "text-muted-foreground"
+                              )}
+                              data-testid="button-start-date"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {startDate ? format(startDate, "PPP") : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={startDate}
+                              onSelect={setStartDate}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">End Date</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !endDate && "text-muted-foreground"
+                              )}
+                              data-testid="button-end-date"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {endDate ? format(endDate, "PPP") : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={endDate}
+                              onSelect={setEndDate}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="objectives" className="space-y-4">
+                    <div className="grid grid-cols-1 gap-6">
+                      <FormField
+                        control={createForm.control}
+                        name="objectives"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Objectives & Goals</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Define clear, measurable objectives for this initiative..."
+                                className="h-24"
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-initiative-objectives" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="scope"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Project Scope</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Define what is included and excluded from this initiative..."
+                                className="h-24"
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-initiative-scope" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="successCriteria"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Success Criteria & KPIs</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Define measurable success criteria and key performance indicators..."
+                                className="h-20"
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-initiative-success-criteria" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      {/* Deliverables Section */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-medium">Key Deliverables</label>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={addDeliverable}
+                            data-testid="button-add-deliverable"
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Deliverable
+                          </Button>
+                        </div>
+                        {deliverables.map((deliverable, index) => (
+                          <div key={deliverable.id} className="p-4 border rounded-lg space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-medium">Deliverable {index + 1}</h4>
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => removeDeliverable(deliverable.id)}
+                                data-testid={`button-remove-deliverable-${index}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-sm font-medium">Title</label>
+                                <Input 
+                                  placeholder="Deliverable title"
+                                  value={deliverable.title}
+                                  onChange={(e) => updateDeliverable(deliverable.id, "title", e.target.value)}
+                                  data-testid={`input-deliverable-title-${index}`}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium">Target Date</label>
+                                <Input 
+                                  type="date"
+                                  value={deliverable.targetDate}
+                                  onChange={(e) => updateDeliverable(deliverable.id, "targetDate", e.target.value)}
+                                  data-testid={`input-deliverable-date-${index}`}
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">Description</label>
+                              <Textarea 
+                                placeholder="Describe this deliverable..."
+                                className="h-16"
+                                value={deliverable.description}
+                                onChange={(e) => updateDeliverable(deliverable.id, "description", e.target.value)}
+                                data-testid={`input-deliverable-description-${index}`}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="planning" className="space-y-4">
+                    <div className="grid grid-cols-1 gap-6">
+                      <FormField
+                        control={createForm.control}
+                        name="budget"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Budget ($)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="100000"
+                                {...field}
+                                value={field.value || ""}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                                data-testid="input-initiative-budget"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="stakeholderRequirements"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Stakeholder Requirements</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Define key stakeholder needs and requirements..."
+                                className="h-24"
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-initiative-stakeholder-requirements" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="businessJustification"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Business Justification</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Explain the business case and expected benefits..."
+                                className="h-24"
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-initiative-business-justification" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="risk" className="space-y-4">
+                    <div className="grid grid-cols-1 gap-6">
+                      <FormField
+                        control={createForm.control}
+                        name="assumptions"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Key Assumptions</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="List key assumptions for this initiative..."
+                                className="h-20"
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-initiative-assumptions" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="constraints"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Constraints & Limitations</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Identify constraints and limitations..."
+                                className="h-20"
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-initiative-constraints" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="risks"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Initial Risk Assessment</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Identify initial risks and mitigation strategies..."
+                                className="h-20"
+                                {...field} 
+                                value={field.value || ""} 
+                                data-testid="input-initiative-risks" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+                
+                <div className="flex justify-between">
+                  <div className="flex space-x-2">
+                    {currentTab !== "basic" && (
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => {
+                          const tabs = ["basic", "objectives", "planning", "risk"];
+                          const currentIndex = tabs.indexOf(currentTab);
+                          if (currentIndex > 0) handleTabChange(tabs[currentIndex - 1]);
+                        }}
+                        data-testid="button-previous-tab"
+                      >
+                        Previous
+                      </Button>
                     )}
-                  />
-                  <FormField
-                    control={createForm.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem className="md:col-span-2">
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Describe the initiative objectives..." {...field} value={field.value || ""} data-testid="input-initiative-description" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                    {currentTab !== "risk" && (
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => {
+                          const tabs = ["basic", "objectives", "planning", "risk"];
+                          const currentIndex = tabs.indexOf(currentTab);
+                          if (currentIndex < tabs.length - 1) handleTabChange(tabs[currentIndex + 1]);
+                        }}
+                        data-testid="button-next-tab"
+                      >
+                        Next
+                      </Button>
                     )}
-                  />
-                  <FormField
-                    control={createForm.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} data-testid="select-initiative-status">
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="planning">Planning</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={createForm.control}
-                    name="progress"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Progress (%)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            placeholder="0"
-                            {...field}
-                            value={field.value || 0}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                            data-testid="input-initiative-progress"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Start Date</label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !startDate && "text-muted-foreground"
-                          )}
-                          data-testid="button-start-date"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {startDate ? format(startDate, "PPP") : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={startDate}
-                          onSelect={setStartDate}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">End Date</label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !endDate && "text-muted-foreground"
-                          )}
-                          data-testid="button-end-date"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {endDate ? format(endDate, "PPP") : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={endDate}
-                          onSelect={setEndDate}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                  <div className="flex space-x-2">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsCreateDialogOpen(false);
+                        resetCreateForm();
+                      }}
+                      data-testid="button-cancel-create"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={createInitiativeMutation.isPending}
+                      data-testid="button-submit-create"
+                    >
+                      {createInitiativeMutation.isPending ? "Creating..." : "Create Initiative"}
+                    </Button>
                   </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsCreateDialogOpen(false)}
-                    data-testid="button-cancel-create"
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={createInitiativeMutation.isPending}
-                    data-testid="button-submit-create"
-                  >
-                    {createInitiativeMutation.isPending ? "Creating..." : "Create Initiative"}
-                  </Button>
                 </div>
               </form>
             </Form>
@@ -444,10 +1163,10 @@ function InitiativeManagementContent() {
         </Dialog>
       </div>
 
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Enhanced Metrics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Initiatives</p>
@@ -455,47 +1174,63 @@ function InitiativeManagementContent() {
                   {totalInitiatives}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Briefcase className="text-primary w-6 h-6" />
+              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <Briefcase className="text-primary w-5 h-5" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Active Initiatives</p>
+                <p className="text-sm font-medium text-muted-foreground">Active</p>
                 <p className="text-2xl font-bold text-foreground" data-testid="metric-active-initiatives">
                   {activeInitiatives}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center">
-                <Target className="text-secondary w-6 h-6" />
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                <Target className="text-blue-600 dark:text-blue-400 w-5 h-5" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold text-foreground" data-testid="metric-completed-initiatives">
-                  {completedInitiatives}
+                <p className="text-sm font-medium text-muted-foreground">High Priority</p>
+                <p className="text-2xl font-bold text-foreground" data-testid="metric-high-priority">
+                  {highPriorityInitiatives}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="text-green-600 w-6 h-6" />
+              <div className="w-10 h-10 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
+                <AlertCircle className="text-red-600 dark:text-red-400 w-5 h-5" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Budget</p>
+                <p className="text-lg font-bold text-foreground" data-testid="metric-total-budget">
+                  {formatCurrency(totalBudget)}
+                </p>
+              </div>
+              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
+                <DollarSign className="text-green-600 dark:text-green-400 w-5 h-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Avg. Progress</p>
@@ -503,45 +1238,167 @@ function InitiativeManagementContent() {
                   {averageProgress}%
                 </p>
               </div>
-              <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
-                <TrendingUp className="text-accent w-6 h-6" />
+              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
+                <TrendingUp className="text-purple-600 dark:text-purple-400 w-5 h-5" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Initiatives Table */}
+      {/* Enhanced Filtering and Search */}
       <Card>
         <CardHeader>
-          <CardTitle>Initiatives</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Initiatives
+              <Badge variant="outline" className="ml-2" data-testid="initiatives-count">
+                {filteredAndSortedInitiatives.length}
+              </Badge>
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-sort">
+                    <ArrowUpDown className="w-4 h-4 mr-2" />
+                    Sort: {sortBy}
+                    {sortOrder === "desc" && " ↓"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {[
+                    { value: "name", label: "Name" },
+                    { value: "priority", label: "Priority" },
+                    { value: "category", label: "Category" },
+                    { value: "budget", label: "Budget" },
+                    { value: "progress", label: "Progress" },
+                    { value: "startDate", label: "Start Date" },
+                    { value: "endDate", label: "End Date" }
+                  ].map((option) => (
+                    <DropdownMenuItem
+                      key={option.value}
+                      onClick={() => handleSortChange(option.value)}
+                      data-testid={`sort-${option.value}`}
+                    >
+                      {option.label}
+                      {sortBy === option.value && (
+                        <span className="ml-auto">
+                          {sortOrder === "asc" ? "↑" : "↓"}
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {hasActiveFilters && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={clearAllFilters}
+                  data-testid="button-clear-filters"
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4 mb-6">
-            <div className="relative flex-1">
+          <div className="space-y-4">
+            {/* Search */}
+            <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search initiatives..."
+                placeholder="Search initiatives, objectives, scope, business justification..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
                 data-testid="input-search-initiatives"
               />
             </div>
-            <Select value={selectedStatus} onValueChange={setSelectedStatus} data-testid="select-filter-status">
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="planning">Planning</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+            
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3">
+              <Select value={selectedStatus} onValueChange={setSelectedStatus} data-testid="select-filter-status">
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="planning">Planning</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-filter-priority">
+                    <Filter className="w-4 h-4 mr-2" />
+                    Priority
+                    {selectedPriorities.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {selectedPriorities.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {PRIORITY_OPTIONS.map((priority) => (
+                    <DropdownMenuItem
+                      key={priority.value}
+                      onClick={() => togglePriorityFilter(priority.value)}
+                      data-testid={`filter-priority-${priority.value}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {getPriorityIcon(priority.value)}
+                        {priority.label}
+                        {selectedPriorities.includes(priority.value) && (
+                          <CheckCircle className="w-4 h-4 ml-auto text-green-600" />
+                        )}
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-filter-category">
+                    <Filter className="w-4 h-4 mr-2" />
+                    Category
+                    {selectedCategories.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {selectedCategories.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {CATEGORY_OPTIONS.map((category) => (
+                    <DropdownMenuItem
+                      key={category.value}
+                      onClick={() => toggleCategoryFilter(category.value)}
+                      data-testid={`filter-category-${category.value}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {getCategoryIcon(category.value)}
+                        {category.label}
+                        {selectedCategories.includes(category.value) && (
+                          <CheckCircle className="w-4 h-4 ml-auto text-green-600" />
+                        )}
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
+          
+          {/* Initiatives List */}
           {initiativesLoading ? (
             <div className="text-center py-8">Loading initiatives...</div>
           ) : (
@@ -558,16 +1415,40 @@ function InitiativeManagementContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredInitiatives.map((initiative) => (
+                {filteredAndSortedInitiatives.map((initiative) => (
                   <TableRow key={initiative.id} data-testid={`row-initiative-${initiative.id}`}>
                     <TableCell className="font-medium">
-                      <div>
+                      <div className="space-y-2">
                         <div className="font-semibold">{initiative.name}</div>
                         {initiative.description && (
                           <div className="text-sm text-muted-foreground truncate max-w-xs">
                             {initiative.description}
                           </div>
                         )}
+                        <div className="flex flex-wrap gap-1">
+                          {initiative.priority && (
+                            <div className="flex items-center gap-1">
+                              {getPriorityIcon(initiative.priority)}
+                              <Badge variant={getPriorityBadgeVariant(initiative.priority)} className="text-xs">
+                                {initiative.priority}
+                              </Badge>
+                            </div>
+                          )}
+                          {initiative.category && (
+                            <div className="flex items-center gap-1">
+                              {getCategoryIcon(initiative.category)}
+                              <Badge variant="outline" className="text-xs">
+                                {CATEGORY_OPTIONS.find(c => c.value === initiative.category)?.label || initiative.category}
+                              </Badge>
+                            </div>
+                          )}
+                          {initiative.budget && (
+                            <Badge variant="outline" className="text-xs text-green-700">
+                              <DollarSign className="w-3 h-3 mr-1" />
+                              {formatCurrency(initiative.budget)}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -600,6 +1481,10 @@ function InitiativeManagementContent() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleStartCopyInitiative(initiative)} data-testid={`button-copy-${initiative.id}`}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            Copy Initiative
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEditInitiative(initiative)} data-testid={`button-edit-${initiative.id}`}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
@@ -639,7 +1524,7 @@ function InitiativeManagementContent() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {filteredInitiatives.length === 0 && (
+                {filteredAndSortedInitiatives.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No initiatives found matching your criteria.
@@ -652,153 +1537,659 @@ function InitiativeManagementContent() {
         </CardContent>
       </Card>
 
-      {/* Edit Initiative Dialog */}
-      <Dialog open={!!editingInitiative} onOpenChange={() => setEditingInitiative(null)}>
-        <DialogContent className="max-w-2xl">
+      {/* Copy Initiative Dialog */}
+      <Dialog open={isCopyDialogOpen} onOpenChange={setIsCopyDialogOpen}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Initiative</DialogTitle>
+            <DialogTitle>Copy Initiative</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Create a copy of "{copyingInitiative?.name}"
+            </p>
           </DialogHeader>
-          <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(handleUpdateInitiative)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Form {...copyForm}>
+            <form onSubmit={copyForm.handleSubmit(handleCopyInitiative)} className="space-y-4">
+              <FormField
+                control={copyForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Initiative Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-copy-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="space-y-3">
                 <FormField
-                  control={editForm.control}
-                  name="name"
+                  control={copyForm.control}
+                  name="copyAssignments"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Initiative Name</FormLabel>
+                    <FormItem className="flex items-center space-x-2">
                       <FormControl>
-                        <Input {...field} data-testid="input-edit-initiative-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} data-testid="input-edit-initiative-description" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} data-testid="select-edit-initiative-status">
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="planning">Planning</SelectItem>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="progress"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Progress (%)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          data-testid="input-edit-initiative-progress"
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={field.onChange}
+                          data-testid="checkbox-copy-assignments"
+                          className="rounded border border-input"
                         />
                       </FormControl>
-                      <FormMessage />
+                      <FormLabel className="text-sm font-normal">
+                        Copy user assignments
+                      </FormLabel>
                     </FormItem>
                   )}
                 />
+                
+                <FormField
+                  control={copyForm.control}
+                  name="copyTasks"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center space-x-2">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={field.onChange}
+                          data-testid="checkbox-copy-tasks"
+                          className="rounded border border-input"
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm font-normal">
+                        Copy tasks and milestones
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Start Date</label>
+                  <label className="text-sm font-medium">New Start Date</label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal",
-                          !editStartDate && "text-muted-foreground"
+                          !copyStartDate && "text-muted-foreground"
                         )}
-                        data-testid="button-edit-start-date"
+                        data-testid="button-copy-start-date"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {editStartDate ? format(editStartDate, "PPP") : "Pick a date"}
+                        {copyStartDate ? format(copyStartDate, "PPP") : "Optional"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
                       <Calendar
                         mode="single"
-                        selected={editStartDate}
-                        onSelect={setEditStartDate}
+                        selected={copyStartDate}
+                        onSelect={setCopyStartDate}
                         initialFocus
                       />
                     </PopoverContent>
                   </Popover>
                 </div>
+                
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">End Date</label>
+                  <label className="text-sm font-medium">New End Date</label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal",
-                          !editEndDate && "text-muted-foreground"
+                          !copyEndDate && "text-muted-foreground"
                         )}
-                        data-testid="button-edit-end-date"
+                        data-testid="button-copy-end-date"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {editEndDate ? format(editEndDate, "PPP") : "Pick a date"}
+                        {copyEndDate ? format(copyEndDate, "PPP") : "Optional"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
                       <Calendar
                         mode="single"
-                        selected={editEndDate}
-                        onSelect={setEditEndDate}
+                        selected={copyEndDate}
+                        onSelect={setCopyEndDate}
                         initialFocus
                       />
                     </PopoverContent>
                   </Popover>
                 </div>
               </div>
+              
               <div className="flex justify-end space-x-2">
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => setEditingInitiative(null)}
-                  data-testid="button-cancel-edit"
+                  onClick={() => setIsCopyDialogOpen(false)}
+                  data-testid="button-cancel-copy"
                 >
                   Cancel
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={updateInitiativeMutation.isPending}
-                  data-testid="button-submit-edit"
+                  disabled={copyInitiativeMutation.isPending}
+                  data-testid="button-submit-copy"
                 >
-                  {updateInitiativeMutation.isPending ? "Updating..." : "Update Initiative"}
+                  {copyInitiativeMutation.isPending ? "Copying..." : "Copy Initiative"}
                 </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Enhanced Edit Initiative Dialog */}
+      <Dialog open={!!editingInitiative} onOpenChange={() => setEditingInitiative(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Initiative</DialogTitle>
+            <p className="text-sm text-muted-foreground">Update initiative details and project charter information</p>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleUpdateInitiative)} className="space-y-6">
+              <Tabs value={editCurrentTab} onValueChange={handleEditTabChange} className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="basic" data-testid="edit-tab-basic">
+                    <Target className="w-4 h-4 mr-2" />
+                    Basic Info
+                  </TabsTrigger>
+                  <TabsTrigger value="objectives" data-testid="edit-tab-objectives">
+                    <Briefcase className="w-4 h-4 mr-2" />
+                    Objectives & Scope
+                  </TabsTrigger>
+                  <TabsTrigger value="planning" data-testid="edit-tab-planning">
+                    <DollarSign className="w-4 h-4 mr-2" />
+                    Planning & Resources
+                  </TabsTrigger>
+                  <TabsTrigger value="risk" data-testid="edit-tab-risk">
+                    <Shield className="w-4 h-4 mr-2" />
+                    Risk & Constraints
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="basic" className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={editForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem className="md:col-span-2">
+                          <FormLabel>Initiative Name *</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-edit-initiative-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="md:col-span-2">
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              className="h-20"
+                              {...field} 
+                              data-testid="input-edit-initiative-description" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="priority"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Priority *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value} data-testid="select-edit-initiative-priority">
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select priority" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {PRIORITY_OPTIONS.map((priority) => (
+                                <SelectItem key={priority.value} value={priority.value}>
+                                  <div className="flex items-center gap-2">
+                                    {getPriorityIcon(priority.value)}
+                                    {priority.label}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="category"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ""} data-testid="select-edit-initiative-category">
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select category" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {CATEGORY_OPTIONS.map((category) => (
+                                <SelectItem key={category.value} value={category.value}>
+                                  <div className="flex items-center gap-2">
+                                    {getCategoryIcon(category.value)}
+                                    {category.label}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value} data-testid="select-edit-initiative-status">
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="planning">Planning</SelectItem>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="progress"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Progress (%)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              data-testid="input-edit-initiative-progress"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Start Date</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !editStartDate && "text-muted-foreground"
+                            )}
+                            data-testid="button-edit-start-date"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {editStartDate ? format(editStartDate, "PPP") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={editStartDate}
+                            onSelect={setEditStartDate}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">End Date</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !editEndDate && "text-muted-foreground"
+                            )}
+                            data-testid="button-edit-end-date"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {editEndDate ? format(editEndDate, "PPP") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={editEndDate}
+                            onSelect={setEditEndDate}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="objectives" className="space-y-4">
+                  <div className="grid grid-cols-1 gap-6">
+                    <FormField
+                      control={editForm.control}
+                      name="objectives"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Objectives & Goals</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Define clear, measurable objectives for this initiative..."
+                              className="h-24"
+                              {...field} 
+                              data-testid="input-edit-initiative-objectives" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="scope"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Project Scope</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Define what is included and excluded from this initiative..."
+                              className="h-24"
+                              {...field} 
+                              data-testid="input-edit-initiative-scope" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="successCriteria"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Success Criteria & KPIs</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Define measurable success criteria and key performance indicators..."
+                              className="h-20"
+                              {...field} 
+                              data-testid="input-edit-initiative-success-criteria" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    {/* Edit Deliverables Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium">Key Deliverables</label>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={addEditDeliverable}
+                          data-testid="button-add-edit-deliverable"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Deliverable
+                        </Button>
+                      </div>
+                      {editDeliverables.map((deliverable, index) => (
+                        <div key={deliverable.id} className="p-4 border rounded-lg space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium">Deliverable {index + 1}</h4>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => removeEditDeliverable(deliverable.id)}
+                              data-testid={`button-remove-edit-deliverable-${index}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-sm font-medium">Title</label>
+                              <Input 
+                                placeholder="Deliverable title"
+                                value={deliverable.title}
+                                onChange={(e) => updateEditDeliverable(deliverable.id, "title", e.target.value)}
+                                data-testid={`input-edit-deliverable-title-${index}`}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">Target Date</label>
+                              <Input 
+                                type="date"
+                                value={deliverable.targetDate}
+                                onChange={(e) => updateEditDeliverable(deliverable.id, "targetDate", e.target.value)}
+                                data-testid={`input-edit-deliverable-date-${index}`}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">Description</label>
+                            <Textarea 
+                              placeholder="Describe this deliverable..."
+                              className="h-16"
+                              value={deliverable.description}
+                              onChange={(e) => updateEditDeliverable(deliverable.id, "description", e.target.value)}
+                              data-testid={`input-edit-deliverable-description-${index}`}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="planning" className="space-y-4">
+                  <div className="grid grid-cols-1 gap-6">
+                    <FormField
+                      control={editForm.control}
+                      name="budget"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Budget ($)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="100000"
+                              {...field}
+                              value={field.value || ""}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                              data-testid="input-edit-initiative-budget"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="stakeholderRequirements"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Stakeholder Requirements</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Define key stakeholder needs and requirements..."
+                              className="h-24"
+                              {...field} 
+                              data-testid="input-edit-initiative-stakeholder-requirements" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="businessJustification"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Business Justification</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Explain the business case and expected benefits..."
+                              className="h-24"
+                              {...field} 
+                              data-testid="input-edit-initiative-business-justification" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="risk" className="space-y-4">
+                  <div className="grid grid-cols-1 gap-6">
+                    <FormField
+                      control={editForm.control}
+                      name="assumptions"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Key Assumptions</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="List key assumptions for this initiative..."
+                              className="h-20"
+                              {...field} 
+                              data-testid="input-edit-initiative-assumptions" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="constraints"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Constraints & Limitations</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Identify constraints and limitations..."
+                              className="h-20"
+                              {...field} 
+                              data-testid="input-edit-initiative-constraints" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="risks"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Initial Risk Assessment</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Identify initial risks and mitigation strategies..."
+                              className="h-20"
+                              {...field} 
+                              data-testid="input-edit-initiative-risks" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
+              
+              <div className="flex justify-between">
+                <div className="flex space-x-2">
+                  {editCurrentTab !== "basic" && (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => {
+                        const tabs = ["basic", "objectives", "planning", "risk"];
+                        const currentIndex = tabs.indexOf(editCurrentTab);
+                        if (currentIndex > 0) handleEditTabChange(tabs[currentIndex - 1]);
+                      }}
+                      data-testid="button-edit-previous-tab"
+                    >
+                      Previous
+                    </Button>
+                  )}
+                  {editCurrentTab !== "risk" && (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => {
+                        const tabs = ["basic", "objectives", "planning", "risk"];
+                        const currentIndex = tabs.indexOf(editCurrentTab);
+                        if (currentIndex < tabs.length - 1) handleEditTabChange(tabs[currentIndex + 1]);
+                      }}
+                      data-testid="button-edit-next-tab"
+                    >
+                      Next
+                    </Button>
+                  )}
+                </div>
+                <div className="flex space-x-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setEditingInitiative(null)}
+                    data-testid="button-cancel-edit"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={updateInitiativeMutation.isPending}
+                    data-testid="button-submit-edit"
+                  >
+                    {updateInitiativeMutation.isPending ? "Updating..." : "Update Initiative"}
+                  </Button>
+                </div>
               </div>
             </form>
           </Form>

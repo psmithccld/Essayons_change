@@ -283,6 +283,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Copy project endpoint
+  app.post("/api/projects/:id/copy", requirePermission('canCreateProjects'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const originalProject = await storage.getProject(req.params.id);
+      if (!originalProject) {
+        return res.status(404).json({ error: "Original project not found" });
+      }
+
+      const { name, copyAssignments, copyTasks, newStartDate, newEndDate } = req.body;
+
+      // Create the copied project with new data
+      const copiedProjectData = {
+        ...originalProject,
+        name: name || `Copy of ${originalProject.name}`,
+        ownerId: req.userId || DEMO_USER_ID,
+        status: "planning" as const, // Reset status to planning
+        progress: 0, // Reset progress
+        startDate: newStartDate ? new Date(newStartDate) : undefined,
+        endDate: newEndDate ? new Date(newEndDate) : undefined,
+      };
+
+      // Remove fields that shouldn't be copied
+      delete (copiedProjectData as any).id;
+      delete (copiedProjectData as any).createdAt;
+      delete (copiedProjectData as any).updatedAt;
+
+      const validatedData = insertProjectSchema.parse(copiedProjectData);
+      const copiedProject = await storage.createProject(validatedData);
+
+      // Copy assignments if requested
+      if (copyAssignments) {
+        try {
+          const assignments = await storage.getProjectAssignments(req.params.id);
+          for (const assignment of assignments) {
+            await storage.createUserInitiativeAssignment({
+              userId: assignment.userId,
+              projectId: copiedProject.id,
+              role: assignment.role,
+              assignedById: req.userId || DEMO_USER_ID
+            });
+          }
+        } catch (assignmentError) {
+          console.error("Error copying assignments:", assignmentError);
+          // Continue even if assignment copying fails
+        }
+      }
+
+      // Copy tasks if requested
+      if (copyTasks) {
+        try {
+          const tasks = await storage.getTasksByProject(req.params.id);
+          for (const task of tasks) {
+            const copiedTaskData = {
+              ...task,
+              projectId: copiedProject.id,
+              status: "pending" as const, // Reset task status
+              progress: 0, // Reset task progress
+              completedDate: undefined, // Clear completion date
+            };
+            
+            // Remove fields that shouldn't be copied
+            delete (copiedTaskData as any).id;
+            delete (copiedTaskData as any).createdAt;
+            delete (copiedTaskData as any).updatedAt;
+            
+            await storage.createTask(copiedTaskData);
+          }
+        } catch (taskError) {
+          console.error("Error copying tasks:", taskError);
+          // Continue even if task copying fails
+        }
+      }
+
+      res.status(201).json(copiedProject);
+    } catch (error) {
+      console.error("Error copying project:", error);
+      res.status(400).json({ error: "Failed to copy project" });
+    }
+  });
+
   // Tasks
   app.get("/api/projects/:projectId/tasks", async (req, res) => {
     try {

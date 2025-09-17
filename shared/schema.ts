@@ -54,6 +54,19 @@ export const projects = pgTable("projects", {
   endDate: timestamp("end_date"),
   progress: integer("progress").default(0), // 0-100
   ownerId: uuid("owner_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
+  // Initiative management enhancements
+  priority: text("priority").notNull().default("medium"), // high, medium, low
+  category: text("category"), // strategic, operational, compliance, technology
+  objectives: text("objectives"), // Project objectives and goals
+  scope: text("scope"), // Project scope definition
+  successCriteria: text("success_criteria"), // Success criteria and KPIs
+  budget: decimal("budget", { precision: 15, scale: 2 }), // Project budget amount
+  assumptions: text("assumptions"), // Project assumptions
+  constraints: text("constraints"), // Project constraints and limitations
+  risks: text("risks"), // Initial risk assessment
+  deliverables: jsonb("deliverables").default([]), // Array of deliverable objects
+  stakeholderRequirements: text("stakeholder_requirements"), // Stakeholder needs
+  businessJustification: text("business_justification"), // Business case
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
