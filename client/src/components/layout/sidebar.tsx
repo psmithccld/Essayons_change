@@ -209,51 +209,53 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="w-64 bg-card border-r border-border flex flex-col" data-testid="sidebar">
+    <div className="w-64 min-w-0 bg-card border-r border-border flex flex-col h-screen" data-testid="sidebar">
       {/* Logo Header */}
-      <div className="p-6 border-b border-border">
+      <div className="p-4 sm:p-6 border-b border-border flex-shrink-0">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <ChartLine className="text-primary-foreground w-4 h-4" />
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-foreground">CMIS</h1>
-            <p className="text-xs text-muted-foreground">Change Management</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-semibold text-foreground truncate">CMIS</h1>
+            <p className="text-xs text-muted-foreground truncate">Change Management</p>
           </div>
         </div>
       </div>
 
-      {/* Navigation Menu */}
-      <nav className="flex-1 p-4">
-        {/* Overview - Fixed at Top */}
-        {renderNavigationItem(allNavigationItems[0])}
-        
-        {/* Draggable Navigation Items */}
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="navigation">
-            {(provided, snapshot) => (
-              <div
-                {...provided.droppableProps}
-                ref={provided.innerRef}
-                className={cn(
-                  "space-y-1 mt-1",
-                  snapshot.isDraggingOver && "bg-muted/50 rounded-md p-1"
-                )}
-              >
-                {draggableItems.map((item, index) => 
-                  renderDraggableItem(item, index)
-                )}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+      {/* Navigation Menu - Scrollable */}
+      <nav className="flex-1 overflow-y-auto min-h-0 p-4">
+        <div className="space-y-1">
+          {/* Overview - Fixed at Top */}
+          {renderNavigationItem(allNavigationItems[0])}
+          
+          {/* Draggable Navigation Items */}
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="navigation">
+              {(provided, snapshot) => (
+                <div
+                  {...provided.droppableProps}
+                  ref={provided.innerRef}
+                  className={cn(
+                    "space-y-1 mt-1",
+                    snapshot.isDraggingOver && "bg-muted/50 rounded-md p-1"
+                  )}
+                >
+                  {draggableItems.map((item, index) => 
+                    renderDraggableItem(item, index)
+                  )}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
+        </div>
       </nav>
 
       {/* User Profile */}
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border flex-shrink-0">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
+          <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center flex-shrink-0">
             <span className="text-xs font-medium text-secondary-foreground">JD</span>
           </div>
           <div className="flex-1 min-w-0">
@@ -263,11 +265,11 @@ export default function Sidebar() {
           <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             <SheetTrigger asChild>
               <Settings 
-                className="text-muted-foreground w-4 h-4 cursor-pointer hover:text-foreground" 
+                className="text-muted-foreground w-4 h-4 cursor-pointer hover:text-foreground flex-shrink-0" 
                 data-testid="settings-button"
               />
             </SheetTrigger>
-            <SheetContent side="right" className="w-[400px] sm:w-[540px]">
+            <SheetContent side="right" className="w-full max-w-[400px] sm:max-w-[540px] overflow-y-auto">
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
                   <Settings className="w-5 h-5" />
@@ -364,8 +366,8 @@ export default function Sidebar() {
                         control={form.control}
                         name="notifications"
                         render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                            <div className="space-y-0.5">
+                          <FormItem className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border p-4 space-y-3 sm:space-y-0">
+                            <div className="space-y-0.5 flex-1 min-w-0">
                               <FormLabel className="text-base">Push Notifications</FormLabel>
                               <div className="text-sm text-muted-foreground">
                                 Receive notifications about project updates
@@ -376,6 +378,7 @@ export default function Sidebar() {
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
                                 data-testid="switch-notifications"
+                                className="flex-shrink-0"
                               />
                             </FormControl>
                           </FormItem>
@@ -385,8 +388,8 @@ export default function Sidebar() {
                         control={form.control}
                         name="emailNotifications"
                         render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                            <div className="space-y-0.5">
+                          <FormItem className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border p-4 space-y-3 sm:space-y-0">
+                            <div className="space-y-0.5 flex-1 min-w-0">
                               <FormLabel className="text-base">Email Notifications</FormLabel>
                               <div className="text-sm text-muted-foreground">
                                 Receive email updates about your projects
@@ -397,6 +400,7 @@ export default function Sidebar() {
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
                                 data-testid="switch-email-notifications"
+                                className="flex-shrink-0"
                               />
                             </FormControl>
                           </FormItem>
@@ -406,8 +410,8 @@ export default function Sidebar() {
                         control={form.control}
                         name="autoSave"
                         render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                            <div className="space-y-0.5">
+                          <FormItem className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border p-4 space-y-3 sm:space-y-0">
+                            <div className="space-y-0.5 flex-1 min-w-0">
                               <FormLabel className="text-base">Auto-save</FormLabel>
                               <div className="text-sm text-muted-foreground">
                                 Automatically save your work while editing
@@ -418,6 +422,7 @@ export default function Sidebar() {
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
                                 data-testid="switch-auto-save"
+                                className="flex-shrink-0"
                               />
                             </FormControl>
                           </FormItem>
@@ -425,18 +430,20 @@ export default function Sidebar() {
                       />
                     </div>
 
-                    <div className="flex justify-end space-x-2 pt-6">
+                    <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-2 pt-6">
                       <Button
                         type="button"
                         variant="outline"
                         onClick={() => setIsSettingsOpen(false)}
                         data-testid="button-cancel-settings"
+                        className="w-full sm:w-auto"
                       >
                         Cancel
                       </Button>
                       <Button
                         type="submit"
                         data-testid="button-save-settings"
+                        className="w-full sm:w-auto"
                       >
                         Save Settings
                       </Button>
