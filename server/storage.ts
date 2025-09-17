@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { 
   users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, mindMaps, processMaps, roles, userInitiativeAssignments,
+  userGroups, userGroupMemberships, userPermissions,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type Survey, type InsertSurvey,
@@ -8,7 +9,8 @@ import {
   type Milestone, type InsertMilestone, type ChecklistTemplate, type InsertChecklistTemplate,
   type MindMap, type InsertMindMap, type ProcessMap, type InsertProcessMap,
   type Role, type InsertRole, type UserInitiativeAssignment, type InsertUserInitiativeAssignment,
-  type Permissions
+  type Permissions, type UserGroup, type InsertUserGroup, type UserGroupMembership, 
+  type InsertUserGroupMembership, type UserPermission, type InsertUserPermission
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray } from "drizzle-orm";
@@ -139,6 +141,35 @@ export interface IStorage {
   // Role-Based Access Methods
   getUserPermissions(userId: string): Promise<Permissions>;
   checkUserPermission(userId: string, permission: keyof Permissions): Promise<boolean>;
+
+  // Security Management Center - User Groups
+  getUserGroups(): Promise<UserGroup[]>;
+  getUserGroup(id: string): Promise<UserGroup | undefined>;
+  createUserGroup(group: InsertUserGroup): Promise<UserGroup>;
+  updateUserGroup(id: string, group: Partial<InsertUserGroup>): Promise<UserGroup | undefined>;
+  deleteUserGroup(id: string): Promise<boolean>;
+
+  // Security Management Center - User Group Memberships
+  getUserGroupMemberships(userId: string): Promise<UserGroupMembership[]>;
+  getGroupMemberships(groupId: string): Promise<UserGroupMembership[]>;
+  assignUserToGroup(membership: InsertUserGroupMembership): Promise<UserGroupMembership>;
+  removeUserFromGroup(userId: string, groupId: string): Promise<boolean>;
+
+  // Security Management Center - Individual User Permissions
+  getUserIndividualPermissions(userId: string): Promise<UserPermission | undefined>;
+  setUserIndividualPermissions(permission: InsertUserPermission): Promise<UserPermission>;
+  updateUserIndividualPermissions(userId: string, permissions: Partial<InsertUserPermission>): Promise<UserPermission | undefined>;
+  clearUserIndividualPermissions(userId: string): Promise<boolean>;
+
+  // Security Management Center - Enhanced Permission Resolution
+  resolveUserPermissions(userId: string): Promise<Permissions>;
+  checkEnhancedUserPermission(userId: string, permission: keyof Permissions): Promise<boolean>;
+  getUserSecuritySummary(userId: string): Promise<{
+    rolePermissions: Permissions;
+    groupPermissions: Permissions[];
+    individualPermissions?: Permissions;
+    resolvedPermissions: Permissions;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -695,20 +726,110 @@ export class DatabaseStorage implements IStorage {
 
     if (result.length === 0 || !result[0].permissions) {
       // Return default permissions with all false if user/role not found
+      // Using the new permission keys that match the schema
       return {
-        canViewUsers: false,
-        canCreateUsers: false,
+        // User Management
+        canSeeUsers: false,
+        canModifyUsers: false,
         canEditUsers: false,
         canDeleteUsers: false,
-        canCreateProjects: false,
-        canEditAllProjects: false,
+        
+        // Project Management
+        canSeeProjects: false,
+        canModifyProjects: false,
+        canEditProjects: false,
         canDeleteProjects: false,
-        canViewAllProjects: false,
-        canViewRoles: false,
-        canCreateRoles: false,
+        canSeeAllProjects: false,
+        canModifyAllProjects: false,
+        canEditAllProjects: false,
+        canDeleteAllProjects: false,
+        
+        // Tasks Management
+        canSeeTasks: false,
+        canModifyTasks: false,
+        canEditTasks: false,
+        canDeleteTasks: false,
+        
+        // Stakeholder Management
+        canSeeStakeholders: false,
+        canModifyStakeholders: false,
+        canEditStakeholders: false,
+        canDeleteStakeholders: false,
+        
+        // RAID Logs Management
+        canSeeRaidLogs: false,
+        canModifyRaidLogs: false,
+        canEditRaidLogs: false,
+        canDeleteRaidLogs: false,
+        
+        // Communications Management
+        canSeeCommunications: false,
+        canModifyCommunications: false,
+        canEditCommunications: false,
+        canDeleteCommunications: false,
+        
+        // Survey Management
+        canSeeSurveys: false,
+        canModifySurveys: false,
+        canEditSurveys: false,
+        canDeleteSurveys: false,
+        
+        // Mind Maps Management
+        canSeeMindMaps: false,
+        canModifyMindMaps: false,
+        canEditMindMaps: false,
+        canDeleteMindMaps: false,
+        
+        // Process Maps Management
+        canSeeProcessMaps: false,
+        canModifyProcessMaps: false,
+        canEditProcessMaps: false,
+        canDeleteProcessMaps: false,
+        
+        // Gantt Charts Management
+        canSeeGanttCharts: false,
+        canModifyGanttCharts: false,
+        canEditGanttCharts: false,
+        canDeleteGanttCharts: false,
+        
+        // Checklist Templates Management
+        canSeeChecklistTemplates: false,
+        canModifyChecklistTemplates: false,
+        canEditChecklistTemplates: false,
+        canDeleteChecklistTemplates: false,
+        
+        // Reports and Analytics
+        canSeeReports: false,
+        canModifyReports: false,
+        canEditReports: false,
+        canDeleteReports: false,
+        
+        // Security and Role Management
+        canSeeRoles: false,
+        canModifyRoles: false,
         canEditRoles: false,
         canDeleteRoles: false,
-        canViewReports: false,
+        canSeeGroups: false,
+        canModifyGroups: false,
+        canEditGroups: false,
+        canDeleteGroups: false,
+        canSeeSecuritySettings: false,
+        canModifySecuritySettings: false,
+        canEditSecuritySettings: false,
+        canDeleteSecuritySettings: false,
+        
+        // Email System Permissions
+        canSendEmails: false,
+        canSendBulkEmails: false,
+        canSendSystemEmails: false,
+        canSeeEmailLogs: false,
+        canModifyEmailTemplates: false,
+        canEditEmailSettings: false,
+        
+        // System Administration
+        canSeeSystemSettings: false,
+        canModifySystemSettings: false,
+        canEditSystemSettings: false,
         canManageSystem: false,
       };
     }
@@ -717,7 +838,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async checkUserPermission(userId: string, permission: keyof Permissions): Promise<boolean> {
-    const permissions = await this.getUserPermissions(userId);
+    const permissions = await this.resolveUserPermissions(userId);
     return permissions[permission] || false;
   }
 
@@ -847,6 +968,248 @@ export class DatabaseStorage implements IStorage {
   async deleteProcessMap(id: string): Promise<boolean> {
     const result = await db.delete(processMaps).where(eq(processMaps.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // ===== SECURITY MANAGEMENT CENTER METHODS =====
+
+  // User Groups Management
+  async getUserGroups(): Promise<UserGroup[]> {
+    try {
+      return await db.select().from(userGroups)
+        .where(eq(userGroups.isActive, true))
+        .orderBy(userGroups.name);
+    } catch (error) {
+      // Fallback when new tables don't exist yet
+      console.warn('User groups table not available yet:', error);
+      return [];
+    }
+  }
+
+  async getUserGroup(id: string): Promise<UserGroup | undefined> {
+    try {
+      const [group] = await db.select().from(userGroups).where(eq(userGroups.id, id));
+      return group || undefined;
+    } catch (error) {
+      console.warn('User groups table not available yet:', error);
+      return undefined;
+    }
+  }
+
+  async createUserGroup(insertGroup: InsertUserGroup): Promise<UserGroup> {
+    try {
+      const [group] = await db.insert(userGroups).values(insertGroup).returning();
+      return group;
+    } catch (error) {
+      console.error('Failed to create user group:', error);
+      throw error;
+    }
+  }
+
+  async updateUserGroup(id: string, updateData: Partial<InsertUserGroup>): Promise<UserGroup | undefined> {
+    try {
+      const [updated] = await db.update(userGroups)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(userGroups.id, id))
+        .returning();
+      return updated || undefined;
+    } catch (error) {
+      console.error('Failed to update user group:', error);
+      return undefined;
+    }
+  }
+
+  async deleteUserGroup(id: string): Promise<boolean> {
+    try {
+      const result = await db.delete(userGroups).where(eq(userGroups.id, id));
+      return result.rowCount ? result.rowCount > 0 : false;
+    } catch (error) {
+      console.error('Failed to delete user group:', error);
+      return false;
+    }
+  }
+
+  // User Group Memberships Management
+  async getUserGroupMemberships(userId: string): Promise<UserGroupMembership[]> {
+    try {
+      return await db.select().from(userGroupMemberships)
+        .where(eq(userGroupMemberships.userId, userId))
+        .orderBy(userGroupMemberships.assignedAt);
+    } catch (error) {
+      console.warn('User group memberships table not available yet:', error);
+      return [];
+    }
+  }
+
+  async getGroupMemberships(groupId: string): Promise<UserGroupMembership[]> {
+    try {
+      return await db.select().from(userGroupMemberships)
+        .where(eq(userGroupMemberships.groupId, groupId))
+        .orderBy(userGroupMemberships.assignedAt);
+    } catch (error) {
+      console.warn('User group memberships table not available yet:', error);
+      return [];
+    }
+  }
+
+  async assignUserToGroup(membership: InsertUserGroupMembership): Promise<UserGroupMembership> {
+    try {
+      const [assigned] = await db.insert(userGroupMemberships).values(membership).returning();
+      return assigned;
+    } catch (error) {
+      console.error('Failed to assign user to group:', error);
+      throw error;
+    }
+  }
+
+  async removeUserFromGroup(userId: string, groupId: string): Promise<boolean> {
+    try {
+      const result = await db.delete(userGroupMemberships)
+        .where(and(
+          eq(userGroupMemberships.userId, userId),
+          eq(userGroupMemberships.groupId, groupId)
+        ));
+      return result.rowCount ? result.rowCount > 0 : false;
+    } catch (error) {
+      console.error('Failed to remove user from group:', error);
+      return false;
+    }
+  }
+
+  // Individual User Permissions Management
+  async getUserIndividualPermissions(userId: string): Promise<UserPermission | undefined> {
+    try {
+      const [permissions] = await db.select().from(userPermissions)
+        .where(eq(userPermissions.userId, userId));
+      return permissions || undefined;
+    } catch (error) {
+      console.warn('User permissions table not available yet:', error);
+      return undefined;
+    }
+  }
+
+  async setUserIndividualPermissions(permission: InsertUserPermission): Promise<UserPermission> {
+    try {
+      const [set] = await db.insert(userPermissions).values(permission).returning();
+      return set;
+    } catch (error) {
+      console.error('Failed to set user individual permissions:', error);
+      throw error;
+    }
+  }
+
+  async updateUserIndividualPermissions(userId: string, updateData: Partial<InsertUserPermission>): Promise<UserPermission | undefined> {
+    try {
+      const [updated] = await db.update(userPermissions)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(userPermissions.userId, userId))
+        .returning();
+      return updated || undefined;
+    } catch (error) {
+      console.error('Failed to update user individual permissions:', error);
+      return undefined;
+    }
+  }
+
+  async clearUserIndividualPermissions(userId: string): Promise<boolean> {
+    try {
+      const result = await db.delete(userPermissions).where(eq(userPermissions.userId, userId));
+      return result.rowCount ? result.rowCount > 0 : false;
+    } catch (error) {
+      console.error('Failed to clear user individual permissions:', error);
+      return false;
+    }
+  }
+
+  // Enhanced Permission Resolution - The Core of Security Management Center
+  async resolveUserPermissions(userId: string): Promise<Permissions> {
+    try {
+      // Get role permissions (existing functionality)
+      const rolePermissions = await this.getUserPermissions(userId);
+      
+      // Get group permissions (most permissive wins across groups)
+      const groupMemberships = await this.getUserGroupMemberships(userId);
+      let groupPermissions: Permissions = {} as Permissions;
+      
+      // Initialize all group permissions as false
+      Object.keys(rolePermissions).forEach(key => {
+        groupPermissions[key as keyof Permissions] = false;
+      });
+      
+      // Get permissions from all groups and apply most permissive logic
+      for (const membership of groupMemberships) {
+        try {
+          const group = await this.getUserGroup(membership.groupId);
+          if (group && group.isActive) {
+            Object.keys(group.permissions).forEach(key => {
+              const permission = key as keyof Permissions;
+              if (group.permissions[permission]) {
+                groupPermissions[permission] = true; // Most permissive wins
+              }
+            });
+          }
+        } catch (err) {
+          console.warn('Failed to get group permissions:', err);
+        }
+      }
+      
+      // Get individual user permissions
+      const individualPermissions = await this.getUserIndividualPermissions(userId);
+      
+      // Combine all permissions with most permissive wins
+      const resolvedPermissions: Permissions = {} as Permissions;
+      
+      Object.keys(rolePermissions).forEach(key => {
+        const permission = key as keyof Permissions;
+        resolvedPermissions[permission] = 
+          rolePermissions[permission] || 
+          groupPermissions[permission] || 
+          (individualPermissions?.permissions[permission] || false);
+      });
+      
+      return resolvedPermissions;
+    } catch (error) {
+      console.error('Failed to resolve user permissions:', error);
+      // Fallback to role-only permissions
+      return await this.getUserPermissions(userId);
+    }
+  }
+
+  async checkEnhancedUserPermission(userId: string, permission: keyof Permissions): Promise<boolean> {
+    const permissions = await this.resolveUserPermissions(userId);
+    return permissions[permission] || false;
+  }
+
+  async getUserSecuritySummary(userId: string): Promise<{
+    rolePermissions: Permissions;
+    groupPermissions: Permissions[];
+    individualPermissions?: Permissions;
+    resolvedPermissions: Permissions;
+  }> {
+    const rolePermissions = await this.getUserPermissions(userId);
+    const groupMemberships = await this.getUserGroupMemberships(userId);
+    const individualUserPermissions = await this.getUserIndividualPermissions(userId);
+    
+    // Get permissions from all groups
+    const groupPermissions: Permissions[] = [];
+    for (const membership of groupMemberships) {
+      try {
+        const group = await this.getUserGroup(membership.groupId);
+        if (group && group.isActive) {
+          groupPermissions.push(group.permissions);
+        }
+      } catch (err) {
+        console.warn('Failed to get group permissions for summary:', err);
+      }
+    }
+    
+    const resolvedPermissions = await this.resolveUserPermissions(userId);
+    
+    return {
+      rolePermissions,
+      groupPermissions,
+      individualPermissions: individualUserPermissions?.permissions,
+      resolvedPermissions,
+    };
   }
 }
 

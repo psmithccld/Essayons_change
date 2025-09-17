@@ -107,7 +107,7 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Roles
-  app.get("/api/roles", requirePermission('canViewRoles'), async (req, res) => {
+  app.get("/api/roles", requirePermission('canSeeRoles'), async (req, res) => {
     try {
       const roles = await storage.getRoles();
       res.json(roles);
@@ -179,7 +179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Users
-  app.get("/api/users", requirePermission('canViewUsers'), async (req, res) => {
+  app.get("/api/users", requirePermission('canSeeUsers'), async (req, res) => {
     try {
       const users = await storage.getUsers();
       res.json(users);
@@ -227,7 +227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects", requirePermission('canCreateProjects'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/projects", requirePermission('canModifyProjects'), async (req: AuthenticatedRequest, res) => {
     try {
       // Convert date strings to Date objects before validation
       const processedData = {
@@ -284,7 +284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Copy project endpoint
-  app.post("/api/projects/:id/copy", requirePermission('canCreateProjects'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/projects/:id/copy", requirePermission('canModifyProjects'), async (req: AuthenticatedRequest, res) => {
     try {
       const originalProject = await storage.getProject(req.params.id);
       if (!originalProject) {
@@ -1181,7 +1181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Enhanced Role Management Routes
-  app.post("/api/roles", requirePermission('canCreateRoles'), async (req, res) => {
+  app.post("/api/roles", requirePermission('canModifyRoles'), async (req, res) => {
     try {
       const validatedData = insertRoleSchema.parse(req.body);
       const role = await storage.createRole(validatedData);
@@ -1222,7 +1222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User-Initiative Assignment Routes
-  app.get("/api/users/:userId/initiatives", requirePermission('canViewUsers'), async (req, res) => {
+  app.get("/api/users/:userId/initiatives", requirePermission('canSeeUsers'), async (req, res) => {
     try {
       const assignments = await storage.getUserInitiativeAssignments(req.params.userId);
       res.json(assignments);
@@ -1311,7 +1311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Enhanced User Management Routes
-  app.get("/api/users/with-roles", requirePermission('canViewUsers'), async (req, res) => {
+  app.get("/api/users/with-roles", requirePermission('canSeeUsers'), async (req, res) => {
     try {
       const usersWithRoles = await storage.getUsersWithRoles();
       res.json(usersWithRoles);
@@ -1321,7 +1321,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/users", requirePermission('canCreateUsers'), async (req, res) => {
+  app.post("/api/users", requirePermission('canModifyUsers'), async (req, res) => {
     try {
       const validatedData = insertUserSchema.parse(req.body);
       const user = await storage.createUser(validatedData);
@@ -1397,7 +1397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  app.get("/api/users/by-role/:roleId", requirePermission('canViewUsers'), async (req, res) => {
+  app.get("/api/users/by-role/:roleId", requirePermission('canSeeUsers'), async (req, res) => {
     try {
       const users = await storage.getUsersByRole(req.params.roleId);
       // Users already have passwordHash removed by storage layer
@@ -1409,7 +1409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Permission Check Routes
-  app.get("/api/users/:userId/permissions", requirePermission('canViewUsers'), async (req, res) => {
+  app.get("/api/users/:userId/permissions", requirePermission('canSeeUsers'), async (req, res) => {
     try {
       const permissions = await storage.getUserPermissions(req.params.userId);
       res.json(permissions);
@@ -1419,7 +1419,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/users/:userId/permissions/:permission", requirePermission('canViewUsers'), async (req, res) => {
+  app.get("/api/users/:userId/permissions/:permission", requirePermission('canSeeUsers'), async (req, res) => {
     try {
       const hasPermission = await storage.checkUserPermission(
         req.params.userId, 
@@ -1429,6 +1429,220 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error checking user permission:", error);
       res.status(500).json({ error: "Failed to check user permission" });
+    }
+  });
+
+  // ===== SECURITY MANAGEMENT CENTER API ROUTES =====
+
+  // User Groups Management Routes
+  app.get("/api/user-groups", requirePermission('canSeeGroups'), async (req, res) => {
+    try {
+      const groups = await storage.getUserGroups();
+      res.json(groups);
+    } catch (error) {
+      console.error("Error fetching user groups:", error);
+      res.status(500).json({ error: "Failed to fetch user groups" });
+    }
+  });
+
+  app.get("/api/user-groups/:id", requirePermission('canSeeGroups'), async (req, res) => {
+    try {
+      const group = await storage.getUserGroup(req.params.id);
+      if (!group) {
+        return res.status(404).json({ error: "User group not found" });
+      }
+      res.json(group);
+    } catch (error) {
+      console.error("Error fetching user group:", error);
+      res.status(500).json({ error: "Failed to fetch user group" });
+    }
+  });
+
+  app.post("/api/user-groups", requirePermission('canModifyGroups'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = insertUserGroupSchema.parse(req.body);
+      const group = await storage.createUserGroup(validatedData);
+      res.status(201).json(group);
+    } catch (error) {
+      console.error("Error creating user group:", error);
+      res.status(400).json({ error: "Failed to create user group" });
+    }
+  });
+
+  app.put("/api/user-groups/:id", requirePermission('canEditGroups'), async (req, res) => {
+    try {
+      const validatedData = insertUserGroupSchema.partial().parse(req.body);
+      const group = await storage.updateUserGroup(req.params.id, validatedData);
+      if (!group) {
+        return res.status(404).json({ error: "User group not found" });
+      }
+      res.json(group);
+    } catch (error) {
+      console.error("Error updating user group:", error);
+      res.status(400).json({ error: "Failed to update user group" });
+    }
+  });
+
+  app.delete("/api/user-groups/:id", requirePermission('canDeleteGroups'), async (req, res) => {
+    try {
+      const success = await storage.deleteUserGroup(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "User group not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user group:", error);
+      res.status(500).json({ error: "Failed to delete user group" });
+    }
+  });
+
+  // User Group Memberships Management Routes
+  app.get("/api/users/:userId/groups", requirePermission('canSeeGroups'), async (req, res) => {
+    try {
+      const memberships = await storage.getUserGroupMemberships(req.params.userId);
+      res.json(memberships);
+    } catch (error) {
+      console.error("Error fetching user group memberships:", error);
+      res.status(500).json({ error: "Failed to fetch user group memberships" });
+    }
+  });
+
+  app.get("/api/user-groups/:groupId/members", requirePermission('canSeeGroups'), async (req, res) => {
+    try {
+      const memberships = await storage.getGroupMemberships(req.params.groupId);
+      res.json(memberships);
+    } catch (error) {
+      console.error("Error fetching group memberships:", error);
+      res.status(500).json({ error: "Failed to fetch group memberships" });
+    }
+  });
+
+  app.post("/api/user-group-memberships", requirePermission('canModifyGroups'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // Server sets assignedById from authenticated user
+      const membershipData = {
+        ...req.body,
+        assignedById: req.userId || DEMO_USER_ID
+      };
+      
+      const validatedData = insertUserGroupMembershipSchema.parse(membershipData);
+      const membership = await storage.assignUserToGroup(validatedData);
+      res.status(201).json(membership);
+    } catch (error) {
+      console.error("Error assigning user to group:", error);
+      res.status(400).json({ error: "Failed to assign user to group" });
+    }
+  });
+
+  app.delete("/api/user-group-memberships/remove", requirePermission('canModifyGroups'), async (req, res) => {
+    try {
+      const { userId, groupId } = req.body;
+      if (!userId || !groupId) {
+        return res.status(400).json({ error: "userId and groupId are required" });
+      }
+      
+      const success = await storage.removeUserFromGroup(userId, groupId);
+      if (!success) {
+        return res.status(404).json({ error: "User group membership not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing user from group:", error);
+      res.status(500).json({ error: "Failed to remove user from group" });
+    }
+  });
+
+  // Individual User Permissions Management Routes
+  app.get("/api/users/:userId/individual-permissions", requirePermission('canSeeSecuritySettings'), async (req, res) => {
+    try {
+      const permissions = await storage.getUserIndividualPermissions(req.params.userId);
+      res.json(permissions || null);
+    } catch (error) {
+      console.error("Error fetching user individual permissions:", error);
+      res.status(500).json({ error: "Failed to fetch user individual permissions" });
+    }
+  });
+
+  app.post("/api/users/:userId/individual-permissions", requirePermission('canModifySecuritySettings'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // Server sets assignedById from authenticated user and userId from params
+      const permissionData = {
+        userId: req.params.userId,
+        permissions: req.body.permissions,
+        assignedById: req.userId || DEMO_USER_ID
+      };
+      
+      const validatedData = insertUserPermissionSchema.parse(permissionData);
+      const permission = await storage.setUserIndividualPermissions(validatedData);
+      res.status(201).json(permission);
+    } catch (error) {
+      console.error("Error setting user individual permissions:", error);
+      res.status(400).json({ error: "Failed to set user individual permissions" });
+    }
+  });
+
+  app.put("/api/users/:userId/individual-permissions", requirePermission('canEditSecuritySettings'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const updateData = {
+        permissions: req.body.permissions
+      };
+      
+      const validatedData = insertUserPermissionSchema.partial().parse(updateData);
+      const permission = await storage.updateUserIndividualPermissions(req.params.userId, validatedData);
+      if (!permission) {
+        return res.status(404).json({ error: "User individual permissions not found" });
+      }
+      res.json(permission);
+    } catch (error) {
+      console.error("Error updating user individual permissions:", error);
+      res.status(400).json({ error: "Failed to update user individual permissions" });
+    }
+  });
+
+  app.delete("/api/users/:userId/individual-permissions", requirePermission('canDeleteSecuritySettings'), async (req, res) => {
+    try {
+      const success = await storage.clearUserIndividualPermissions(req.params.userId);
+      if (!success) {
+        return res.status(404).json({ error: "User individual permissions not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error clearing user individual permissions:", error);
+      res.status(500).json({ error: "Failed to clear user individual permissions" });
+    }
+  });
+
+  // Enhanced Permission Resolution Routes
+  app.get("/api/users/:userId/resolved-permissions", requirePermission('canSeeSecuritySettings'), async (req, res) => {
+    try {
+      const resolvedPermissions = await storage.resolveUserPermissions(req.params.userId);
+      res.json(resolvedPermissions);
+    } catch (error) {
+      console.error("Error resolving user permissions:", error);
+      res.status(500).json({ error: "Failed to resolve user permissions" });
+    }
+  });
+
+  app.get("/api/users/:userId/security-summary", requirePermission('canSeeSecuritySettings'), async (req, res) => {
+    try {
+      const securitySummary = await storage.getUserSecuritySummary(req.params.userId);
+      res.json(securitySummary);
+    } catch (error) {
+      console.error("Error fetching user security summary:", error);
+      res.status(500).json({ error: "Failed to fetch user security summary" });
+    }
+  });
+
+  app.get("/api/users/:userId/enhanced-permissions/:permission", requirePermission('canSeeSecuritySettings'), async (req, res) => {
+    try {
+      const hasPermission = await storage.checkEnhancedUserPermission(
+        req.params.userId, 
+        req.params.permission as keyof Permissions
+      );
+      res.json({ hasPermission });
+    } catch (error) {
+      console.error("Error checking enhanced user permission:", error);
+      res.status(500).json({ error: "Failed to check enhanced user permission" });
     }
   });
 

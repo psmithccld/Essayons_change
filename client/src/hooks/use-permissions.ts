@@ -39,23 +39,23 @@ export function usePermissions() {
 
   // Feature-level access checks
   const canAccessUserManagement = (): boolean => {
-    return hasPermission('canViewUsers');
+    return hasPermission('canSeeUsers');
   };
 
   const canAccessInitiativeManagement = (): boolean => {
-    return hasAnyPermission('canViewAllProjects', 'canCreateProjects', 'canEditAllProjects');
+    return hasAnyPermission('canSeeAllProjects', 'canModifyProjects', 'canEditAllProjects');
   };
 
   const canAccessSecurityManagement = (): boolean => {
-    return hasPermission('canViewRoles');
+    return hasPermission('canSeeRoles');
   };
 
   const canManageProjects = (): boolean => {
-    return hasAnyPermission('canCreateProjects', 'canEditAllProjects', 'canDeleteProjects');
+    return hasAnyPermission('canModifyProjects', 'canEditAllProjects', 'canDeleteProjects');
   };
 
   const canCreateContent = (): boolean => {
-    return hasAnyPermission('canCreateProjects', 'canEditAllProjects');
+    return hasAnyPermission('canModifyProjects', 'canEditAllProjects');
   };
 
   const canDeleteContent = (): boolean => {
@@ -63,7 +63,7 @@ export function usePermissions() {
   };
 
   const canViewSystemReports = (): boolean => {
-    return hasPermission('canViewReports');
+    return hasPermission('canSeeReports');
   };
 
   const isSystemAdmin = (): boolean => {

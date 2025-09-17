@@ -26,41 +26,130 @@ import { usePermissions } from "@/hooks/use-permissions";
 const PERMISSION_CATEGORIES = {
   "User Management": {
     icon: Users,
-    permissions: ["canViewUsers", "canCreateUsers", "canEditUsers", "canDeleteUsers"] as (keyof Permissions)[],
+    permissions: ["canSeeUsers", "canModifyUsers", "canEditUsers", "canDeleteUsers"] as (keyof Permissions)[],
     description: "Control access to user management features"
   },
   "Project Management": {
     icon: FileText,
-    permissions: ["canCreateProjects", "canEditAllProjects", "canDeleteProjects", "canViewAllProjects"] as (keyof Permissions)[],
+    permissions: ["canModifyProjects", "canEditAllProjects", "canDeleteProjects", "canSeeAllProjects"] as (keyof Permissions)[],
     description: "Manage project creation and modification permissions"
   },
   "Role Management": {
     icon: Shield,
-    permissions: ["canViewRoles", "canCreateRoles", "canEditRoles", "canDeleteRoles"] as (keyof Permissions)[],
+    permissions: ["canSeeRoles", "canModifyRoles", "canEditRoles", "canDeleteRoles"] as (keyof Permissions)[],
     description: "Control role and permission management access"
   },
   "System Administration": {
     icon: Settings,
-    permissions: ["canViewReports", "canManageSystem"] as (keyof Permissions)[],
+    permissions: ["canSeeReports", "canManageSystem"] as (keyof Permissions)[],
     description: "System-level administrative capabilities"
   }
 };
 
 // Permission display names for better UX
 const PERMISSION_LABELS: Record<keyof Permissions, string> = {
-  canViewUsers: "View Users",
-  canCreateUsers: "Create Users", 
+  // User Management
+  canSeeUsers: "View Users",
+  canModifyUsers: "Create Users", 
   canEditUsers: "Edit Users",
   canDeleteUsers: "Delete Users",
-  canCreateProjects: "Create Projects",
-  canEditAllProjects: "Edit All Projects",
+  
+  // Project Management
+  canSeeProjects: "View Projects",
+  canModifyProjects: "Create Projects",
+  canEditProjects: "Edit Projects",
   canDeleteProjects: "Delete Projects",
-  canViewAllProjects: "View All Projects",
-  canViewRoles: "View Roles",
-  canCreateRoles: "Create Roles",
+  canSeeAllProjects: "View All Projects",
+  canModifyAllProjects: "Create All Projects",
+  canEditAllProjects: "Edit All Projects",
+  canDeleteAllProjects: "Delete All Projects",
+  
+  // Tasks Management
+  canSeeTasks: "View Tasks",
+  canModifyTasks: "Create Tasks",
+  canEditTasks: "Edit Tasks",
+  canDeleteTasks: "Delete Tasks",
+  
+  // Stakeholder Management
+  canSeeStakeholders: "View Stakeholders",
+  canModifyStakeholders: "Create Stakeholders",
+  canEditStakeholders: "Edit Stakeholders",
+  canDeleteStakeholders: "Delete Stakeholders",
+  
+  // RAID Logs Management
+  canSeeRaidLogs: "View RAID Logs",
+  canModifyRaidLogs: "Create RAID Logs",
+  canEditRaidLogs: "Edit RAID Logs",
+  canDeleteRaidLogs: "Delete RAID Logs",
+  
+  // Communications Management
+  canSeeCommunications: "View Communications",
+  canModifyCommunications: "Create Communications",
+  canEditCommunications: "Edit Communications",
+  canDeleteCommunications: "Delete Communications",
+  
+  // Survey Management
+  canSeeSurveys: "View Surveys",
+  canModifySurveys: "Create Surveys",
+  canEditSurveys: "Edit Surveys",
+  canDeleteSurveys: "Delete Surveys",
+  
+  // Mind Maps Management
+  canSeeMindMaps: "View Mind Maps",
+  canModifyMindMaps: "Create Mind Maps",
+  canEditMindMaps: "Edit Mind Maps",
+  canDeleteMindMaps: "Delete Mind Maps",
+  
+  // Process Maps Management
+  canSeeProcessMaps: "View Process Maps",
+  canModifyProcessMaps: "Create Process Maps",
+  canEditProcessMaps: "Edit Process Maps",
+  canDeleteProcessMaps: "Delete Process Maps",
+  
+  // Gantt Charts Management
+  canSeeGanttCharts: "View Gantt Charts",
+  canModifyGanttCharts: "Create Gantt Charts",
+  canEditGanttCharts: "Edit Gantt Charts",
+  canDeleteGanttCharts: "Delete Gantt Charts",
+  
+  // Checklist Templates Management
+  canSeeChecklistTemplates: "View Checklists",
+  canModifyChecklistTemplates: "Create Checklists",
+  canEditChecklistTemplates: "Edit Checklists",
+  canDeleteChecklistTemplates: "Delete Checklists",
+  
+  // Reports and Analytics
+  canSeeReports: "View Reports",
+  canModifyReports: "Create Reports",
+  canEditReports: "Edit Reports",
+  canDeleteReports: "Delete Reports",
+  
+  // Security and Role Management
+  canSeeRoles: "View Roles",
+  canModifyRoles: "Create Roles",
   canEditRoles: "Edit Roles",
   canDeleteRoles: "Delete Roles",
-  canViewReports: "View Reports",
+  canSeeGroups: "View Groups",
+  canModifyGroups: "Create Groups",
+  canEditGroups: "Edit Groups",
+  canDeleteGroups: "Delete Groups",
+  canSeeSecuritySettings: "View Security Settings",
+  canModifySecuritySettings: "Create Security Settings",
+  canEditSecuritySettings: "Edit Security Settings",
+  canDeleteSecuritySettings: "Delete Security Settings",
+  
+  // Email System Permissions
+  canSendEmails: "Send Emails",
+  canSendBulkEmails: "Send Bulk Emails",
+  canSendSystemEmails: "Send System Emails",
+  canSeeEmailLogs: "View Email Logs",
+  canModifyEmailTemplates: "Create Email Templates",
+  canEditEmailSettings: "Edit Email Settings",
+  
+  // System Administration
+  canSeeSystemSettings: "View System Settings",
+  canModifySystemSettings: "Create System Settings",
+  canEditSystemSettings: "Edit System Settings",
   canManageSystem: "Manage System"
 };
 

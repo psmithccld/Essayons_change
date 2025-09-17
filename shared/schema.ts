@@ -4,21 +4,110 @@ import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Define permissions structure for type safety
+// Enhanced permissions structure for comprehensive Security Management Center
 export const permissionsSchema = z.object({
-  canViewUsers: z.boolean().default(false), // RBAC: View user lists and profiles
-  canCreateUsers: z.boolean().default(false),
+  // User Management - granular CRUD operations
+  canSeeUsers: z.boolean().default(false),
+  canModifyUsers: z.boolean().default(false),
   canEditUsers: z.boolean().default(false),
   canDeleteUsers: z.boolean().default(false),
-  canCreateProjects: z.boolean().default(false),
-  canEditAllProjects: z.boolean().default(false),
+  
+  // Project Management - granular CRUD operations
+  canSeeProjects: z.boolean().default(false),
+  canModifyProjects: z.boolean().default(false),
+  canEditProjects: z.boolean().default(false),
   canDeleteProjects: z.boolean().default(false),
-  canViewAllProjects: z.boolean().default(false),
-  canViewRoles: z.boolean().default(false), // RBAC: View roles for assignment
-  canCreateRoles: z.boolean().default(false),
+  canSeeAllProjects: z.boolean().default(false),
+  canModifyAllProjects: z.boolean().default(false),
+  canEditAllProjects: z.boolean().default(false),
+  canDeleteAllProjects: z.boolean().default(false),
+  
+  // Tasks Management - granular CRUD operations
+  canSeeTasks: z.boolean().default(false),
+  canModifyTasks: z.boolean().default(false),
+  canEditTasks: z.boolean().default(false),
+  canDeleteTasks: z.boolean().default(false),
+  
+  // Stakeholder Management - granular CRUD operations
+  canSeeStakeholders: z.boolean().default(false),
+  canModifyStakeholders: z.boolean().default(false),
+  canEditStakeholders: z.boolean().default(false),
+  canDeleteStakeholders: z.boolean().default(false),
+  
+  // RAID Logs Management - granular CRUD operations
+  canSeeRaidLogs: z.boolean().default(false),
+  canModifyRaidLogs: z.boolean().default(false),
+  canEditRaidLogs: z.boolean().default(false),
+  canDeleteRaidLogs: z.boolean().default(false),
+  
+  // Communications Management - granular CRUD operations
+  canSeeCommunications: z.boolean().default(false),
+  canModifyCommunications: z.boolean().default(false),
+  canEditCommunications: z.boolean().default(false),
+  canDeleteCommunications: z.boolean().default(false),
+  
+  // Survey Management - granular CRUD operations
+  canSeeSurveys: z.boolean().default(false),
+  canModifySurveys: z.boolean().default(false),
+  canEditSurveys: z.boolean().default(false),
+  canDeleteSurveys: z.boolean().default(false),
+  
+  // Mind Maps Management - granular CRUD operations
+  canSeeMindMaps: z.boolean().default(false),
+  canModifyMindMaps: z.boolean().default(false),
+  canEditMindMaps: z.boolean().default(false),
+  canDeleteMindMaps: z.boolean().default(false),
+  
+  // Process Maps Management - granular CRUD operations
+  canSeeProcessMaps: z.boolean().default(false),
+  canModifyProcessMaps: z.boolean().default(false),
+  canEditProcessMaps: z.boolean().default(false),
+  canDeleteProcessMaps: z.boolean().default(false),
+  
+  // Gantt Charts Management - granular CRUD operations
+  canSeeGanttCharts: z.boolean().default(false),
+  canModifyGanttCharts: z.boolean().default(false),
+  canEditGanttCharts: z.boolean().default(false),
+  canDeleteGanttCharts: z.boolean().default(false),
+  
+  // Checklist Templates Management - granular CRUD operations
+  canSeeChecklistTemplates: z.boolean().default(false),
+  canModifyChecklistTemplates: z.boolean().default(false),
+  canEditChecklistTemplates: z.boolean().default(false),
+  canDeleteChecklistTemplates: z.boolean().default(false),
+  
+  // Reports and Analytics - granular access
+  canSeeReports: z.boolean().default(false),
+  canModifyReports: z.boolean().default(false),
+  canEditReports: z.boolean().default(false),
+  canDeleteReports: z.boolean().default(false),
+  
+  // Security and Role Management - granular CRUD operations
+  canSeeRoles: z.boolean().default(false),
+  canModifyRoles: z.boolean().default(false),
   canEditRoles: z.boolean().default(false),
   canDeleteRoles: z.boolean().default(false),
-  canViewReports: z.boolean().default(false),
+  canSeeGroups: z.boolean().default(false),
+  canModifyGroups: z.boolean().default(false),
+  canEditGroups: z.boolean().default(false),
+  canDeleteGroups: z.boolean().default(false),
+  canSeeSecuritySettings: z.boolean().default(false),
+  canModifySecuritySettings: z.boolean().default(false),
+  canEditSecuritySettings: z.boolean().default(false),
+  canDeleteSecuritySettings: z.boolean().default(false),
+  
+  // Email System Permissions - fine-grained control
+  canSendEmails: z.boolean().default(false),
+  canSendBulkEmails: z.boolean().default(false),
+  canSendSystemEmails: z.boolean().default(false),
+  canSeeEmailLogs: z.boolean().default(false),
+  canModifyEmailTemplates: z.boolean().default(false),
+  canEditEmailSettings: z.boolean().default(false),
+  
+  // System Administration - high-level permissions
+  canSeeSystemSettings: z.boolean().default(false),
+  canModifySystemSettings: z.boolean().default(false),
+  canEditSystemSettings: z.boolean().default(false),
   canManageSystem: z.boolean().default(false),
 });
 
@@ -43,6 +132,38 @@ export const users = pgTable("users", {
   isActive: boolean("is_active").notNull().default(true),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// User Groups for advanced security management
+export const userGroups = pgTable("user_groups", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  permissions: jsonb("permissions").notNull().$type<Permissions>(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Many-to-many relationship between users and groups
+export const userGroupMemberships = pgTable("user_group_memberships", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  groupId: uuid("group_id").references(() => userGroups.id, { onDelete: "cascade" }).notNull(),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  assignedById: uuid("assigned_by_id").references(() => users.id, { onDelete: "set null" }),
+}, (table) => ({
+  uniqueUserGroup: unique().on(table.userId, table.groupId), // Prevent duplicate group memberships
+}));
+
+// Individual user permissions for ad-hoc security
+export const userPermissions = pgTable("user_permissions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  permissions: jsonb("permissions").notNull().$type<Permissions>(),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  assignedById: uuid("assigned_by_id").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const projects = pgTable("projects", {
@@ -258,11 +379,52 @@ export const rolesRelations = relations(roles, ({ many }) => ({
   users: many(users),
 }));
 
+// User Groups Relations
+export const userGroupsRelations = relations(userGroups, ({ many }) => ({
+  memberships: many(userGroupMemberships),
+}));
+
+// User Group Memberships Relations  
+export const userGroupMembershipsRelations = relations(userGroupMemberships, ({ one }) => ({
+  user: one(users, {
+    fields: [userGroupMemberships.userId],
+    references: [users.id],
+  }),
+  group: one(userGroups, {
+    fields: [userGroupMemberships.groupId],
+    references: [userGroups.id],
+  }),
+  assignedBy: one(users, {
+    fields: [userGroupMemberships.assignedById],
+    references: [users.id],
+    relationName: "groupAssignments"
+  }),
+}));
+
+// User Permissions Relations
+export const userPermissionsRelations = relations(userPermissions, ({ one }) => ({
+  user: one(users, {
+    fields: [userPermissions.userId],
+    references: [users.id],
+  }),
+  assignedBy: one(users, {
+    fields: [userPermissions.assignedById],
+    references: [users.id],
+    relationName: "permissionAssignments"
+  }),
+}));
+
 export const usersRelations = relations(users, ({ one, many }) => ({
   role: one(roles, {
     fields: [users.roleId],
     references: [roles.id],
   }),
+  // Security Management Relations
+  groupMemberships: many(userGroupMemberships),
+  individualPermissions: one(userPermissions),
+  assignedGroupMemberships: many(userGroupMemberships, { relationName: "groupAssignments" }),
+  assignedPermissions: many(userPermissions, { relationName: "permissionAssignments" }),
+  // Existing Relations
   ownedProjects: many(projects),
   assignedTasks: many(tasks),
   ownedRaidLogs: many(raidLogs, { relationName: "raidLogOwner" }),
@@ -597,54 +759,343 @@ export const insertProcessMapSchema = createInsertSchema(processMaps).omit({
   updatedAt: true,
 });
 
-// Default role permissions for seeding
+// Security Management Insert Schemas
+export const insertUserGroupSchema = createInsertSchema(userGroups).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  permissions: permissionsSchema, // Validate permissions structure
+});
+
+export const insertUserGroupMembershipSchema = createInsertSchema(userGroupMemberships).omit({
+  id: true,
+  assignedAt: true,
+});
+
+export const insertUserPermissionSchema = createInsertSchema(userPermissions).omit({
+  id: true,
+  assignedAt: true,
+  updatedAt: true,
+}).extend({
+  permissions: permissionsSchema, // Validate permissions structure
+});
+
+// Default role permissions for seeding with enhanced Security Management Center permissions
 export const DEFAULT_PERMISSIONS = {
   SUPER_ADMIN: {
-    canViewUsers: true,
-    canCreateUsers: true,
+    // User Management - Full Access
+    canSeeUsers: true,
+    canModifyUsers: true,
     canEditUsers: true,
     canDeleteUsers: true,
-    canCreateProjects: true,
-    canEditAllProjects: true,
+    
+    // Project Management - Full Access
+    canSeeProjects: true,
+    canModifyProjects: true,
+    canEditProjects: true,
     canDeleteProjects: true,
-    canViewAllProjects: true,
-    canViewRoles: true,
-    canCreateRoles: true,
+    canSeeAllProjects: true,
+    canModifyAllProjects: true,
+    canEditAllProjects: true,
+    canDeleteAllProjects: true,
+    
+    // Tasks Management - Full Access
+    canSeeTasks: true,
+    canModifyTasks: true,
+    canEditTasks: true,
+    canDeleteTasks: true,
+    
+    // Stakeholder Management - Full Access
+    canSeeStakeholders: true,
+    canModifyStakeholders: true,
+    canEditStakeholders: true,
+    canDeleteStakeholders: true,
+    
+    // RAID Logs Management - Full Access
+    canSeeRaidLogs: true,
+    canModifyRaidLogs: true,
+    canEditRaidLogs: true,
+    canDeleteRaidLogs: true,
+    
+    // Communications Management - Full Access
+    canSeeCommunications: true,
+    canModifyCommunications: true,
+    canEditCommunications: true,
+    canDeleteCommunications: true,
+    
+    // Survey Management - Full Access
+    canSeeSurveys: true,
+    canModifySurveys: true,
+    canEditSurveys: true,
+    canDeleteSurveys: true,
+    
+    // Mind Maps Management - Full Access
+    canSeeMindMaps: true,
+    canModifyMindMaps: true,
+    canEditMindMaps: true,
+    canDeleteMindMaps: true,
+    
+    // Process Maps Management - Full Access
+    canSeeProcessMaps: true,
+    canModifyProcessMaps: true,
+    canEditProcessMaps: true,
+    canDeleteProcessMaps: true,
+    
+    // Gantt Charts Management - Full Access
+    canSeeGanttCharts: true,
+    canModifyGanttCharts: true,
+    canEditGanttCharts: true,
+    canDeleteGanttCharts: true,
+    
+    // Checklist Templates Management - Full Access
+    canSeeChecklistTemplates: true,
+    canModifyChecklistTemplates: true,
+    canEditChecklistTemplates: true,
+    canDeleteChecklistTemplates: true,
+    
+    // Reports and Analytics - Full Access
+    canSeeReports: true,
+    canModifyReports: true,
+    canEditReports: true,
+    canDeleteReports: true,
+    
+    // Security and Role Management - Full Access
+    canSeeRoles: true,
+    canModifyRoles: true,
     canEditRoles: true,
     canDeleteRoles: true,
-    canViewReports: true,
+    canSeeGroups: true,
+    canModifyGroups: true,
+    canEditGroups: true,
+    canDeleteGroups: true,
+    canSeeSecuritySettings: true,
+    canModifySecuritySettings: true,
+    canEditSecuritySettings: true,
+    canDeleteSecuritySettings: true,
+    
+    // Email System Permissions - Full Access
+    canSendEmails: true,
+    canSendBulkEmails: true,
+    canSendSystemEmails: true,
+    canSeeEmailLogs: true,
+    canModifyEmailTemplates: true,
+    canEditEmailSettings: true,
+    
+    // System Administration - Full Access
+    canSeeSystemSettings: true,
+    canModifySystemSettings: true,
+    canEditSystemSettings: true,
     canManageSystem: true,
   },
   PROJECT_MANAGER: {
-    canViewUsers: true, // Can view users for assignment purposes
-    canCreateUsers: false,
+    // User Management - View Only
+    canSeeUsers: true,
+    canModifyUsers: false,
     canEditUsers: false,
     canDeleteUsers: false,
-    canCreateProjects: true,
-    canEditAllProjects: false,
+    
+    // Project Management - Limited Management
+    canSeeProjects: true,
+    canModifyProjects: true,
+    canEditProjects: true,
     canDeleteProjects: false,
-    canViewAllProjects: false,
-    canViewRoles: true, // Can view roles for assignment purposes
-    canCreateRoles: false,
+    canSeeAllProjects: true,
+    canModifyAllProjects: false,
+    canEditAllProjects: false,
+    canDeleteAllProjects: false,
+    
+    // Tasks Management - Full Management
+    canSeeTasks: true,
+    canModifyTasks: true,
+    canEditTasks: true,
+    canDeleteTasks: true,
+    
+    // Stakeholder Management - Full Management
+    canSeeStakeholders: true,
+    canModifyStakeholders: true,
+    canEditStakeholders: true,
+    canDeleteStakeholders: true,
+    
+    // RAID Logs Management - Full Management
+    canSeeRaidLogs: true,
+    canModifyRaidLogs: true,
+    canEditRaidLogs: true,
+    canDeleteRaidLogs: true,
+    
+    // Communications Management - Full Management
+    canSeeCommunications: true,
+    canModifyCommunications: true,
+    canEditCommunications: true,
+    canDeleteCommunications: true,
+    
+    // Survey Management - Full Management
+    canSeeSurveys: true,
+    canModifySurveys: true,
+    canEditSurveys: true,
+    canDeleteSurveys: true,
+    
+    // Mind Maps Management - Full Management
+    canSeeMindMaps: true,
+    canModifyMindMaps: true,
+    canEditMindMaps: true,
+    canDeleteMindMaps: true,
+    
+    // Process Maps Management - Full Management
+    canSeeProcessMaps: true,
+    canModifyProcessMaps: true,
+    canEditProcessMaps: true,
+    canDeleteProcessMaps: true,
+    
+    // Gantt Charts Management - Full Management
+    canSeeGanttCharts: true,
+    canModifyGanttCharts: true,
+    canEditGanttCharts: true,
+    canDeleteGanttCharts: true,
+    
+    // Checklist Templates Management - Full Management
+    canSeeChecklistTemplates: true,
+    canModifyChecklistTemplates: true,
+    canEditChecklistTemplates: true,
+    canDeleteChecklistTemplates: true,
+    
+    // Reports and Analytics - View Only
+    canSeeReports: true,
+    canModifyReports: false,
+    canEditReports: false,
+    canDeleteReports: false,
+    
+    // Security and Role Management - View Only
+    canSeeRoles: true,
+    canModifyRoles: false,
     canEditRoles: false,
     canDeleteRoles: false,
-    canViewReports: true,
+    canSeeGroups: false,
+    canModifyGroups: false,
+    canEditGroups: false,
+    canDeleteGroups: false,
+    canSeeSecuritySettings: false,
+    canModifySecuritySettings: false,
+    canEditSecuritySettings: false,
+    canDeleteSecuritySettings: false,
+    
+    // Email System Permissions - Basic Access
+    canSendEmails: true,
+    canSendBulkEmails: false,
+    canSendSystemEmails: false,
+    canSeeEmailLogs: false,
+    canModifyEmailTemplates: false,
+    canEditEmailSettings: false,
+    
+    // System Administration - No Access
+    canSeeSystemSettings: false,
+    canModifySystemSettings: false,
+    canEditSystemSettings: false,
     canManageSystem: false,
   },
   TEAM_MEMBER: {
-    canViewUsers: false, // Team members don't need to view all users
-    canCreateUsers: false,
+    // User Management - No Access
+    canSeeUsers: false,
+    canModifyUsers: false,
     canEditUsers: false,
     canDeleteUsers: false,
-    canCreateProjects: false,
-    canEditAllProjects: false,
+    
+    // Project Management - Limited View Only
+    canSeeProjects: true,
+    canModifyProjects: false,
+    canEditProjects: false,
     canDeleteProjects: false,
-    canViewAllProjects: false,
-    canViewRoles: false, // Team members don't need to assign roles
-    canCreateRoles: false,
+    canSeeAllProjects: false,
+    canModifyAllProjects: false,
+    canEditAllProjects: false,
+    canDeleteAllProjects: false,
+    
+    // Tasks Management - Limited Access
+    canSeeTasks: true,
+    canModifyTasks: true,
+    canEditTasks: true,
+    canDeleteTasks: false,
+    
+    // Stakeholder Management - View Only
+    canSeeStakeholders: true,
+    canModifyStakeholders: false,
+    canEditStakeholders: false,
+    canDeleteStakeholders: false,
+    
+    // RAID Logs Management - View Only
+    canSeeRaidLogs: true,
+    canModifyRaidLogs: false,
+    canEditRaidLogs: false,
+    canDeleteRaidLogs: false,
+    
+    // Communications Management - View Only
+    canSeeCommunications: true,
+    canModifyCommunications: false,
+    canEditCommunications: false,
+    canDeleteCommunications: false,
+    
+    // Survey Management - Limited Access
+    canSeeSurveys: true,
+    canModifySurveys: false,
+    canEditSurveys: false,
+    canDeleteSurveys: false,
+    
+    // Mind Maps Management - Limited Access
+    canSeeMindMaps: true,
+    canModifyMindMaps: true,
+    canEditMindMaps: true,
+    canDeleteMindMaps: false,
+    
+    // Process Maps Management - Limited Access
+    canSeeProcessMaps: true,
+    canModifyProcessMaps: true,
+    canEditProcessMaps: true,
+    canDeleteProcessMaps: false,
+    
+    // Gantt Charts Management - View Only
+    canSeeGanttCharts: true,
+    canModifyGanttCharts: false,
+    canEditGanttCharts: false,
+    canDeleteGanttCharts: false,
+    
+    // Checklist Templates Management - Limited Access
+    canSeeChecklistTemplates: true,
+    canModifyChecklistTemplates: false,
+    canEditChecklistTemplates: false,
+    canDeleteChecklistTemplates: false,
+    
+    // Reports and Analytics - No Access
+    canSeeReports: false,
+    canModifyReports: false,
+    canEditReports: false,
+    canDeleteReports: false,
+    
+    // Security and Role Management - No Access
+    canSeeRoles: false,
+    canModifyRoles: false,
     canEditRoles: false,
     canDeleteRoles: false,
-    canViewReports: false,
+    canSeeGroups: false,
+    canModifyGroups: false,
+    canEditGroups: false,
+    canDeleteGroups: false,
+    canSeeSecuritySettings: false,
+    canModifySecuritySettings: false,
+    canEditSecuritySettings: false,
+    canDeleteSecuritySettings: false,
+    
+    // Email System Permissions - No Access
+    canSendEmails: false,
+    canSendBulkEmails: false,
+    canSendSystemEmails: false,
+    canSeeEmailLogs: false,
+    canModifyEmailTemplates: false,
+    canEditEmailSettings: false,
+    
+    // System Administration - No Access
+    canSeeSystemSettings: false,
+    canModifySystemSettings: false,
+    canEditSystemSettings: false,
     canManageSystem: false,
   },
 } as const;
@@ -701,3 +1152,13 @@ export type InsertMindMap = z.infer<typeof insertMindMapSchema>;
 
 export type ProcessMap = typeof processMaps.$inferSelect;
 export type InsertProcessMap = z.infer<typeof insertProcessMapSchema>;
+
+// Security Management Center Types
+export type UserGroup = typeof userGroups.$inferSelect;
+export type InsertUserGroup = z.infer<typeof insertUserGroupSchema>;
+
+export type UserGroupMembership = typeof userGroupMemberships.$inferSelect;
+export type InsertUserGroupMembership = z.infer<typeof insertUserGroupMembershipSchema>;
+
+export type UserPermission = typeof userPermissions.$inferSelect;
+export type InsertUserPermission = z.infer<typeof insertUserPermissionSchema>;
