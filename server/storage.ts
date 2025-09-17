@@ -1,13 +1,14 @@
 import bcrypt from 'bcrypt';
 import { 
-  users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, mindMaps, processMaps, roles,
+  users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, mindMaps, processMaps, roles, userInitiativeAssignments,
   type User, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type Survey, type InsertSurvey,
   type SurveyResponse, type InsertSurveyResponse, type GptInteraction, type InsertGptInteraction,
   type Milestone, type InsertMilestone, type ChecklistTemplate, type InsertChecklistTemplate,
   type MindMap, type InsertMindMap, type ProcessMap, type InsertProcessMap,
-  type Role, type InsertRole
+  type Role, type InsertRole, type UserInitiativeAssignment, type InsertUserInitiativeAssignment,
+  type Permissions
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray } from "drizzle-orm";
@@ -121,6 +122,22 @@ export interface IStorage {
     stakeholderEngagement: number;
     changeReadiness: number;
   }>;
+
+  // User-Initiative Assignments
+  getUserInitiativeAssignments(userId: string): Promise<UserInitiativeAssignment[]>;
+  getInitiativeAssignments(projectId: string): Promise<UserInitiativeAssignment[]>;
+  assignUserToInitiative(assignment: InsertUserInitiativeAssignment): Promise<UserInitiativeAssignment>;
+  updateUserInitiativeAssignment(id: string, assignment: Partial<InsertUserInitiativeAssignment>): Promise<UserInitiativeAssignment | undefined>;
+  removeUserFromInitiative(userId: string, projectId: string): Promise<boolean>;
+
+  // Enhanced User Methods
+  getUsersWithRoles(): Promise<(Omit<User, 'passwordHash'> & { role: Role })[]>;
+  updateUserRole(userId: string, roleId: string): Promise<User | undefined>;
+  getUsersByRole(roleId: string): Promise<User[]>;
+
+  // Role-Based Access Methods
+  getUserPermissions(userId: string): Promise<Permissions>;
+  checkUserPermission(userId: string, permission: keyof Permissions): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -153,12 +170,17 @@ export class DatabaseStorage implements IStorage {
   }
   // Users
   async getUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(users.name);
+    const users_list = await db.select().from(users).orderBy(users.name);
+    // Remove passwordHash from response for security
+    return users_list.map(({ passwordHash, ...user }) => user as User);
   }
 
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || undefined;
+    if (!user) return undefined;
+    // Remove passwordHash from response for security
+    const { passwordHash, ...userWithoutHash } = user;
+    return userWithoutHash as User;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
@@ -178,7 +200,9 @@ export class DatabaseStorage implements IStorage {
     };
     
     const [user] = await db.insert(users).values(userData).returning();
-    return user;
+    // Remove passwordHash from response for security
+    const { passwordHash: _, ...userWithoutHash } = user;
+    return userWithoutHash as User;
   }
 
   async updateUser(id: string, userData: Partial<Omit<InsertUser, 'password'> & { passwordHash?: string }>): Promise<User | undefined> {
@@ -186,7 +210,10 @@ export class DatabaseStorage implements IStorage {
       .set(userData)
       .where(eq(users.id, id))
       .returning();
-    return updated || undefined;
+    if (!updated) return undefined;
+    // Remove passwordHash from response for security
+    const { passwordHash, ...userWithoutHash } = updated;
+    return userWithoutHash as User;
   }
 
   async verifyPassword(username: string, password: string): Promise<User | null> {
@@ -543,6 +570,133 @@ export class DatabaseStorage implements IStorage {
       stakeholderEngagement,
       changeReadiness
     };
+  }
+
+  // User-Initiative Assignments
+  async getUserInitiativeAssignments(userId: string): Promise<UserInitiativeAssignment[]> {
+    return await db.select().from(userInitiativeAssignments)
+      .where(eq(userInitiativeAssignments.userId, userId))
+      .orderBy(desc(userInitiativeAssignments.assignedAt));
+  }
+
+  async getInitiativeAssignments(projectId: string): Promise<UserInitiativeAssignment[]> {
+    return await db.select().from(userInitiativeAssignments)
+      .where(eq(userInitiativeAssignments.projectId, projectId))
+      .orderBy(desc(userInitiativeAssignments.assignedAt));
+  }
+
+  async assignUserToInitiative(assignment: InsertUserInitiativeAssignment): Promise<UserInitiativeAssignment> {
+    const [created] = await db.insert(userInitiativeAssignments).values(assignment).returning();
+    return created;
+  }
+
+  async updateUserInitiativeAssignment(id: string, assignment: Partial<InsertUserInitiativeAssignment>): Promise<UserInitiativeAssignment | undefined> {
+    const [updated] = await db.update(userInitiativeAssignments)
+      .set(assignment)
+      .where(eq(userInitiativeAssignments.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async removeUserFromInitiative(userId: string, projectId: string): Promise<boolean> {
+    const result = await db.delete(userInitiativeAssignments)
+      .where(and(
+        eq(userInitiativeAssignments.userId, userId),
+        eq(userInitiativeAssignments.projectId, projectId)
+      ));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Enhanced User Methods
+  async getUsersWithRoles(): Promise<(Omit<User, 'passwordHash'> & { role: Role })[]> {
+    const result = await db.select({
+      id: users.id,
+      username: users.username,
+      // passwordHash: users.passwordHash, // SECURITY: Excluded to prevent exposure
+      name: users.name,
+      roleId: users.roleId,
+      isActive: users.isActive,
+      lastLoginAt: users.lastLoginAt,
+      createdAt: users.createdAt,
+      role: {
+        id: roles.id,
+        name: roles.name,
+        description: roles.description,
+        permissions: roles.permissions,
+        isActive: roles.isActive,
+        createdAt: roles.createdAt,
+        updatedAt: roles.updatedAt
+      }
+    })
+    .from(users)
+    .leftJoin(roles, eq(users.roleId, roles.id))
+    .orderBy(users.name);
+
+    return result.map(row => ({
+      id: row.id,
+      username: row.username,
+      // passwordHash: row.passwordHash, // SECURITY: Removed to prevent exposure
+      name: row.name,
+      roleId: row.roleId,
+      isActive: row.isActive,
+      lastLoginAt: row.lastLoginAt,
+      createdAt: row.createdAt,
+      role: row.role as Role
+    }));
+  }
+
+  async updateUserRole(userId: string, roleId: string): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ roleId })
+      .where(eq(users.id, userId))
+      .returning();
+    if (!updated) return undefined;
+    // Remove passwordHash from response for security
+    const { passwordHash, ...userWithoutHash } = updated;
+    return userWithoutHash as User;
+  }
+
+  async getUsersByRole(roleId: string): Promise<User[]> {
+    const users_list = await db.select().from(users)
+      .where(eq(users.roleId, roleId))
+      .orderBy(users.name);
+    // Remove passwordHash from response for security
+    return users_list.map(({ passwordHash, ...user }) => user as User);
+  }
+
+  // Role-Based Access Methods
+  async getUserPermissions(userId: string): Promise<Permissions> {
+    const result = await db.select({
+      permissions: roles.permissions
+    })
+    .from(users)
+    .leftJoin(roles, eq(users.roleId, roles.id))
+    .where(eq(users.id, userId));
+
+    if (result.length === 0 || !result[0].permissions) {
+      // Return default permissions with all false if user/role not found
+      return {
+        canCreateUsers: false,
+        canEditUsers: false,
+        canDeleteUsers: false,
+        canCreateProjects: false,
+        canEditAllProjects: false,
+        canDeleteProjects: false,
+        canViewAllProjects: false,
+        canCreateRoles: false,
+        canEditRoles: false,
+        canDeleteRoles: false,
+        canViewReports: false,
+        canManageSystem: false,
+      };
+    }
+
+    return result[0].permissions as Permissions;
+  }
+
+  async checkUserPermission(userId: string, permission: keyof Permissions): Promise<boolean> {
+    const permissions = await this.getUserPermissions(userId);
+    return permissions[permission] || false;
   }
 
   // Milestones

@@ -1,14 +1,48 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertProjectSchema, insertTaskSchema, insertStakeholderSchema, insertRaidLogSchema,
   insertCommunicationSchema, insertSurveySchema, baseSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
   insertMilestoneSchema, insertChecklistTemplateSchema, insertMindMapSchema, insertProcessMapSchema,
-  insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema
+  insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema,
+  insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
+  type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions
 } from "@shared/schema";
 import * as openaiService from "./openai";
 import { sendTaskAssignmentNotification } from "./services/emailService";
+
+// SECURITY: Permission enforcement middleware
+interface AuthenticatedRequest extends Request {
+  userId?: string;
+}
+
+// For demo purposes, using a hardcoded user ID - in production, get from session/token
+const DEMO_USER_ID = "550e8400-e29b-41d4-a716-446655440000";
+
+// Permission middleware factory
+const requirePermission = (permission: keyof Permissions) => {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      // In production, extract userId from session/token
+      const userId = req.userId || DEMO_USER_ID;
+      
+      const hasPermission = await storage.checkUserPermission(userId, permission);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: `Access denied. Required permission: ${permission}` 
+        });
+      }
+      
+      // Store userId for use in route handlers
+      req.userId = userId;
+      next();
+    } catch (error) {
+      console.error("Error checking permission:", error);
+      res.status(500).json({ error: "Permission check failed" });
+    }
+  };
+};
 
 // Helper function to build complete RAID log from template-specific data
 function buildRaidInsertFromTemplate(type: string, baseData: any): any {
@@ -73,7 +107,7 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Roles
-  app.get("/api/roles", async (req, res) => {
+  app.get("/api/roles", requirePermission('canCreateRoles'), async (req, res) => {
     try {
       const roles = await storage.getRoles();
       res.json(roles);
@@ -117,7 +151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Users
-  app.get("/api/users", async (req, res) => {
+  app.get("/api/users", requirePermission('canCreateUsers'), async (req, res) => {
     try {
       const users = await storage.getUsers();
       res.json(users);
@@ -1024,6 +1058,213 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting process map:", error);
       res.status(500).json({ error: "Failed to delete process map" });
+    }
+  });
+
+  // Enhanced Role Management Routes
+  app.post("/api/roles", requirePermission('canCreateRoles'), async (req, res) => {
+    try {
+      const validatedData = insertRoleSchema.parse(req.body);
+      const role = await storage.createRole(validatedData);
+      res.status(201).json(role);
+    } catch (error) {
+      console.error("Error creating role:", error);
+      res.status(400).json({ error: "Failed to create role" });
+    }
+  });
+
+  app.put("/api/roles/:id", requirePermission('canEditRoles'), async (req, res) => {
+    try {
+      // SECURITY: Validate input data with Zod
+      const validatedData = insertRoleSchema.partial().parse(req.body);
+      
+      const role = await storage.updateRole(req.params.id, validatedData);
+      if (!role) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+      res.json(role);
+    } catch (error) {
+      console.error("Error updating role:", error);
+      res.status(400).json({ error: "Failed to update role" });
+    }
+  });
+
+  app.delete("/api/roles/:id", requirePermission('canDeleteRoles'), async (req, res) => {
+    try {
+      const success = await storage.deleteRole(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting role:", error);
+      res.status(500).json({ error: "Failed to delete role" });
+    }
+  });
+
+  // User-Initiative Assignment Routes
+  app.get("/api/users/:userId/initiatives", async (req, res) => {
+    try {
+      const assignments = await storage.getUserInitiativeAssignments(req.params.userId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching user initiative assignments:", error);
+      res.status(500).json({ error: "Failed to fetch user initiative assignments" });
+    }
+  });
+
+  app.get("/api/projects/:projectId/assignments", async (req, res) => {
+    try {
+      const assignments = await storage.getInitiativeAssignments(req.params.projectId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching initiative assignments:", error);
+      res.status(500).json({ error: "Failed to fetch initiative assignments" });
+    }
+  });
+
+  app.post("/api/assignments", requirePermission('canEditAllProjects'), async (req, res) => {
+    try {
+      const validatedData = insertUserInitiativeAssignmentSchema.parse(req.body);
+      const assignment = await storage.assignUserToInitiative(validatedData);
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error creating user initiative assignment:", error);
+      res.status(400).json({ error: "Failed to create assignment" });
+    }
+  });
+
+  app.put("/api/assignments/:id", requirePermission('canEditAllProjects'), async (req, res) => {
+    try {
+      // SECURITY: Validate input data with Zod
+      const validatedData = insertUserInitiativeAssignmentSchema.partial().parse(req.body);
+      
+      const assignment = await storage.updateUserInitiativeAssignment(req.params.id, validatedData);
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error updating assignment:", error);
+      res.status(400).json({ error: "Failed to update assignment" });
+    }
+  });
+
+  app.delete("/api/assignments/:id", requirePermission('canEditAllProjects'), async (req, res) => {
+    try {
+      const { userId, projectId } = req.body;
+      if (!userId || !projectId) {
+        return res.status(400).json({ error: "userId and projectId are required" });
+      }
+      const success = await storage.removeUserFromInitiative(userId, projectId);
+      if (!success) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting assignment:", error);
+      res.status(500).json({ error: "Failed to delete assignment" });
+    }
+  });
+
+  // Enhanced User Management Routes
+  app.get("/api/users/with-roles", requirePermission('canCreateUsers'), async (req, res) => {
+    try {
+      const usersWithRoles = await storage.getUsersWithRoles();
+      res.json(usersWithRoles);
+    } catch (error) {
+      console.error("Error fetching users with roles:", error);
+      res.status(500).json({ error: "Failed to fetch users with roles" });
+    }
+  });
+
+  app.post("/api/users", requirePermission('canCreateUsers'), async (req, res) => {
+    try {
+      const validatedData = insertUserSchema.parse(req.body);
+      const user = await storage.createUser(validatedData);
+      
+      // Remove password hash from response
+      const { passwordHash, ...userResponse } = user;
+      res.status(201).json(userResponse);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(400).json({ error: "Failed to create user" });
+    }
+  });
+
+  app.put("/api/users/:id", requirePermission('canEditUsers'), async (req, res) => {
+    try {
+      // SECURITY: Validate input data with Zod, exclude password field
+      const validatedData = insertUserSchema.partial().omit({ password: true }).parse(req.body);
+      
+      const user = await storage.updateUser(req.params.id, validatedData);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Remove password hash from response
+      const { passwordHash, ...userResponse } = user;
+      res.json(userResponse);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(400).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.put("/api/users/:id/role", requirePermission('canEditUsers'), async (req, res) => {
+    try {
+      const { roleId } = req.body;
+      if (!roleId) {
+        return res.status(400).json({ error: "roleId is required" });
+      }
+      
+      const user = await storage.updateUserRole(req.params.id, roleId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Remove password hash from response
+      const { passwordHash, ...userResponse } = user;
+      res.json(userResponse);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(400).json({ error: "Failed to update user role" });
+    }
+  });
+
+  app.get("/api/users/by-role/:roleId", async (req, res) => {
+    try {
+      const users = await storage.getUsersByRole(req.params.roleId);
+      // Remove password hashes from response
+      const usersResponse = users.map(({ passwordHash, ...user }) => user);
+      res.json(usersResponse);
+    } catch (error) {
+      console.error("Error fetching users by role:", error);
+      res.status(500).json({ error: "Failed to fetch users by role" });
+    }
+  });
+
+  // Permission Check Routes
+  app.get("/api/users/:userId/permissions", async (req, res) => {
+    try {
+      const permissions = await storage.getUserPermissions(req.params.userId);
+      res.json(permissions);
+    } catch (error) {
+      console.error("Error fetching user permissions:", error);
+      res.status(500).json({ error: "Failed to fetch user permissions" });
+    }
+  });
+
+  app.get("/api/users/:userId/permissions/:permission", async (req, res) => {
+    try {
+      const hasPermission = await storage.checkUserPermission(
+        req.params.userId, 
+        req.params.permission as keyof Permissions
+      );
+      res.json({ hasPermission });
+    } catch (error) {
+      console.error("Error checking user permission:", error);
+      res.status(500).json({ error: "Failed to check user permission" });
     }
   });
 
