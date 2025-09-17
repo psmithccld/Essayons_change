@@ -73,6 +73,47 @@ const categories = [
   { value: "general", label: "General", icon: Building },
 ];
 
+interface TaskChecklistProps {
+  checklist: Array<{id: string, text: string, completed: boolean}>;
+  taskId: string;
+  onToggleItem: (taskId: string, itemId: string, completed: boolean) => void;
+}
+
+function TaskChecklist({ checklist, taskId, onToggleItem }: TaskChecklistProps) {
+  return (
+    <div className="mb-3 space-y-2">
+      <div className="flex items-center space-x-2">
+        <ListChecks className="w-4 h-4 text-muted-foreground" />
+        <span className="text-sm font-medium text-muted-foreground">
+          Checklist ({checklist.filter(item => item.completed).length}/{checklist.length})
+        </span>
+      </div>
+      <div className="space-y-1 ml-6">
+        {checklist.map((item) => (
+          <div key={item.id} className="flex items-center space-x-2">
+            <Checkbox
+              checked={item.completed}
+              onCheckedChange={(checked) => 
+                onToggleItem(taskId, item.id, checked as boolean)
+              }
+              data-testid={`checkbox-${taskId}-${item.id}`}
+            />
+            <span 
+              className={`text-sm ${
+                item.completed 
+                  ? 'line-through text-muted-foreground' 
+                  : 'text-foreground'
+              }`}
+            >
+              {item.text}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function getCategoryIcon(category: string) {
   const categoryData = categories.find(c => c.value === category);
   const IconComponent = categoryData?.icon || Building;
@@ -197,17 +238,23 @@ export default function Tasks() {
 
   const handleEditTask = (task: Task) => {
     setEditingTask(task);
+    
+    // Ensure checklist is properly typed
+    const checklistData = Array.isArray(task.checklist) 
+      ? (task.checklist as Array<{id: string, text: string, completed: boolean}>)
+      : [];
+    
     form.reset({
       name: task.name,
       description: task.description || "",
-      status: task.status,
-      priority: task.priority,
+      status: task.status as "pending" | "in_progress" | "completed" | "blocked",
+      priority: task.priority as "low" | "medium" | "high" | "critical",
       assigneeId: task.assigneeId || "unassigned",
       assigneeEmail: task.assigneeEmail || "",
       assignmentType: task.assigneeId ? "user" : task.assigneeEmail ? "external" : "user",
       startDate: task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : "",
       dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "",
-      checklist: task.checklist || [],
+      checklist: checklistData,
     });
     setIsNewTaskOpen(true);
   };
@@ -247,7 +294,13 @@ export default function Tasks() {
     };
     
     if (editingTask) {
-      updateTaskMutation.mutate({ taskId: editingTask.id, data: taskData });
+      // Convert string dates to Date objects for update API
+      const updateData = {
+        ...taskData,
+        startDate: taskData.startDate ? new Date(taskData.startDate) : null,
+        dueDate: taskData.dueDate ? new Date(taskData.dueDate) : null,
+      };
+      updateTaskMutation.mutate({ taskId: editingTask.id, data: updateData });
       setEditingTask(null);
     } else {
       createTaskMutation.mutate(taskData);
@@ -291,7 +344,11 @@ export default function Tasks() {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     
-    const updatedChecklist = (task.checklist as any[] || []).map((item: any) => 
+    const checklist = Array.isArray(task.checklist) 
+      ? (task.checklist as Array<{id: string, text: string, completed: boolean}>)
+      : [];
+    
+    const updatedChecklist = checklist.map((item) => 
       item.id === itemId ? { ...item, completed } : item
     );
     
@@ -754,38 +811,13 @@ export default function Tasks() {
                       )}
                       
                       {/* Task Checklist */}
-                      {task.checklist && Array.isArray(task.checklist) && task.checklist.length > 0 && (
-                        <div className="mb-3 space-y-2">
-                          <div className="flex items-center space-x-2">
-                            <ListChecks className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm font-medium text-muted-foreground">
-                              Checklist ({(task.checklist as any[]).filter(item => item.completed).length}/{(task.checklist as any[]).length})
-                            </span>
-                          </div>
-                          <div className="space-y-1 ml-6">
-                            {(task.checklist as any[]).map((item: any) => (
-                              <div key={item.id} className="flex items-center space-x-2">
-                                <Checkbox
-                                  checked={item.completed}
-                                  onCheckedChange={(checked) => 
-                                    toggleChecklistItem(task.id, item.id, checked as boolean)
-                                  }
-                                  data-testid={`checkbox-${task.id}-${item.id}`}
-                                />
-                                <span 
-                                  className={`text-sm ${
-                                    item.completed 
-                                      ? 'line-through text-muted-foreground' 
-                                      : 'text-foreground'
-                                  }`}
-                                >
-                                  {String(item.text)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      {task.checklist && Array.isArray(task.checklist) && task.checklist.length > 0 ? (
+                        <TaskChecklist 
+                          checklist={task.checklist as Array<{id: string, text: string, completed: boolean}>}
+                          taskId={task.id}
+                          onToggleItem={toggleChecklistItem}
+                        />
+                      ) : null}
                       
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                         {task.startDate && (
