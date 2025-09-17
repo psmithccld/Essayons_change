@@ -97,12 +97,31 @@ export default function ProcessMapping() {
 
   // Initialize Fabric.js canvas
   useEffect(() => {
-    if (!canvasRef.current || canvas) return;
+    if (!canvasRef.current) return;
+
+    // Clean up existing canvas if it exists
+    if (canvas) {
+      try {
+        canvas.dispose();
+      } catch (error) {
+        console.error('Error disposing existing canvas:', error);
+      }
+    }
 
     try {
-      const fabricCanvas = new FabricCanvas(canvasRef.current, {
-        width: window.innerWidth - 320,
-        height: window.innerHeight - 200,
+      const canvasElement = canvasRef.current;
+      const width = window.innerWidth - 320;
+      const height = window.innerHeight - 200;
+      
+      // Set explicit dimensions on the HTML canvas element first
+      canvasElement.width = width;
+      canvasElement.height = height;
+      canvasElement.style.width = width + 'px';
+      canvasElement.style.height = height + 'px';
+
+      const fabricCanvas = new FabricCanvas(canvasElement, {
+        width: width,
+        height: height,
         backgroundColor: '#ffffff',
       });
 
@@ -118,7 +137,6 @@ export default function ProcessMapping() {
         setTools(prev => ({ ...prev, selectedElement: null }));
       });
 
-
       setCanvas(fabricCanvas);
 
       return () => {
@@ -131,7 +149,7 @@ export default function ProcessMapping() {
     } catch (error) {
       console.error('Error initializing Fabric.js canvas:', error);
     }
-  }, [canvas]);
+  }, []); // Remove canvas dependency to avoid initialization loop
 
   // Update ref when selectedSymbolType changes
   useEffect(() => {
@@ -543,13 +561,17 @@ export default function ProcessMapping() {
       
       return apiRequest('POST', `/api/projects/${currentProject.id}/process-maps`, processMapData);
     },
-    onSuccess: () => {
+    onSuccess: (createdProcessMap) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'process-maps'] });
       setIsNewProcessMapOpen(false);
       processMapForm.reset();
+      
+      // Set the newly created process map as current so Save button appears
+      setCurrentProcessMap(createdProcessMap);
+      
       toast({
         title: "Success",
-        description: "Process map created successfully!",
+        description: "Process map created successfully! You can now add symbols and save changes.",
       });
     },
     onError: (error) => {
