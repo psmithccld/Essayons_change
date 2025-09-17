@@ -227,12 +227,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects", async (req, res) => {
+  app.post("/api/projects", requirePermission('canCreateProjects'), async (req: AuthenticatedRequest, res) => {
     try {
       // Convert date strings to Date objects before validation
       const processedData = {
         ...req.body,
-        ownerId: "550e8400-e29b-41d4-a716-446655440000",
+        ownerId: req.userId || DEMO_USER_ID, // Use authenticated user ID
         startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
         endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
       };
@@ -246,9 +246,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/projects/:id", async (req, res) => {
+  app.put("/api/projects/:id", requirePermission('canEditAllProjects'), async (req, res) => {
     try {
-      const project = await storage.updateProject(req.params.id, req.body);
+      // Convert date strings to Date objects and validate
+      const processedData = {
+        ...req.body,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      };
+      
+      // Create update schema by making insertProjectSchema fields optional and omitting generated fields
+      const updateProjectSchema = insertProjectSchema.partial().omit({ id: true, ownerId: true, createdAt: true, updatedAt: true });
+      const validatedData = updateProjectSchema.parse(processedData);
+      
+      const project = await storage.updateProject(req.params.id, validatedData);
       if (!project) {
         return res.status(404).json({ error: "Project not found" });
       }
@@ -259,7 +270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/projects/:id", async (req, res) => {
+  app.delete("/api/projects/:id", requirePermission('canDeleteProjects'), async (req, res) => {
     try {
       const success = await storage.deleteProject(req.params.id);
       if (!success) {
@@ -1151,9 +1162,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/assignments", requirePermission('canEditAllProjects'), async (req, res) => {
+  app.post("/api/assignments", requirePermission('canEditAllProjects'), async (req: AuthenticatedRequest, res) => {
     try {
-      const validatedData = insertUserInitiativeAssignmentSchema.parse(req.body);
+      // Server sets assignedById from authenticated user
+      const assignmentData = {
+        ...req.body,
+        assignedById: req.userId || DEMO_USER_ID
+      };
+      
+      const validatedData = insertUserInitiativeAssignmentSchema.parse(assignmentData);
       const assignment = await storage.assignUserToInitiative(validatedData);
       res.status(201).json(assignment);
     } catch (error) {
@@ -1179,6 +1196,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/assignments/:id", requirePermission('canEditAllProjects'), async (req, res) => {
+    try {
+      const { userId, projectId } = req.body;
+      if (!userId || !projectId) {
+        return res.status(400).json({ error: "userId and projectId are required" });
+      }
+      const success = await storage.removeUserFromInitiative(userId, projectId);
+      if (!success) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting assignment:", error);
+      res.status(500).json({ error: "Failed to delete assignment" });
+    }
+  });
+
+  // Alternative DELETE route for cleaner frontend patterns
+  app.delete("/api/assignments/remove", requirePermission('canEditAllProjects'), async (req, res) => {
     try {
       const { userId, projectId } = req.body;
       if (!userId || !projectId) {
