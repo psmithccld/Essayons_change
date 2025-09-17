@@ -19,7 +19,9 @@ import {
   Palette,
   Bell,
   ListChecks,
-  GripVertical
+  GripVertical,
+  Briefcase,
+  Shield
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -64,6 +66,9 @@ const allNavigationItems: NavigationItem[] = [
   { id: "stakeholders", icon: Users, label: "Stakeholders", path: "/stakeholders" },
   { id: "surveys", icon: ClipboardCheck, label: "Readiness Surveys", path: "/surveys" },
   { id: "gpt-coach", icon: Bot, label: "GPT Coach", path: "/gpt-coach" },
+  { id: "user-management", icon: Users, label: "User Management", path: "/users" },
+  { id: "initiative-management", icon: Briefcase, label: "Initiative Management", path: "/initiatives" },
+  { id: "security-management", icon: Shield, label: "Security & Roles", path: "/security" },
   { id: "fishbone", icon: Fish, label: "Fishbone Analysis", path: "/fishbone" },
   { id: "process-mapping", icon: GitBranch, label: "Process Mapping", path: "/process-mapping" },
   { id: "mind-maps", icon: Brain, label: "Mind Maps", path: "/mind-maps" }
