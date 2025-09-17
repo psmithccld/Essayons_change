@@ -38,6 +38,7 @@ import {
   type InsertStakeholder,
   type InsertMindMap,
   type InsertMilestone,
+  type User,
 } from "@shared/schema";
 
 // Extend schemas for form handling
@@ -114,7 +115,7 @@ export default function MindMaps() {
     enabled: !!currentProject?.id,
   });
 
-  const { data: users = [] } = useQuery({
+  const { data: users = [] } = useQuery<User[]>({
     queryKey: ['/api/users'],
   });
 
@@ -160,7 +161,7 @@ export default function MindMaps() {
   // Resize canvas when window resizes
   useEffect(() => {
     const handleResize = () => {
-      if (canvas && canvasRef.current && canvas.getElement && canvas.lowerCanvasEl) {
+      if (canvas && canvasRef.current && canvas.getElement() && canvas.lowerCanvasEl) {
         try {
           const newWidth = window.innerWidth - 300;
           const newHeight = window.innerHeight - 200;
@@ -822,7 +823,7 @@ export default function MindMaps() {
                   <FormItem>
                     <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Textarea {...field} data-testid="textarea-mind-map-description" />
+                      <Textarea {...field} value={field.value || ""} data-testid="textarea-mind-map-description" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -879,7 +880,7 @@ export default function MindMaps() {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea {...field} data-testid="textarea-task-description" />
+                        <Textarea {...field} value={field.value || ""} data-testid="textarea-task-description" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -939,7 +940,7 @@ export default function MindMaps() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assignee</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger data-testid="select-task-assignee">
                             <SelectValue placeholder="Select assignee" />
@@ -947,7 +948,7 @@ export default function MindMaps() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="">Unassigned</SelectItem>
-                          {users.map((user: any) => (
+                          {users.map((user) => (
                             <SelectItem key={user.id} value={user.id}>
                               {user.name}
                             </SelectItem>
@@ -1189,7 +1190,7 @@ export default function MindMaps() {
                     <FormItem>
                       <FormLabel>Department</FormLabel>
                       <FormControl>
-                        <Input {...field} data-testid="input-stakeholder-department" />
+                        <Input {...field} value={field.value || ""} data-testid="input-stakeholder-department" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1202,7 +1203,7 @@ export default function MindMaps() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" {...field} data-testid="input-stakeholder-email" />
+                        <Input type="email" {...field} value={field.value || ""} data-testid="input-stakeholder-email" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1316,7 +1317,7 @@ export default function MindMaps() {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea {...field} data-testid="textarea-milestone-description" />
+                        <Textarea {...field} value={field.value || ""} data-testid="textarea-milestone-description" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

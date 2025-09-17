@@ -666,7 +666,8 @@ export default function ProcessMapping() {
         connections: connections,
       };
       
-      return apiRequest('POST', `/api/projects/${currentProject.id}/process-maps`, processMapData);
+      const response = await apiRequest('POST', `/api/projects/${currentProject.id}/process-maps`, processMapData);
+      return await response.json();
     },
     onSuccess: (createdProcessMap: ProcessMap) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'process-maps'] });

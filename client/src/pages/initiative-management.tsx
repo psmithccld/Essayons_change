@@ -31,7 +31,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 const createInitiativeSchema = insertProjectSchema.extend({
   startDate: z.string().optional(),
   endDate: z.string().optional()
-}).omit({ id: true, ownerId: true, createdAt: true, updatedAt: true });
+});
 
 const editInitiativeSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -270,9 +270,10 @@ function InitiativeManagementContent() {
     }
   };
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "Not set";
-    return format(new Date(dateString), "MMM dd, yyyy");
+  const formatDate = (dateValue: string | Date | null) => {
+    if (!dateValue) return "Not set";
+    const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
+    return format(date, "MMM dd, yyyy");
   };
 
   return (
@@ -316,7 +317,7 @@ function InitiativeManagementContent() {
                       <FormItem className="md:col-span-2">
                         <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <Textarea placeholder="Describe the initiative objectives..." {...field} data-testid="input-initiative-description" />
+                          <Textarea placeholder="Describe the initiative objectives..." {...field} value={field.value || ""} data-testid="input-initiative-description" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -358,6 +359,7 @@ function InitiativeManagementContent() {
                             max="100"
                             placeholder="0"
                             {...field}
+                            value={field.value || 0}
                             onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                             data-testid="input-initiative-progress"
                           />
@@ -911,7 +913,7 @@ function InitiativeManagementContent() {
                   <TableRow key={assignment.id} data-testid={`row-assignment-${assignment.id}`}>
                     <TableCell className="font-medium">{assignment.user.name}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{assignment.user.role?.name || "No Role"}</Badge>
+                      <Badge variant="outline">User Role</Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant="default">{assignment.role}</Badge>
