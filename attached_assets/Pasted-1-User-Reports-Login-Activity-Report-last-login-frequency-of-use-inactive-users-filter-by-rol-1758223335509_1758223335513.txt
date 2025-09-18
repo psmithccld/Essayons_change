@@ -1,0 +1,69 @@
+1. User Reports
+
+Login Activity Report – last login, frequency of use, inactive users (filter by role, org, team).
+
+Role Assignment Report – current security roles, changes in role assignment (audit).
+
+Initiatives Participation Report – which initiatives each user is assigned to, cross-initiative load.
+
+2. Task Reports
+
+Task Status Report – filter by initiative, owner, due date, phase, completion %.
+
+Upcoming Deadlines Report – tasks due within X days.
+
+Overdue Tasks Report – tasks past suspense date.
+
+Completion Trend Report – tasks completed vs. open over time (initiative or org-wide).
+
+3. RAID Reports
+
+RAID Item Report – filter by type (Risk, Assumption, Issue, Dependency), severity, owner, status.
+
+High Severity Risks Report – quick hit for leadership dashboards.
+
+Open Issues by Initiative – grouped by initiative or owner.
+
+Dependencies at Risk – dependencies near suspense that may block milestones.
+
+4. Stakeholder Reports
+
+Stakeholder Directory – by initiative, role (sponsor, champion, resistor), influence/interest rating.
+
+Cross-Initiative Stakeholder Load Report – individuals tagged to multiple initiatives → potential overload or influence bottlenecks.
+
+Engagement Tracking Report – stakeholder communication touchpoints logged vs. missed.
+
+5. Readiness & Surveys (the big one)
+
+This is where the Essayons Change framework really differentiates you. Think survey results → metrics → trends.
+
+Readiness Reports
+
+Phase Readiness Score Report – aggregate readiness % by initiative and phase.
+
+Survey Response Report – detailed question/response breakdown with filters (initiative, phase, stakeholder type, date).
+
+Sentiment Trend Report – pulse scores (excitement → resistance) over time.
+
+Understanding Gaps Report – % of respondents who don’t understand purpose/role/resources.
+
+Post-Mortem Success Report – overall success scores across initiatives, with lessons-learned themes.
+
+Response Rate Report – completion %, distribution across stakeholder groups.
+
+Cross-Cutting Reports
+
+Change Health Dashboard – weighted composite (Readiness, Understanding, Sentiment, Success) by initiative.
+
+Org Readiness Heatmap – initiatives scored against each other to show where adoption risk is highest.
+
+Stakeholder Sentiment Report – filter survey results by stakeholder type or role.
+
+🧭 Guidance
+
+Start with filterable tabular reports for each object type (users, tasks, RAID, stakeholders, surveys).
+
+Add summary dashboards for leaders (e.g., Org Readiness Heatmap, Change Health Dashboard).
+
+Tie reports back to phases — every report should be able to show “Where in the fishbone are we seeing issues?”
