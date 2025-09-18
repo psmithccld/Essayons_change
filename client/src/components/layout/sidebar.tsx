@@ -276,12 +276,17 @@ export default function Sidebar() {
       {/* Logo Header */}
       <div className="p-4 sm:p-6 border-b border-border flex-shrink-0">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <ChartLine className="text-primary-foreground w-4 h-4" />
+          <div className="w-10 h-10 flex items-center justify-center bg-white rounded-lg p-1">
+            <img 
+              src="/attached_assets/ChatGPT Image Sep 16, 2025, 11_58_57 AM_1758206111535.png" 
+              alt="Essayons Change Logo" 
+              className="w-full h-full object-contain"
+              data-testid="img-logo"
+            />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold text-foreground truncate">CMIS</h1>
-            <p className="text-xs text-muted-foreground truncate">Change Management</p>
+            <h1 className="text-lg font-semibold text-foreground truncate" data-testid="text-brand-title">Essayons</h1>
+            <p className="text-xs text-muted-foreground truncate">Change</p>
           </div>
         </div>
       </div>

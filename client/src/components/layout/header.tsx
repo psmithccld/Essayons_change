@@ -89,7 +89,7 @@ export default function Header() {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-6">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Change Management Dashboard</h1>
+            <h1 className="text-2xl font-semibold text-foreground">Your Logo Here</h1>
             <p className="text-sm text-muted-foreground">Monitor and manage organizational change initiatives</p>
           </div>
           
