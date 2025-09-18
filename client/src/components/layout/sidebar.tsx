@@ -275,7 +275,7 @@ export default function Sidebar() {
     <div className="w-64 min-w-0 bg-card border-r border-border flex flex-col h-screen" data-testid="sidebar">
       {/* Logo Header */}
       <div className="p-4 sm:p-6 border-b border-border flex-shrink-0">
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center justify-center">
           <div className="w-10 h-10 flex items-center justify-center bg-white rounded-lg p-1">
             <img 
               src="/images/essayons-logo.png" 
@@ -283,10 +283,6 @@ export default function Sidebar() {
               className="w-full h-full object-contain"
               data-testid="img-logo"
             />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold text-foreground truncate" data-testid="text-brand-title">Essayons</h1>
-            <p className="text-xs text-muted-foreground truncate">Change</p>
           </div>
         </div>
       </div>
