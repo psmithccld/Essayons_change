@@ -633,7 +633,7 @@ export default function MindMaps() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between p-2 border-b bg-muted/50">
+      <div className="flex items-center p-2 border-b bg-muted/50">
         <div className="flex items-center space-x-2">
           <Button
             variant={tools.mode === 'select' ? 'default' : 'outline'}
@@ -752,11 +752,10 @@ export default function MindMaps() {
           >
             <Eraser className="w-4 h-4" />
           </Button>
-        </div>
-
-        {/* Integration menu (always visible for demo since Fabric.js text selection is disabled) */}
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-muted-foreground">Canvas Tools:</span>
+          
+          <div className="w-px h-6 bg-border mx-2" />
+          
+          {/* Integration menu moved to toolbar */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" data-testid="button-integrate">

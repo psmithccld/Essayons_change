@@ -1221,7 +1221,7 @@ export default function DevelopmentMaps() {
                 <CardTitle className="text-sm">Canvas Tools</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-wrap items-start gap-2">
                   <Button
                     variant={tools.mode === 'select' ? 'default' : 'outline'}
                     size="sm"
@@ -1370,7 +1370,7 @@ export default function DevelopmentMaps() {
                 
                 <Separator />
                 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={zoomIn} data-testid="button-zoom-in">
                     <ZoomIn className="w-4 h-4" />
                   </Button>
