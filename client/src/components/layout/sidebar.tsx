@@ -278,7 +278,7 @@ export default function Sidebar() {
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 flex items-center justify-center bg-white rounded-lg p-1">
             <img 
-              src="/attached_assets/ChatGPT Image Sep 16, 2025, 11_58_57 AM_1758206111535.png" 
+              src="/images/essayons-logo.png" 
               alt="Essayons Change Logo" 
               className="w-full h-full object-contain"
               data-testid="img-logo"
