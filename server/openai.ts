@@ -231,3 +231,149 @@ Return as JSON:
 
   return JSON.parse(response.choices[0].message.content || "{}");
 }
+
+export async function generateResistanceCounterMessages(resistancePoints: Array<{
+  title: string;
+  description: string;
+  severity: string;
+  affectedGroups: string[];
+}>): Promise<{
+  counterMessages: Array<{
+    resistanceTitle: string;
+    counterMessage: string;
+    tactics: string[];
+    channels: string[];
+  }>;
+  generalStrategies: string[];
+}> {
+  const prompt = `As a change management expert, generate counter-messages and tactics for these resistance points:
+
+${resistancePoints.map(r => `Resistance: ${r.title}
+Description: ${r.description}
+Severity: ${r.severity}
+Affected Groups: ${r.affectedGroups.join(', ')}
+`).join('\n')}
+
+For each resistance point, provide:
+1. A compelling counter-message that addresses the specific concern
+2. Tactical approaches to deliver the message
+3. Most effective communication channels
+
+Also provide general strategies for managing resistance.
+
+Return as JSON:
+{
+  "counterMessages": [
+    {
+      "resistanceTitle": "title",
+      "counterMessage": "compelling response",
+      "tactics": ["tactic1", "tactic2"],
+      "channels": ["channel1", "channel2"]
+    }
+  ],
+  "generalStrategies": ["strategy1", "strategy2"]
+}`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+  });
+
+  return JSON.parse(response.choices[0].message.content || "{}");
+}
+
+// Enhanced error handling interface
+interface AIServiceError {
+  type: 'api_key' | 'rate_limit' | 'network' | 'service_unavailable' | 'unknown';
+  message: string;
+  fallbackAvailable: boolean;
+}
+
+// Wrapper function to handle OpenAI errors gracefully
+function handleOpenAIError(error: any): AIServiceError {
+  if (error.status === 401) {
+    return {
+      type: 'api_key',
+      message: 'OpenAI API key is missing or invalid. Please configure a valid API key to enable AI-powered features.',
+      fallbackAvailable: true
+    };
+  }
+  if (error.status === 429) {
+    return {
+      type: 'rate_limit',
+      message: 'OpenAI API rate limit exceeded. Please try again later.',
+      fallbackAvailable: true
+    };
+  }
+  if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+    return {
+      type: 'network',
+      message: 'Unable to connect to OpenAI service. Please check your internet connection.',
+      fallbackAvailable: true
+    };
+  }
+  if (error.status >= 500) {
+    return {
+      type: 'service_unavailable',
+      message: 'OpenAI service is temporarily unavailable. Please try again later.',
+      fallbackAvailable: true
+    };
+  }
+  return {
+    type: 'unknown',
+    message: 'An unexpected error occurred with the AI service.',
+    fallbackAvailable: true
+  };
+}
+
+export async function generatePhaseGuidance(phase: string, projectContext: {
+  name: string;
+  description: string;
+  currentPhase: string;
+}): Promise<{
+  keyThemes: string[];
+  communicationObjectives: string[];
+  recommendedChannels: string[];
+  keyMessages: string[];
+  timeline: {
+    week: string;
+    activities: string[];
+  }[];
+  aiError?: AIServiceError;
+}> {
+  const prompt = `As a change management expert, provide communication guidance for the "${phase}" phase of this change initiative:
+
+Project: ${projectContext.name}
+Description: ${projectContext.description}
+Current Phase: ${projectContext.currentPhase}
+
+For the ${phase} phase, provide:
+1. Key communication themes to emphasize
+2. Primary communication objectives
+3. Most effective communication channels
+4. Core messages to convey
+5. Weekly timeline with key activities
+
+Return as JSON:
+{
+  "keyThemes": ["theme1", "theme2"],
+  "communicationObjectives": ["objective1", "objective2"],
+  "recommendedChannels": ["channel1", "channel2"],
+  "keyMessages": ["message1", "message2"],
+  "timeline": [
+    {
+      "week": "Week 1",
+      "activities": ["activity1", "activity2"]
+    }
+  ]
+}`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+  });
+
+  return JSON.parse(response.choices[0].message.content || "{}");
+}

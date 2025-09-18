@@ -1,13 +1,13 @@
 import bcrypt from 'bcrypt';
 import { 
   users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
-  userGroups, userGroupMemberships, userPermissions,
+  userGroups, userGroupMemberships, userPermissions, communicationStrategy,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type Survey, type InsertSurvey,
   type SurveyResponse, type InsertSurveyResponse, type GptInteraction, type InsertGptInteraction,
   type Milestone, type InsertMilestone, type ChecklistTemplate, type InsertChecklistTemplate,
-  type ProcessMap, type InsertProcessMap,
+  type ProcessMap, type InsertProcessMap, type CommunicationStrategy, type InsertCommunicationStrategy,
   type Role, type InsertRole, type UserInitiativeAssignment, type InsertUserInitiativeAssignment,
   type Permissions, type UserGroup, type InsertUserGroup, type UserGroupMembership, 
   type InsertUserGroupMembership, type UserPermission, type InsertUserPermission
@@ -69,6 +69,14 @@ export interface IStorage {
   createCommunication(communication: InsertCommunication): Promise<Communication>;
   updateCommunication(id: string, communication: Partial<InsertCommunication>): Promise<Communication | undefined>;
   deleteCommunication(id: string): Promise<boolean>;
+
+  // Communication Strategies
+  getCommunicationStrategiesByProject(projectId: string): Promise<CommunicationStrategy[]>;
+  getCommunicationStrategy(id: string): Promise<CommunicationStrategy | undefined>;
+  getCommunicationStrategyByPhase(projectId: string, phase: string): Promise<CommunicationStrategy | undefined>;
+  createCommunicationStrategy(strategy: InsertCommunicationStrategy): Promise<CommunicationStrategy>;
+  updateCommunicationStrategy(id: string, strategy: Partial<InsertCommunicationStrategy>): Promise<CommunicationStrategy | undefined>;
+  deleteCommunicationStrategy(id: string): Promise<boolean>;
 
   // Surveys
   getSurveysByProject(projectId: string): Promise<Survey[]>;
@@ -455,6 +463,45 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCommunication(id: string): Promise<boolean> {
     const result = await db.delete(communications).where(eq(communications.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Communication Strategies
+  async getCommunicationStrategiesByProject(projectId: string): Promise<CommunicationStrategy[]> {
+    return await db.select().from(communicationStrategy).where(eq(communicationStrategy.projectId, projectId)).orderBy(desc(communicationStrategy.createdAt));
+  }
+
+  async getCommunicationStrategy(id: string): Promise<CommunicationStrategy | undefined> {
+    const [strategy] = await db.select().from(communicationStrategy).where(eq(communicationStrategy.id, id));
+    return strategy || undefined;
+  }
+
+  async getCommunicationStrategyByPhase(projectId: string, phase: string): Promise<CommunicationStrategy | undefined> {
+    const [strategy] = await db.select()
+      .from(communicationStrategy)
+      .where(and(
+        eq(communicationStrategy.projectId, projectId),
+        eq(communicationStrategy.phase, phase),
+        eq(communicationStrategy.isActive, true)
+      ));
+    return strategy || undefined;
+  }
+
+  async createCommunicationStrategy(strategy: InsertCommunicationStrategy): Promise<CommunicationStrategy> {
+    const [created] = await db.insert(communicationStrategy).values(strategy).returning();
+    return created;
+  }
+
+  async updateCommunicationStrategy(id: string, strategy: Partial<InsertCommunicationStrategy>): Promise<CommunicationStrategy | undefined> {
+    const [updated] = await db.update(communicationStrategy)
+      .set({ ...strategy, updatedAt: new Date() })
+      .where(eq(communicationStrategy.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteCommunicationStrategy(id: string): Promise<boolean> {
+    const result = await db.delete(communicationStrategy).where(eq(communicationStrategy.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 

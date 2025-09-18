@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertProjectSchema, insertTaskSchema, insertStakeholderSchema, insertRaidLogSchema,
-  insertCommunicationSchema, insertSurveySchema, baseSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
+  insertCommunicationSchema, insertCommunicationStrategySchema, insertSurveySchema, baseSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
   insertMilestoneSchema, insertChecklistTemplateSchema, insertProcessMapSchema,
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema,
   insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
@@ -852,6 +852,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Communication Strategies
+  app.get("/api/projects/:projectId/communication-strategies", requirePermission('canSeeCommunications'), async (req, res) => {
+    try {
+      const strategies = await storage.getCommunicationStrategiesByProject(req.params.projectId);
+      res.json(strategies);
+    } catch (error) {
+      console.error("Error fetching communication strategies:", error);
+      res.status(500).json({ error: "Failed to fetch communication strategies" });
+    }
+  });
+
+  app.get("/api/projects/:projectId/communication-strategies/phase/:phase", requirePermission('canSeeCommunications'), async (req, res) => {
+    try {
+      const strategy = await storage.getCommunicationStrategyByPhase(req.params.projectId, req.params.phase);
+      if (!strategy) {
+        return res.status(404).json({ error: "Communication strategy not found for this phase" });
+      }
+      res.json(strategy);
+    } catch (error) {
+      console.error("Error fetching communication strategy by phase:", error);
+      res.status(500).json({ error: "Failed to fetch communication strategy" });
+    }
+  });
+
+  app.post("/api/projects/:projectId/communication-strategies", requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = insertCommunicationStrategySchema.parse({
+        ...req.body,
+        projectId: req.params.projectId,
+        createdById: req.userId || DEMO_USER_ID
+      });
+      const strategy = await storage.createCommunicationStrategy(validatedData);
+      res.status(201).json(strategy);
+    } catch (error) {
+      console.error("Error creating communication strategy:", error);
+      res.status(400).json({ error: "Failed to create communication strategy" });
+    }
+  });
+
+  app.put("/api/communication-strategies/:id", requirePermission('canEditCommunications'), async (req, res) => {
+    try {
+      const updateSchema = insertCommunicationStrategySchema.omit({ projectId: true, createdById: true }).partial();
+      const validatedData = updateSchema.parse(req.body);
+      
+      const strategy = await storage.updateCommunicationStrategy(req.params.id, validatedData);
+      if (!strategy) {
+        return res.status(404).json({ error: "Communication strategy not found" });
+      }
+      res.json(strategy);
+    } catch (error) {
+      console.error("Error updating communication strategy:", error);
+      res.status(400).json({ error: "Failed to update communication strategy" });
+    }
+  });
+
+  app.delete("/api/communication-strategies/:id", requirePermission('canDeleteCommunications'), async (req, res) => {
+    try {
+      const success = await storage.deleteCommunicationStrategy(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Communication strategy not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting communication strategy:", error);
+      res.status(500).json({ error: "Failed to delete communication strategy" });
+    }
+  });
+
   // Surveys
   app.get("/api/projects/:projectId/surveys", async (req, res) => {
     try {
@@ -1048,6 +1116,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating content:", error);
       res.status(500).json({ error: "Failed to generate content" });
+    }
+  });
+
+  app.post("/api/gpt/resistance-counter-messages", async (req, res) => {
+    try {
+      const { projectId, resistancePoints } = req.body;
+      
+      const counterMessages = await openaiService.generateResistanceCounterMessages(resistancePoints);
+
+      // Save interaction
+      await storage.createGptInteraction({
+        projectId,
+        userId: "550e8400-e29b-41d4-a716-446655440000",
+        type: "resistance_counter_messages",
+        prompt: "Generate counter-messages for resistance points",
+        response: JSON.stringify(counterMessages),
+        metadata: { resistanceCount: resistancePoints.length }
+      });
+
+      res.json(counterMessages);
+    } catch (error) {
+      console.error("Error generating counter messages:", error);
+      res.status(500).json({ error: "Failed to generate counter messages" });
+    }
+  });
+
+  app.post("/api/gpt/phase-guidance", requirePermission('canSeeCommunications'), async (req, res) => {
+    try {
+      const { projectId, phase, projectName, description, currentPhase } = req.body;
+      
+      const guidance = await openaiService.generatePhaseGuidance(phase, {
+        name: projectName,
+        description,
+        currentPhase
+      });
+
+      // Save interaction only if OpenAI was successful
+      if (!guidance.aiError) {
+        await storage.createGptInteraction({
+          projectId,
+          userId: "550e8400-e29b-41d4-a716-446655440000",
+          type: "phase_guidance",
+          prompt: `Generate guidance for ${phase} phase`,
+          response: JSON.stringify(guidance),
+          metadata: { phase, currentPhase }
+        });
+      }
+
+      res.json(guidance);
+    } catch (error: any) {
+      console.error("Error generating phase guidance:", error);
+      
+      // Provide more specific error messages
+      if (error.status === 401) {
+        res.status(200).json({
+          keyThemes: ["Communication strategy guidance temporarily unavailable"],
+          communicationObjectives: ["AI-powered features require valid API configuration"],
+          recommendedChannels: ["Email updates", "Team meetings", "Project dashboards"],
+          keyMessages: ["Manual guidance available through project management"],
+          timeline: [
+            {
+              week: "Week 1",
+              activities: ["Contact administrator about AI features"]
+            }
+          ],
+          aiError: {
+            type: 'api_key',
+            message: 'OpenAI API key is missing or invalid. Please configure a valid API key to enable AI-powered features.',
+            fallbackAvailable: true
+          }
+        });
+      } else {
+        res.status(200).json({
+          keyThemes: ["Communication strategy guidance temporarily unavailable"],
+          communicationObjectives: ["Standard communication best practices apply"],
+          recommendedChannels: ["Email updates", "Team meetings", "Project dashboards"],
+          keyMessages: ["Focus on clear, timely communication with stakeholders"],
+          timeline: [
+            {
+              week: "Week 1",
+              activities: ["Plan communication approach", "Identify key stakeholders"]
+            }
+          ],
+          aiError: {
+            type: 'service_unavailable',
+            message: 'AI service is temporarily unavailable. Using standard communication guidance.',
+            fallbackAvailable: true
+          }
+        });
+      }
     }
   });
 
