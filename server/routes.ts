@@ -1890,8 +1890,33 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/projects/:projectId/communications", requireAuthAndPermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/projects/:projectId/communications", async (req: AuthenticatedRequest, res) => {
     try {
+      // Determine required permission based on communication type
+      let requiredPermission: keyof Permissions = 'canModifyCommunications';
+      if (req.body.type === 'meeting') {
+        requiredPermission = 'canScheduleMeetings';
+      }
+
+      // SECURITY: Check authentication and specific permission
+      if (!req.userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Check user permissions
+      const user = await storage.getUser(req.userId);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const userPermissions = await storage.resolveUserPermissions(req.userId);
+      if (!userPermissions[requiredPermission]) {
+        return res.status(403).json({ 
+          error: "Access denied", 
+          message: `Permission '${requiredPermission}' is required to create this type of communication`
+        });
+      }
+
       const validatedData = insertCommunicationSchema.parse({
         ...req.body,
         projectId: req.params.projectId,
@@ -1905,12 +1930,26 @@ Return the refined content in JSON format:
     }
   });
 
-  app.put("/api/communications/:id", async (req, res) => {
+  app.put("/api/communications/:id", requireAuthAndPermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
-      const communication = await storage.updateCommunication(req.params.id, req.body);
-      if (!communication) {
+      // Get existing communication to check type for specific permission
+      const existingCommunication = await storage.getCommunication(req.params.id);
+      if (!existingCommunication) {
         return res.status(404).json({ error: "Communication not found" });
       }
+
+      // Check meeting-specific permissions if it's a meeting
+      if (existingCommunication.type === 'meeting') {
+        const userPermissions = await storage.resolveUserPermissions(req.userId!);
+        if (!userPermissions.canScheduleMeetings) {
+          return res.status(403).json({ 
+            error: "Access denied", 
+            message: "Permission 'canScheduleMeetings' is required to modify meetings"
+          });
+        }
+      }
+
+      const communication = await storage.updateCommunication(req.params.id, req.body);
       res.json(communication);
     } catch (error) {
       console.error("Error updating communication:", error);
@@ -1918,8 +1957,25 @@ Return the refined content in JSON format:
     }
   });
 
-  app.delete("/api/communications/:id", async (req, res) => {
+  app.delete("/api/communications/:id", requireAuthAndPermission('canDeleteCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
+      // Get existing communication to check type for specific permission
+      const existingCommunication = await storage.getCommunication(req.params.id);
+      if (!existingCommunication) {
+        return res.status(404).json({ error: "Communication not found" });
+      }
+
+      // Check meeting-specific permissions if it's a meeting
+      if (existingCommunication.type === 'meeting') {
+        const userPermissions = await storage.resolveUserPermissions(req.userId!);
+        if (!userPermissions.canDeleteMeetings) {
+          return res.status(403).json({ 
+            error: "Access denied", 
+            message: "Permission 'canDeleteMeetings' is required to delete meetings"
+          });
+        }
+      }
+
       const success = await storage.deleteCommunication(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Communication not found" });
@@ -2820,6 +2876,280 @@ Return the refined content in JSON format:
     }
   });
 
+  // Meeting agenda generation endpoint
+  app.post("/api/gpt/generate-meeting-agenda", requireAuthAndPermission('canGenerateMeetingAgendas'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // SECURITY: Input validation with Zod
+      const validatedInput = generateMeetingAgendaSchema.parse(req.body);
+      
+      // SECURITY: Rate limiting check for meeting agenda generation
+      if (!checkRateLimit(req.userId!, 10, 300000)) { // 10 agenda generations per 5 minutes
+        return res.status(429).json({ 
+          error: "Rate limit exceeded. Please wait before generating more agendas." 
+        });
+      }
+
+      const agendaData = await openaiService.generateMeetingAgenda(validatedInput);
+
+      // Save GPT interaction for audit trail
+      await storage.createGptInteraction({
+        projectId: null, // Meeting agenda generation might not always be tied to specific project
+        userId: req.userId!,
+        type: 'meeting_agenda_generation',
+        prompt: `Generate meeting agenda for ${validatedInput.meetingType} meeting: ${validatedInput.meetingPurpose}`,
+        response: JSON.stringify(agendaData),
+        metadata: {
+          meetingType: validatedInput.meetingType,
+          duration: validatedInput.duration,
+          participantCount: validatedInput.participants.length
+        }
+      });
+
+      res.json(agendaData);
+    } catch (error) {
+      console.error("Error generating meeting agenda:", error);
+      res.status(500).json({ error: "Failed to generate meeting agenda" });
+    }
+  });
+
+  // Meeting Invites Sending - SECURITY: Requires meeting invite permission and proper auth
+  app.post("/api/communications/:id/send-meeting-invites", requireAuthAndPermission('canSendMeetingInvites'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // SECURITY: Input validation with Zod
+      const validatedInput = sendMeetingInviteSchema.parse(req.body);
+      const { recipients, meetingData, dryRun } = validatedInput;
+
+      // SECURITY: Rate limiting check for meeting invites
+      if (!checkRateLimit(req.userId!, 5, 300000)) { // 5 meeting invite distributions per 5 minutes
+        return res.status(429).json({ 
+          error: "Rate limit exceeded. Please wait before sending more meeting invites." 
+        });
+      }
+
+      // Get communication
+      const communication = await storage.getCommunication(req.params.id);
+      if (!communication) {
+        return res.status(404).json({ error: "Communication not found" });
+      }
+
+      // Validate communication type
+      if (communication.type !== 'meeting') {
+        return res.status(400).json({ error: "Communication must be a meeting" });
+      }
+
+      // Get project
+      const project = await storage.getProject(communication.projectId);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      // Handle DRY RUN mode
+      if (dryRun) {
+        console.log(`[DRY RUN] Meeting Invites - Would send "${meetingData.title}" to ${recipients.length} recipients`);
+        return res.json({
+          success: true,
+          dryRun: true,
+          message: `DRY RUN: Would send meeting invites to ${recipients.length} participants`,
+          distributionResult: {
+            sent: recipients.length,
+            failed: 0,
+            results: recipients.map(r => ({ email: r.email, success: true }))
+          }
+        });
+      }
+
+      // SECURITY: Environment safety check for live sending
+      const safetyCheck = checkEnvironmentSafety('bulk_email');
+      if (!safetyCheck.safe) {
+        return res.status(403).json({ 
+          error: safetyCheck.message,
+          hint: "Meeting invite service not configured properly"
+        });
+      }
+
+      // Generate meeting invite content using GPT
+      const inviteContent = await openaiService.generateMeetingInviteContent({
+        projectName: project.name,
+        title: meetingData.title,
+        purpose: meetingData.description,
+        date: new Date(meetingData.startTime).toDateString(),
+        time: new Date(meetingData.startTime).toTimeString(),
+        duration: Math.round((new Date(meetingData.endTime).getTime() - new Date(meetingData.startTime).getTime()) / (1000 * 60)),
+        location: meetingData.location,
+        agenda: meetingData.agenda,
+        preparation: meetingData.preparation,
+        hostName: meetingData.organizerName
+      });
+
+      // Send bulk meeting invites
+      const { sendBulkMeetingInvites } = await import("./services/emailService");
+      const distributionResult = await sendBulkMeetingInvites(
+        recipients,
+        meetingData,
+        inviteContent
+      );
+
+      // Update communication status
+      const updatedCommunication = await storage.updateCommunication(req.params.id, {
+        status: distributionResult.sent > 0 ? 'sent' : 'failed',
+        sendDate: new Date(),
+        distributionMethod: 'email'
+      });
+
+      // Create recipient records
+      for (const recipient of recipients) {
+        await storage.createCommunicationRecipient({
+          communicationId: communication.id,
+          recipientType: 'meeting_participant',
+          recipientEmail: recipient.email,
+          recipientName: recipient.name,
+          recipientRole: recipient.role,
+          deliveryStatus: distributionResult.results.find(r => r.email === recipient.email)?.success ? 'sent' : 'failed'
+        });
+      }
+
+      // SECURITY: Log meeting invites distribution
+      console.log(`[MEETING INVITES] User ${req.userId}`, {
+        communicationId: req.params.id,
+        recipientCount: recipients.length,
+        sent: distributionResult.sent,
+        failed: distributionResult.failed,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({
+        success: distributionResult.sent > 0,
+        dryRun: false,
+        message: `Meeting invites sent to ${distributionResult.sent} participants. ${distributionResult.failed} failed.`,
+        communication: updatedCommunication,
+        distributionResult,
+        environmentInfo: {
+          nodeEnv: process.env.NODE_ENV,
+          emailConfigured: !!process.env.SENDGRID_API_KEY
+        }
+      });
+
+    } catch (error) {
+      console.error("Error sending meeting invites:", error);
+      res.status(500).json({ error: "Failed to send meeting invites" });
+    }
+  });
+
+  // Meeting Content Refinement - SECURITY: Requires meeting agenda generation permission and proper auth
+  app.post("/api/gpt/refine-meeting-content", requireAuthAndPermission('canGenerateMeetingAgendas'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // SECURITY: Input validation with Zod
+      const validatedInput = refineMeetingContentSchema.parse(req.body);
+      
+      // SECURITY: Rate limiting check for meeting content refinement
+      if (!checkRateLimit(req.userId!, 15, 300000)) { // 15 refinements per 5 minutes
+        return res.status(429).json({ 
+          error: "Rate limit exceeded. Please wait before refining more meeting content." 
+        });
+      }
+
+      const refinedContent = await openaiService.refineMeetingContent(validatedInput);
+
+      // Save GPT interaction for audit trail
+      await storage.createGptInteraction({
+        projectId: null, // Meeting content refinement might not always be tied to specific project
+        userId: req.userId!,
+        type: 'meeting_content_refinement',
+        prompt: `Refine meeting content: ${validatedInput.refinementRequest}`,
+        response: JSON.stringify(refinedContent),
+        metadata: {
+          originalTitle: validatedInput.currentContent.title,
+          refinementType: validatedInput.refinementRequest.substring(0, 50),
+          meetingType: validatedInput.meetingContext.meetingType
+        }
+      });
+
+      res.json(refinedContent);
+    } catch (error) {
+      console.error("Error refining meeting content:", error);
+      res.status(500).json({ error: "Failed to refine meeting content" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
+
+// Meeting-specific validation schemas
+const generateMeetingAgendaSchema = z.object({
+  projectName: z.string().min(1, "Project name is required"),
+  meetingType: z.enum(['status', 'planning', 'review', 'decision', 'brainstorming']),
+  meetingPurpose: z.string().min(1, "Meeting purpose is required"),
+  duration: z.number().min(15).max(480), // 15 minutes to 8 hours
+  participants: z.array(z.object({
+    name: z.string(),
+    role: z.string()
+  })).min(1, "At least one participant is required"),
+  objectives: z.array(z.string()).min(1, "At least one objective is required"),
+  raidLogContext: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    type: z.string(),
+    description: z.string()
+  })).optional()
+});
+
+const refineMeetingContentSchema = z.object({
+  currentContent: z.object({
+    title: z.string(),
+    agenda: z.array(z.object({
+      item: z.string(),
+      timeAllocation: z.number(),
+      owner: z.string(),
+      type: z.string()
+    })),
+    objectives: z.array(z.string()),
+    preparation: z.string().optional()
+  }),
+  refinementRequest: z.string().min(1, "Refinement request is required"),
+  meetingContext: z.object({
+    meetingType: z.string(),
+    duration: z.number(),
+    participantCount: z.number()
+  })
+});
+
+const generateMeetingInviteSchema = z.object({
+  projectName: z.string().min(1, "Project name is required"),
+  title: z.string().min(1, "Meeting title is required"),
+  purpose: z.string().min(1, "Meeting purpose is required"),
+  date: z.string().min(1, "Meeting date is required"),
+  time: z.string().min(1, "Meeting time is required"),
+  duration: z.number().min(15).max(480),
+  location: z.string().min(1, "Meeting location is required"),
+  agenda: z.array(z.object({
+    item: z.string(),
+    timeAllocation: z.number()
+  })),
+  preparation: z.string().optional(),
+  hostName: z.string().min(1, "Host name is required")
+});
+
+const sendMeetingInviteSchema = z.object({
+  recipients: z.array(z.object({
+    email: z.string().email(),
+    name: z.string(),
+    role: z.string().optional()
+  })).min(1, "At least one recipient is required"),
+  meetingData: z.object({
+    title: z.string(),
+    description: z.string(),
+    startTime: z.string(),
+    endTime: z.string(),
+    location: z.string(),
+    organizerName: z.string(),
+    organizerEmail: z.string().email(),
+    agenda: z.array(z.object({
+      item: z.string(),
+      timeAllocation: z.number()
+    })),
+    preparation: z.string().optional(),
+    projectName: z.string()
+  }),
+  dryRun: z.boolean().default(false)
+});

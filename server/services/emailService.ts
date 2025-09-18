@@ -355,3 +355,352 @@ export async function sendP2PEmail(
     html
   });
 }
+// Meeting invitation and calendar integration functions
+
+export async function sendMeetingInvite(
+  recipientEmail: string,
+  meetingData: {
+    title: string;
+    description: string;
+    startTime: string; // ISO string
+    endTime: string; // ISO string
+    location: string;
+    organizerName: string;
+    organizerEmail: string;
+    agenda: Array<{
+      item: string;
+      timeAllocation: number;
+    }>;
+    preparation?: string;
+    projectName: string;
+  },
+  inviteContent: {
+    subject: string;
+    htmlContent: string;
+    textContent: string;
+  }
+): Promise<boolean> {
+  if (!process.env.SENDGRID_API_KEY) {
+    console.log('Meeting invite skipped - SendGrid not configured');
+    return false;
+  }
+
+  // Generate calendar invite (ICS format)
+  const calendarInvite = generateICSCalendarInvite(meetingData);
+  
+  try {
+    await mailService.send({
+      to: recipientEmail,
+      from: process.env.FROM_EMAIL || 'noreply@changemanagement.com',
+      subject: inviteContent.subject,
+      text: inviteContent.textContent,
+      html: inviteContent.htmlContent,
+      attachments: [
+        {
+          content: Buffer.from(calendarInvite).toString('base64'),
+          filename: 'meeting.ics',
+          type: 'text/calendar',
+          disposition: 'attachment'
+        }
+      ]
+    });
+    
+    console.log(`Meeting invite sent successfully to ${recipientEmail}`);
+    return true;
+  } catch (error) {
+    console.error('SendGrid meeting invite error:', error);
+    return false;
+  }
+}
+
+export async function sendBulkMeetingInvites(
+  recipients: Array<{
+    email: string;
+    name: string;
+    role?: string;
+  }>,
+  meetingData: {
+    title: string;
+    description: string;
+    startTime: string;
+    endTime: string;
+    location: string;
+    organizerName: string;
+    organizerEmail: string;
+    agenda: Array<{
+      item: string;
+      timeAllocation: number;
+    }>;
+    preparation?: string;
+    projectName: string;
+  },
+  inviteContent: {
+    subject: string;
+    htmlContent: string;
+    textContent: string;
+  }
+): Promise<{ sent: number; failed: number; results: Array<{ email: string; success: boolean; error?: string }> }> {
+  const results: Array<{ email: string; success: boolean; error?: string }> = [];
+  let sent = 0;
+  let failed = 0;
+
+  // Send invites with rate limiting
+  for (const recipient of recipients) {
+    try {
+      // Personalize content with recipient name
+      const personalizedContent = {
+        ...inviteContent,
+        htmlContent: inviteContent.htmlContent.replace(/\[RECIPIENT_NAME\]/g, recipient.name),
+        textContent: inviteContent.textContent.replace(/\[RECIPIENT_NAME\]/g, recipient.name)
+      };
+
+      const success = await sendMeetingInvite(recipient.email, meetingData, personalizedContent);
+      if (success) {
+        sent++;
+        results.push({ email: recipient.email, success: true });
+      } else {
+        failed++;
+        results.push({ email: recipient.email, success: false, error: 'Send failed' });
+      }
+      
+      // Rate limiting: wait 200ms between emails
+      await new Promise(resolve => setTimeout(resolve, 200));
+    } catch (error) {
+      failed++;
+      results.push({ 
+        email: recipient.email, 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    }
+  }
+
+  return { sent, failed, results };
+}
+
+function generateICSCalendarInvite(meetingData: {
+  title: string;
+  description: string;
+  startTime: string;
+  endTime: string;
+  location: string;
+  organizerName: string;
+  organizerEmail: string;
+  agenda: Array<{
+    item: string;
+    timeAllocation: number;
+  }>;
+  preparation?: string;
+}): string {
+  const startDate = new Date(meetingData.startTime);
+  const endDate = new Date(meetingData.endTime);
+  
+  // Format dates for ICS (YYYYMMDDTHHMMSSZ)
+  const formatICSDate = (date: Date): string => {
+    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  };
+
+  const startICS = formatICSDate(startDate);
+  const endICS = formatICSDate(endDate);
+  const nowICS = formatICSDate(new Date());
+
+  // Generate unique UID
+  const uid = `meeting-${Date.now()}@changemanagement.com`;
+
+  // Build agenda text
+  const agendaText = meetingData.agenda.length > 0 
+    ? `\\n\\nAGENDA:\\n${meetingData.agenda.map(item => `• ${item.item} (${item.timeAllocation} min)`).join('\\n')}`
+    : '';
+  
+  const preparationText = meetingData.preparation 
+    ? `\\n\\nPREPARATION:\\n${meetingData.preparation}`
+    : '';
+
+  const description = meetingData.description + agendaText + preparationText;
+
+  const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Essayons Change Platform//Meeting Scheduler//EN
+CALSCALE:GREGORIAN
+METHOD:REQUEST
+BEGIN:VEVENT
+UID:${uid}
+DTSTART:${startICS}
+DTEND:${endICS}
+DTSTAMP:${nowICS}
+ORGANIZER;CN=${meetingData.organizerName}:MAILTO:${meetingData.organizerEmail}
+SUMMARY:${meetingData.title}
+DESCRIPTION:${description.replace(/\n/g, '\\n')}
+LOCATION:${meetingData.location}
+STATUS:CONFIRMED
+SEQUENCE:0
+END:VEVENT
+END:VCALENDAR`;
+
+  return icsContent;
+}
+
+export async function sendMeetingCancellation(
+  recipientEmail: string,
+  meetingData: {
+    title: string;
+    originalStartTime: string;
+    organizerName: string;
+    organizerEmail: string;
+    cancellationReason?: string;
+  }
+): Promise<boolean> {
+  if (!process.env.SENDGRID_API_KEY) {
+    console.log('Meeting cancellation skipped - SendGrid not configured');
+    return false;
+  }
+
+  const subject = `Meeting Cancelled: ${meetingData.title}`;
+  const reason = meetingData.cancellationReason || 'No reason provided';
+  
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #832c2c; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0; font-size: 24px;">Meeting Cancelled</h1>
+      </div>
+      
+      <div style="padding: 30px; background-color: #ffffff;">
+        <h2 style="color: #832c2c;">${meetingData.title}</h2>
+        <p style="font-size: 16px; margin-bottom: 20px;">
+          This meeting scheduled for ${new Date(meetingData.originalStartTime).toLocaleString()} has been cancelled.
+        </p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #832c2c; margin: 20px 0;">
+          <strong>Reason:</strong> ${reason}
+        </div>
+        
+        <p style="margin-top: 20px;">
+          If you have any questions, please contact ${meetingData.organizerName} at ${meetingData.organizerEmail}.
+        </p>
+      </div>
+      
+      <div style="background-color: #F8F9FA; padding: 20px; text-align: center; border-top: 1px solid #e9ecef;">
+        <p style="margin: 0; color: #5A7684; font-size: 12px;">
+          Generated by Essayons Change Platform
+        </p>
+      </div>
+    </div>
+  `;
+
+  const textContent = `Meeting Cancelled: ${meetingData.title}
+
+This meeting scheduled for ${new Date(meetingData.originalStartTime).toLocaleString()} has been cancelled.
+
+Reason: ${reason}
+
+If you have any questions, please contact ${meetingData.organizerName} at ${meetingData.organizerEmail}.
+
+Generated by Essayons Change Platform`;
+
+  return sendEmail({
+    to: recipientEmail,
+    from: process.env.FROM_EMAIL || 'noreply@changemanagement.com',
+    subject,
+    text: textContent,
+    html: htmlContent
+  });
+}
+
+export async function sendMeetingReminder(
+  recipientEmail: string,
+  meetingData: {
+    title: string;
+    startTime: string;
+    location: string;
+    agenda: Array<{
+      item: string;
+      timeAllocation: number;
+    }>;
+    preparation?: string;
+    projectName: string;
+  },
+  reminderType: 'day_before' | 'hour_before' | 'fifteen_minutes'
+): Promise<boolean> {
+  if (!process.env.SENDGRID_API_KEY) {
+    console.log('Meeting reminder skipped - SendGrid not configured');
+    return false;
+  }
+
+  const timeframes = {
+    day_before: '24 hours',
+    hour_before: '1 hour',
+    fifteen_minutes: '15 minutes'
+  };
+
+  const subject = `Meeting Reminder: ${meetingData.title} - ${timeframes[reminderType]}`;
+  
+  const agendaHtml = meetingData.agenda.length > 0
+    ? `<h3 style="color: #832c2c; margin-top: 25px;">Agenda</h3>
+       <ul style="margin: 10px 0;">
+         ${meetingData.agenda.map(item => 
+           `<li style="margin: 8px 0;">${item.item} <em>(${item.timeAllocation} min)</em></li>`
+         ).join('')}
+       </ul>`
+    : '';
+
+  const preparationHtml = meetingData.preparation
+    ? `<h3 style="color: #832c2c; margin-top: 25px;">Preparation Required</h3>
+       <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #832c2c; margin: 10px 0;">
+         ${meetingData.preparation}
+       </div>`
+    : '';
+
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #832c2c; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0; font-size: 24px;">Meeting Reminder</h1>
+        <p style="margin: 10px 0 0 0; font-size: 14px;">In ${timeframes[reminderType]}</p>
+      </div>
+      
+      <div style="padding: 30px; background-color: #ffffff;">
+        <h2 style="color: #832c2c; margin-top: 0;">${meetingData.title}</h2>
+        
+        <div style="margin: 20px 0;">
+          <p><strong>Time:</strong> ${new Date(meetingData.startTime).toLocaleString()}</p>
+          <p><strong>Location:</strong> ${meetingData.location}</p>
+          <p><strong>Project:</strong> ${meetingData.projectName}</p>
+        </div>
+        
+        ${agendaHtml}
+        ${preparationHtml}
+      </div>
+      
+      <div style="background-color: #F8F9FA; padding: 20px; text-align: center; border-top: 1px solid #e9ecef;">
+        <p style="margin: 0; color: #5A7684; font-size: 12px;">
+          Generated by Essayons Change Platform
+        </p>
+      </div>
+    </div>
+  `;
+
+  const agendaText = meetingData.agenda.length > 0
+    ? `\n\nAgenda:\n${meetingData.agenda.map(item => `- ${item.item} (${item.timeAllocation} min)`).join('\n')}`
+    : '';
+
+  const preparationText = meetingData.preparation
+    ? `\n\nPreparation Required:\n${meetingData.preparation}`
+    : '';
+
+  const textContent = `Meeting Reminder: ${meetingData.title}
+
+Time: ${new Date(meetingData.startTime).toLocaleString()}
+Location: ${meetingData.location}
+Project: ${meetingData.projectName}
+${agendaText}
+${preparationText}
+
+Generated by Essayons Change Platform`;
+
+  return sendEmail({
+    to: recipientEmail,
+    from: process.env.FROM_EMAIL || 'noreply@changemanagement.com',
+    subject,
+    text: textContent,
+    html: htmlContent
+  });
+}

@@ -377,3 +377,291 @@ Return as JSON:
 
   return JSON.parse(response.choices[0].message.content || "{}");
 }
+
+// Meeting-specific GPT functions for meeting management
+
+export async function generateMeetingAgenda(meetingData: {
+  projectName: string;
+  meetingType: string; // status, planning, review, decision, brainstorming
+  meetingPurpose: string;
+  duration: number; // in minutes
+  participants: Array<{
+    name: string;
+    role: string;
+  }>;
+  objectives: string[];
+  raidLogContext?: Array<{
+    id: string;
+    title: string;
+    type: string;
+    description: string;
+  }>;
+}): Promise<{
+  agenda: Array<{
+    item: string;
+    timeAllocation: number;
+    owner: string;
+    type: string; // discussion, presentation, decision, brainstorming
+  }>;
+  meetingStructure: {
+    opening: string;
+    mainTopics: string[];
+    closing: string;
+  };
+  preparationNotes: string[];
+  bestPractices: string[];
+}> {
+  const raidContext = meetingData.raidLogContext ? 
+    `\nRelated RAID Items:\n${meetingData.raidLogContext.map(item => 
+      `- ${item.type.toUpperCase()}: ${item.title} - ${item.description}`
+    ).join('\n')}` : '';
+
+  const prompt = `As a meeting facilitation expert, create a professional meeting agenda for this change management meeting:
+
+Project: ${meetingData.projectName}
+Meeting Type: ${meetingData.meetingType}
+Purpose: ${meetingData.meetingPurpose}
+Duration: ${meetingData.duration} minutes
+Objectives: ${meetingData.objectives.join(', ')}
+
+Participants:
+${meetingData.participants.map(p => `- ${p.name} (${p.role})`).join('\n')}
+${raidContext}
+
+Create a structured agenda that:
+1. Maximizes productivity within the time constraint
+2. Ensures all objectives are addressed
+3. Assigns appropriate time allocations
+4. Designates owners for each agenda item
+5. Follows best practices for ${meetingData.meetingType} meetings
+
+Include preparation notes and best practices specific to this meeting type.
+
+Return as JSON:
+{
+  "agenda": [
+    {
+      "item": "agenda item description",
+      "timeAllocation": number_in_minutes,
+      "owner": "person responsible",
+      "type": "discussion|presentation|decision|brainstorming"
+    }
+  ],
+  "meetingStructure": {
+    "opening": "suggested opening approach",
+    "mainTopics": ["topic1", "topic2"],
+    "closing": "suggested closing approach"
+  },
+  "preparationNotes": ["note1", "note2"],
+  "bestPractices": ["practice1", "practice2"]
+}`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+  });
+
+  return JSON.parse(response.choices[0].message.content || "{}");
+}
+
+export async function refineMeetingAgenda(currentAgenda: {
+  agenda: Array<{
+    item: string;
+    timeAllocation: number;
+    owner: string;
+    type: string;
+  }>;
+  meetingType: string;
+  duration: number;
+  objectives: string[];
+}, refinementRequest: string): Promise<{
+  agenda: Array<{
+    item: string;
+    timeAllocation: number;
+    owner: string;
+    type: string;
+  }>;
+  improvements: string[];
+  reasoning: string;
+}> {
+  const prompt = `As a meeting facilitation expert, refine this meeting agenda based on the specific request:
+
+Current Agenda:
+${currentAgenda.agenda.map(item => 
+  `- ${item.item} (${item.timeAllocation}min, Owner: ${item.owner}, Type: ${item.type})`
+).join('\n')}
+
+Meeting Details:
+- Type: ${currentAgenda.meetingType}
+- Duration: ${currentAgenda.duration} minutes
+- Objectives: ${currentAgenda.objectives.join(', ')}
+
+Refinement Request: ${refinementRequest}
+
+Please refine the agenda to address the specific request while:
+1. Maintaining the total meeting duration
+2. Ensuring all objectives are still addressed
+3. Improving flow and productivity
+4. Optimizing time allocations
+
+Return as JSON:
+{
+  "agenda": [
+    {
+      "item": "refined agenda item",
+      "timeAllocation": number_in_minutes,
+      "owner": "person responsible",
+      "type": "discussion|presentation|decision|brainstorming"
+    }
+  ],
+  "improvements": ["improvement1", "improvement2"],
+  "reasoning": "explanation of changes made"
+}`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+  });
+
+  return JSON.parse(response.choices[0].message.content || "{}");
+}
+
+export async function refineMeetingContent(currentContent: {
+  title: string;
+  agenda: Array<{
+    item: string;
+    timeAllocation: number;
+    owner: string;
+    type: string;
+  }>;
+  objectives: string[];
+  preparation?: string;
+}, refinementRequest: string, meetingContext: {
+  meetingType: string;
+  duration: number;
+  participantCount: number;
+}): Promise<{
+  title: string;
+  agenda: Array<{
+    item: string;
+    timeAllocation: number;
+    owner: string;
+    type: string;
+  }>;
+  objectives: string[];
+  preparation: string;
+  improvements: string[];
+}> {
+  const prompt = `As a meeting facilitation expert, refine this meeting content based on the following request:
+
+Current Meeting Content:
+Title: ${currentContent.title}
+Objectives: ${currentContent.objectives.join(', ')}
+Preparation: ${currentContent.preparation || 'None specified'}
+
+Current Agenda:
+${currentContent.agenda.map(item => 
+  `- ${item.item} (${item.timeAllocation}min, Owner: ${item.owner}, Type: ${item.type})`
+).join('\n')}
+
+Meeting Context:
+- Type: ${meetingContext.meetingType}
+- Duration: ${meetingContext.duration} minutes
+- Participants: ${meetingContext.participantCount}
+
+Refinement Request: ${refinementRequest}
+
+Please refine the meeting content addressing the specific request while maintaining:
+1. Realistic time allocations
+2. Clear ownership
+3. Balanced participation
+4. Meeting best practices
+
+Return the refined content as JSON:
+{
+  "title": "refined title",
+  "agenda": [
+    {
+      "item": "agenda item description",
+      "timeAllocation": number_in_minutes,
+      "owner": "person responsible",
+      "type": "discussion|presentation|decision|brainstorming"
+    }
+  ],
+  "objectives": ["objective1", "objective2"],
+  "preparation": "preparation instructions",
+  "improvements": ["improvement1", "improvement2"]
+}`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+  });
+
+  return JSON.parse(response.choices[0].message.content || "{}");
+}
+
+export async function generateMeetingInviteContent(meetingData: {
+  projectName: string;
+  title: string;
+  purpose: string;
+  date: string;
+  time: string;
+  duration: number;
+  location: string;
+  agenda: Array<{
+    item: string;
+    timeAllocation: number;
+  }>;
+  preparation?: string;
+  hostName: string;
+}): Promise<{
+  subject: string;
+  htmlContent: string;
+  textContent: string;
+  calendarDescription: string;
+}> {
+  const prompt = `As a professional communication expert, create meeting invitation content:
+
+Meeting Details:
+- Project: ${meetingData.projectName}
+- Title: ${meetingData.title}
+- Purpose: ${meetingData.purpose}
+- Date: ${meetingData.date}
+- Time: ${meetingData.time}
+- Duration: ${meetingData.duration} minutes
+- Location: ${meetingData.location}
+- Host: ${meetingData.hostName}
+
+Agenda:
+${meetingData.agenda.map(item => `- ${item.item} (${item.timeAllocation}min)`).join('\n')}
+
+Preparation: ${meetingData.preparation || 'None required'}
+
+Create professional invitation content that:
+1. Clearly communicates all essential details
+2. Sets expectations for participation
+3. Includes the agenda and preparation requirements
+4. Uses a professional, engaging tone
+5. Provides both HTML and text versions
+6. Includes appropriate calendar description
+
+Return as JSON:
+{
+  "subject": "email subject line",
+  "htmlContent": "formatted HTML email content",
+  "textContent": "plain text email content",
+  "calendarDescription": "brief description for calendar invite"
+}`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+  });
+
+  return JSON.parse(response.choices[0].message.content || "{}");
+}

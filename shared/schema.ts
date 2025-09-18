@@ -46,6 +46,15 @@ export const permissionsSchema = z.object({
   canEditCommunications: z.boolean().default(false),
   canDeleteCommunications: z.boolean().default(false),
   
+  // Meeting Management - granular CRUD operations and scheduling
+  canSeeMeetings: z.boolean().default(false),
+  canModifyMeetings: z.boolean().default(false),
+  canEditMeetings: z.boolean().default(false),
+  canDeleteMeetings: z.boolean().default(false),
+  canScheduleMeetings: z.boolean().default(false),
+  canSendMeetingInvites: z.boolean().default(false),
+  canGenerateMeetingAgendas: z.boolean().default(false),
+  
   // Survey Management - granular CRUD operations
   canSeeSurveys: z.boolean().default(false),
   canModifySurveys: z.boolean().default(false),
@@ -276,7 +285,7 @@ export const communicationTemplates = pgTable("communication_templates", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
-  category: text("category").notNull(), // flyer, email, meeting_agenda, newsletter
+  category: text("category").notNull(), // flyer, email, meeting_agenda, newsletter, meeting
   templateType: text("template_type").notNull(), // company_approved, custom, system_default
   content: text("content").notNull(),
   metadata: jsonb("metadata").default({}), // Template-specific metadata like color schemes, fonts, etc.
@@ -291,7 +300,7 @@ export const communicationTemplates = pgTable("communication_templates", {
 export const communications = pgTable("communications", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
-  type: text("type").notNull(), // flyer, group_email, point_to_point_email, meeting_prompt
+  type: text("type").notNull(), // flyer, group_email, point_to_point_email, meeting_prompt, meeting
   title: text("title").notNull(),
   content: text("content").notNull(),
   targetAudience: text("target_audience").array().default([]),
@@ -309,6 +318,16 @@ export const communications = pgTable("communications", {
   meetingWhen: timestamp("meeting_when"), // When the meeting is scheduled
   meetingWhere: text("meeting_where"), // Where the meeting will take place
   meetingWhy: text("meeting_why"), // Why the meeting is necessary
+  // Enhanced meeting fields
+  meetingType: text("meeting_type"), // status, planning, review, decision, brainstorming
+  meetingDuration: integer("meeting_duration"), // Duration in minutes
+  meetingTimezone: text("meeting_timezone"), // Timezone for the meeting
+  meetingLocation: text("meeting_location"), // Physical location or virtual meeting link
+  meetingAgenda: jsonb("meeting_agenda").default([]), // Array of agenda items with time allocations
+  meetingObjectives: text("meeting_objectives").array().default([]), // Meeting objectives
+  meetingOutcomes: text("meeting_outcomes"), // Meeting outcomes/decisions (post-meeting)
+  meetingPreparation: text("meeting_preparation"), // What participants should prepare
+  meetingRecurrencePattern: text("meeting_recurrence_pattern"), // none, daily, weekly, monthly, custom
   // GPT-generated content tracking
   isGptGenerated: boolean("is_gpt_generated").notNull().default(false),
   gptPromptUsed: text("gpt_prompt_used"), // Original prompt if GPT-generated

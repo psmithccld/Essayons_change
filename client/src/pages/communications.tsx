@@ -32,7 +32,12 @@ import {
   Send,
   Bot,
   Save,
-  Trash2
+  Trash2,
+  CalendarPlus,
+  MapPin,
+  Users2,
+  Timer,
+  CheckSquare
 } from "lucide-react";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -773,6 +778,921 @@ function P2PEmailsExecutionModule() {
             )}
           </DialogContent>
         </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Meetings Execution Module Component
+function MeetingsExecutionModule() {
+  const { currentProject } = useCurrentProject();
+  const [activeView, setActiveView] = useState<'repository' | 'create' | 'manage'>('repository');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showAgendaModal, setShowAgendaModal] = useState(false);
+  const [currentMeeting, setCurrentMeeting] = useState<Communication | null>(null);
+  const [isGeneratingAgenda, setIsGeneratingAgenda] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedRaidLogs, setSelectedRaidLogs] = useState<string[]>([]);
+  const { toast } = useToast();
+
+  // Meeting form state - 5Ws Capture System
+  const [meetingWho, setMeetingWho] = useState<{ participants: Array<{ name: string; role: string; email?: string }> }>({
+    participants: []
+  });
+  const [meetingWhat, setMeetingWhat] = useState({
+    title: '',
+    purpose: '',
+    objectives: [] as string[],
+    expectedOutcomes: ''
+  });
+  const [meetingWhen, setMeetingWhen] = useState({
+    date: '',
+    time: '',
+    duration: 60,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+  });
+  const [meetingWhere, setMeetingWhere] = useState({
+    locationType: 'virtual' as 'physical' | 'virtual' | 'hybrid',
+    physicalAddress: '',
+    virtualLink: '',
+    dialInDetails: ''
+  });
+  const [meetingWhy, setMeetingWhy] = useState({
+    context: '',
+    urgency: 'normal' as 'low' | 'normal' | 'high' | 'critical',
+    projectRelation: '',
+    decisionRequired: false
+  });
+
+  // Generated agenda state
+  const [generatedAgenda, setGeneratedAgenda] = useState<{
+    agenda: Array<{
+      item: string;
+      timeAllocation: number;
+      owner: string;
+      type: string;
+    }>;
+    meetingStructure: {
+      opening: string;
+      mainTopics: string[];
+      closing: string;
+    };
+    preparationNotes: string[];
+    bestPractices: string[];
+  } | null>(null);
+
+  // Meeting type
+  const [meetingType, setMeetingType] = useState<'status' | 'planning' | 'review' | 'decision' | 'brainstorming'>('status');
+
+  // Fetch communications filtered for meetings
+  const { data: communications = [], isLoading: communicationsLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'communications'],
+    enabled: !!currentProject?.id
+  });
+
+  const meetings = communications.filter((comm: Communication) => comm.type === 'meeting');
+
+  // Fetch stakeholders for participant selection
+  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
+    enabled: !!currentProject?.id
+  });
+
+  // Fetch RAID logs for context integration
+  const { data: raidLogs = [], isLoading: raidLogsLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'raid-logs'],
+    enabled: !!currentProject?.id
+  });
+
+  // Create meeting mutation
+  const createMeetingMutation = useMutation({
+    mutationFn: (data: any) => apiRequest(`/api/projects/${currentProject?.id}/communications`, {
+      method: 'POST',
+      body: {
+        ...data,
+        type: 'meeting',
+        status: 'draft'
+      }
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      toast({ title: "Meeting created successfully" });
+      setShowCreateModal(false);
+      resetMeetingForm();
+    },
+    onError: () => {
+      toast({ title: "Failed to create meeting", variant: "destructive" });
+    }
+  });
+
+  // Generate meeting agenda mutation
+  const generateAgendaMutation = useMutation({
+    mutationFn: (data: any) => apiRequest('/api/gpt/generate-meeting-agenda', {
+      method: 'POST',
+      body: data
+    }),
+    onSuccess: (agendaData) => {
+      setGeneratedAgenda(agendaData);
+      setIsGeneratingAgenda(false);
+      toast({ title: "Meeting agenda generated successfully" });
+    },
+    onError: () => {
+      setIsGeneratingAgenda(false);
+      toast({ title: "Failed to generate meeting agenda", variant: "destructive" });
+    }
+  });
+
+  // Send meeting invites mutation
+  const sendInvitesMutation = useMutation({
+    mutationFn: ({ meetingId, recipients, meetingData, dryRun }: {
+      meetingId: string;
+      recipients: Array<{ email: string; name: string; role?: string }>;
+      meetingData: any;
+      dryRun?: boolean;
+    }) => apiRequest(`/api/communications/${meetingId}/send-meeting-invites`, {
+      method: 'POST',
+      body: { recipients, meetingData, dryRun: dryRun || false }
+    }),
+    onSuccess: (data, { dryRun }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      
+      if (dryRun) {
+        toast({ 
+          title: "Dry Run Complete", 
+          description: "Meeting invites preview generated successfully. No invites were actually sent.",
+          variant: "default"
+        });
+      } else {
+        toast({ 
+          title: "Meeting Invites Sent", 
+          description: `Invites successfully sent to ${data.distributionResult?.sent || 0} participants.`
+        });
+      }
+      
+      setShowInviteModal(false);
+      setCurrentMeeting(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to send meeting invites", variant: "destructive" });
+    }
+  });
+
+  const resetMeetingForm = () => {
+    setMeetingWho({ participants: [] });
+    setMeetingWhat({ title: '', purpose: '', objectives: [], expectedOutcomes: '' });
+    setMeetingWhen({ date: '', time: '', duration: 60, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+    setMeetingWhere({ locationType: 'virtual', physicalAddress: '', virtualLink: '', dialInDetails: '' });
+    setMeetingWhy({ context: '', urgency: 'normal', projectRelation: '', decisionRequired: false });
+    setGeneratedAgenda(null);
+    setSelectedRaidLogs([]);
+  };
+
+  const handleGenerateAgenda = () => {
+    if (!meetingWhat.title || !meetingWhat.purpose || meetingWho.participants.length === 0) {
+      toast({ title: "Please fill in meeting basics before generating agenda", variant: "destructive" });
+      return;
+    }
+
+    setIsGeneratingAgenda(true);
+    
+    const agendaData = {
+      projectName: currentProject?.name || 'Project',
+      meetingType,
+      meetingPurpose: meetingWhat.purpose,
+      duration: meetingWhen.duration,
+      participants: meetingWho.participants,
+      objectives: meetingWhat.objectives,
+      raidLogContext: selectedRaidLogs.map(id => {
+        const raidLog = raidLogs.find((log: any) => log.id === id);
+        return raidLog ? {
+          id: raidLog.id,
+          title: raidLog.title,
+          type: raidLog.type,
+          description: raidLog.description
+        } : null;
+      }).filter(Boolean)
+    };
+
+    generateAgendaMutation.mutate(agendaData);
+  };
+
+  const handleCreateMeeting = () => {
+    if (!meetingWhat.title || !meetingWhat.purpose || !meetingWhen.date || !meetingWhen.time) {
+      toast({ title: "Please fill in all required meeting details", variant: "destructive" });
+      return;
+    }
+
+    const meetingData = {
+      title: meetingWhat.title,
+      content: meetingWhat.purpose,
+      targetAudience: meetingWho.participants.map(p => p.name),
+      meetingWhen: new Date(`${meetingWhen.date}T${meetingWhen.time}`),
+      meetingWhere: meetingWhere.locationType === 'physical' ? meetingWhere.physicalAddress : 
+                   meetingWhere.locationType === 'virtual' ? meetingWhere.virtualLink :
+                   `${meetingWhere.physicalAddress} / ${meetingWhere.virtualLink}`,
+      meetingDuration: meetingWhen.duration,
+      meetingTimezone: meetingWhen.timezone,
+      meetingType,
+      meetingObjectives: meetingWhat.objectives,
+      meetingAgenda: generatedAgenda?.agenda || [],
+      meetingParticipants: meetingWho.participants,
+      meetingContext: meetingWhy.context,
+      meetingUrgency: meetingWhy.urgency
+    };
+
+    createMeetingMutation.mutate(meetingData);
+  };
+
+  const handleSendInvites = (meeting: Communication) => {
+    if (!meeting.meetingParticipants || meeting.meetingParticipants.length === 0) {
+      toast({ title: "No participants found for this meeting", variant: "destructive" });
+      return;
+    }
+
+    const startTime = meeting.meetingWhen ? new Date(meeting.meetingWhen) : new Date();
+    const endTime = new Date(startTime.getTime() + (meeting.meetingDuration || 60) * 60000);
+
+    const meetingData = {
+      title: meeting.title,
+      description: meeting.content || '',
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      location: meeting.meetingWhere || 'TBD',
+      organizerName: 'Meeting Organizer', // Should be current user name
+      organizerEmail: 'organizer@changemanagement.com', // Should be current user email
+      agenda: meeting.meetingAgenda || [],
+      preparation: meeting.meetingPreparation,
+      projectName: currentProject?.name || 'Project'
+    };
+
+    const recipients = meeting.meetingParticipants.map((p: any) => ({
+      email: p.email || `${p.name.toLowerCase().replace(/\s+/g, '.')}@company.com`,
+      name: p.name,
+      role: p.role
+    }));
+
+    sendInvitesMutation.mutate({
+      meetingId: meeting.id,
+      recipients,
+      meetingData,
+      dryRun: false
+    });
+  };
+
+  const filteredMeetings = meetings.filter((meeting: Communication) => {
+    const matchesSearch = meeting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         meeting.content?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || meeting.meetingType === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  return (
+    <Card className="border-2 border-red-100" data-testid="meetings-execution-module">
+      <CardHeader className="bg-gradient-to-r from-red-50 to-red-100 border-b border-red-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="bg-red-600 p-2 rounded-lg">
+              <Calendar className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-red-800">Meeting Management</CardTitle>
+              <p className="text-red-600 text-sm">AI-powered meeting planning and execution</p>
+            </div>
+          </div>
+          <Badge variant="secondary" className="bg-red-100 text-red-700">
+            {meetings.length} Meetings
+          </Badge>
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-6">
+        <Tabs value={activeView} onValueChange={(value: any) => setActiveView(value)} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="repository" data-testid="repository-tab" className="flex items-center space-x-2">
+              <FileText className="h-4 w-4" />
+              <span>Repository</span>
+            </TabsTrigger>
+            <TabsTrigger value="create" data-testid="create-tab" className="flex items-center space-x-2">
+              <CalendarPlus className="h-4 w-4" />
+              <span>Create</span>
+            </TabsTrigger>
+            <TabsTrigger value="manage" data-testid="manage-tab" className="flex items-center space-x-2">
+              <Settings className="h-4 w-4" />
+              <span>Manage</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Meeting Repository View */}
+          <TabsContent value="repository" className="space-y-6" data-testid="repository-content">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Input 
+                  placeholder="Search meetings..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="max-w-sm"
+                  data-testid="search-meetings"
+                />
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="w-48" data-testid="category-filter">
+                    <SelectValue placeholder="Filter by type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="status">Status Meetings</SelectItem>
+                    <SelectItem value="planning">Planning Meetings</SelectItem>
+                    <SelectItem value="review">Review Meetings</SelectItem>
+                    <SelectItem value="decision">Decision Meetings</SelectItem>
+                    <SelectItem value="brainstorming">Brainstorming</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button 
+                onClick={() => setShowCreateModal(true)}
+                className="bg-red-600 hover:bg-red-700 text-white"
+                data-testid="create-meeting-button"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Schedule Meeting
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {communicationsLoading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <Card key={i} className="p-4">
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-3 w-1/2 mb-2" />
+                    <Skeleton className="h-3 w-full" />
+                  </Card>
+                ))
+              ) : filteredMeetings.length > 0 ? (
+                filteredMeetings.map((meeting: Communication) => (
+                  <Card key={meeting.id} className="p-4 hover:shadow-md transition-shadow" data-testid={`meeting-card-${meeting.id}`}>
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between">
+                        <h4 className="font-medium text-sm truncate" data-testid={`meeting-title-${meeting.id}`}>
+                          {meeting.title}
+                        </h4>
+                        <Badge 
+                          variant={meeting.status === 'sent' ? 'default' : 'secondary'}
+                          className="text-xs"
+                          data-testid={`meeting-status-${meeting.id}`}
+                        >
+                          {meeting.status}
+                        </Badge>
+                      </div>
+                      
+                      <div className="space-y-2 text-xs text-gray-600">
+                        {meeting.meetingWhen && (
+                          <div className="flex items-center space-x-1">
+                            <Clock className="h-3 w-3" />
+                            <span data-testid={`meeting-time-${meeting.id}`}>
+                              {new Date(meeting.meetingWhen).toLocaleDateString()} at {new Date(meeting.meetingWhen).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center space-x-1">
+                          <MapPin className="h-3 w-3" />
+                          <span className="truncate" data-testid={`meeting-location-${meeting.id}`}>
+                            {meeting.meetingWhere || 'Location TBD'}
+                          </span>
+                        </div>
+                        
+                        {meeting.meetingParticipants && (
+                          <div className="flex items-center space-x-1">
+                            <Users2 className="h-3 w-3" />
+                            <span data-testid={`meeting-participants-${meeting.id}`}>
+                              {meeting.meetingParticipants.length} participants
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center space-x-1">
+                          <Timer className="h-3 w-3" />
+                          <span data-testid={`meeting-duration-${meeting.id}`}>
+                            {meeting.meetingDuration || 60} minutes
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCurrentMeeting(meeting);
+                            setShowAgendaModal(true);
+                          }}
+                          data-testid={`view-agenda-${meeting.id}`}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                        
+                        {meeting.status === 'draft' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSendInvites(meeting)}
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                            data-testid={`send-invites-${meeting.id}`}
+                          >
+                            <Send className="h-3 w-3 mr-1" />
+                            Send Invites
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-8 text-gray-500" data-testid="no-meetings-message">
+                  <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No meetings found</p>
+                  <p className="text-sm">Create your first meeting to get started</p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Meeting Creation View - 5Ws Capture System */}
+          <TabsContent value="create" className="space-y-6" data-testid="create-meeting-content">
+            <Card className="p-6">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Schedule New Meeting</h3>
+                  <div className="flex items-center space-x-2">
+                    <Button 
+                      variant="outline"
+                      onClick={handleGenerateAgenda}
+                      disabled={isGeneratingAgenda || !meetingWhat.purpose}
+                      data-testid="generate-agenda-button"
+                    >
+                      <Bot className="h-4 w-4 mr-2" />
+                      {isGeneratingAgenda ? 'Generating...' : 'AI Agenda'}
+                    </Button>
+                    <Button 
+                      onClick={handleCreateMeeting}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                      data-testid="create-meeting-submit"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      Schedule Meeting
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 5Ws Meeting Capture System */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  
+                  {/* WHO - Participants */}
+                  <Card className="p-4 border-blue-200 bg-blue-50">
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <Users2 className="h-5 w-5 text-blue-600" />
+                        <h4 className="font-medium text-blue-800">WHO - Participants</h4>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Meeting Type</Label>
+                        <Select value={meetingType} onValueChange={(value: any) => setMeetingType(value)}>
+                          <SelectTrigger data-testid="meeting-type-select">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="status">Status Meeting</SelectItem>
+                            <SelectItem value="planning">Planning Meeting</SelectItem>
+                            <SelectItem value="review">Review Meeting</SelectItem>
+                            <SelectItem value="decision">Decision Meeting</SelectItem>
+                            <SelectItem value="brainstorming">Brainstorming Session</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Add Participants</Label>
+                        {stakeholdersLoading ? (
+                          <Skeleton className="h-10 w-full" />
+                        ) : (
+                          <div className="space-y-2">
+                            {stakeholders.map((stakeholder: Stakeholder) => (
+                              <div key={stakeholder.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  checked={meetingWho.participants.some(p => p.name === stakeholder.name)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setMeetingWho(prev => ({
+                                        participants: [...prev.participants, {
+                                          name: stakeholder.name,
+                                          role: stakeholder.role,
+                                          email: stakeholder.email
+                                        }]
+                                      }));
+                                    } else {
+                                      setMeetingWho(prev => ({
+                                        participants: prev.participants.filter(p => p.name !== stakeholder.name)
+                                      }));
+                                    }
+                                  }}
+                                  data-testid={`participant-checkbox-${stakeholder.id}`}
+                                />
+                                <span className="text-sm">{stakeholder.name} ({stakeholder.role})</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-500">
+                          Selected: {meetingWho.participants.length} participants
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* WHAT - Purpose & Objectives */}
+                  <Card className="p-4 border-green-200 bg-green-50">
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <Target className="h-5 w-5 text-green-600" />
+                        <h4 className="font-medium text-green-800">WHAT - Purpose & Objectives</h4>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Meeting Title *</Label>
+                        <Input
+                          value={meetingWhat.title}
+                          onChange={(e) => setMeetingWhat(prev => ({ ...prev, title: e.target.value }))}
+                          placeholder="Enter meeting title"
+                          data-testid="meeting-title-input"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Meeting Purpose *</Label>
+                        <Textarea
+                          value={meetingWhat.purpose}
+                          onChange={(e) => setMeetingWhat(prev => ({ ...prev, purpose: e.target.value }))}
+                          placeholder="Describe the main purpose of this meeting"
+                          rows={3}
+                          data-testid="meeting-purpose-input"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Objectives</Label>
+                        <div className="space-y-2">
+                          {meetingWhat.objectives.map((objective, index) => (
+                            <div key={index} className="flex items-center space-x-2">
+                              <Input
+                                value={objective}
+                                onChange={(e) => {
+                                  const newObjectives = [...meetingWhat.objectives];
+                                  newObjectives[index] = e.target.value;
+                                  setMeetingWhat(prev => ({ ...prev, objectives: newObjectives }));
+                                }}
+                                placeholder={`Objective ${index + 1}`}
+                                data-testid={`objective-input-${index}`}
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const newObjectives = meetingWhat.objectives.filter((_, i) => i !== index);
+                                  setMeetingWhat(prev => ({ ...prev, objectives: newObjectives }));
+                                }}
+                                data-testid={`remove-objective-${index}`}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setMeetingWhat(prev => ({ ...prev, objectives: [...prev.objectives, ''] }))}
+                            data-testid="add-objective"
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add Objective
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* WHEN - Date & Time */}
+                  <Card className="p-4 border-purple-200 bg-purple-50">
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <Clock className="h-5 w-5 text-purple-600" />
+                        <h4 className="font-medium text-purple-800">WHEN - Date & Time</h4>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Date *</Label>
+                          <Input
+                            type="date"
+                            value={meetingWhen.date}
+                            onChange={(e) => setMeetingWhen(prev => ({ ...prev, date: e.target.value }))}
+                            data-testid="meeting-date-input"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Time *</Label>
+                          <Input
+                            type="time"
+                            value={meetingWhen.time}
+                            onChange={(e) => setMeetingWhen(prev => ({ ...prev, time: e.target.value }))}
+                            data-testid="meeting-time-input"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Duration (minutes)</Label>
+                          <Select 
+                            value={meetingWhen.duration.toString()} 
+                            onValueChange={(value) => setMeetingWhen(prev => ({ ...prev, duration: parseInt(value) }))}
+                          >
+                            <SelectTrigger data-testid="meeting-duration-select">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="15">15 minutes</SelectItem>
+                              <SelectItem value="30">30 minutes</SelectItem>
+                              <SelectItem value="45">45 minutes</SelectItem>
+                              <SelectItem value="60">1 hour</SelectItem>
+                              <SelectItem value="90">1.5 hours</SelectItem>
+                              <SelectItem value="120">2 hours</SelectItem>
+                              <SelectItem value="180">3 hours</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Timezone</Label>
+                          <Input
+                            value={meetingWhen.timezone}
+                            onChange={(e) => setMeetingWhen(prev => ({ ...prev, timezone: e.target.value }))}
+                            placeholder="Timezone"
+                            data-testid="meeting-timezone-input"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* WHERE - Location */}
+                  <Card className="p-4 border-orange-200 bg-orange-50">
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <MapPin className="h-5 w-5 text-orange-600" />
+                        <h4 className="font-medium text-orange-800">WHERE - Location</h4>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Location Type</Label>
+                        <Select 
+                          value={meetingWhere.locationType} 
+                          onValueChange={(value: any) => setMeetingWhere(prev => ({ ...prev, locationType: value }))}
+                        >
+                          <SelectTrigger data-testid="location-type-select">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="physical">Physical Location</SelectItem>
+                            <SelectItem value="virtual">Virtual Meeting</SelectItem>
+                            <SelectItem value="hybrid">Hybrid (Physical + Virtual)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {(meetingWhere.locationType === 'physical' || meetingWhere.locationType === 'hybrid') && (
+                        <div className="space-y-2">
+                          <Label>Physical Address</Label>
+                          <Textarea
+                            value={meetingWhere.physicalAddress}
+                            onChange={(e) => setMeetingWhere(prev => ({ ...prev, physicalAddress: e.target.value }))}
+                            placeholder="Enter physical meeting location"
+                            rows={2}
+                            data-testid="physical-address-input"
+                          />
+                        </div>
+                      )}
+
+                      {(meetingWhere.locationType === 'virtual' || meetingWhere.locationType === 'hybrid') && (
+                        <div className="space-y-2">
+                          <Label>Virtual Meeting Link</Label>
+                          <Input
+                            value={meetingWhere.virtualLink}
+                            onChange={(e) => setMeetingWhere(prev => ({ ...prev, virtualLink: e.target.value }))}
+                            placeholder="Teams, Zoom, or other virtual meeting link"
+                            data-testid="virtual-link-input"
+                          />
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <Label>Dial-in Details (Optional)</Label>
+                        <Textarea
+                          value={meetingWhere.dialInDetails}
+                          onChange={(e) => setMeetingWhere(prev => ({ ...prev, dialInDetails: e.target.value }))}
+                          placeholder="Phone number, access codes, etc."
+                          rows={2}
+                          data-testid="dial-in-details-input"
+                        />
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* WHY - Context & RAID Integration */}
+                  <Card className="p-4 border-red-200 bg-red-50 lg:col-span-2">
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <AlertTriangle className="h-5 w-5 text-red-600" />
+                        <h4 className="font-medium text-red-800">WHY - Context & Integration</h4>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Meeting Context</Label>
+                          <Textarea
+                            value={meetingWhy.context}
+                            onChange={(e) => setMeetingWhy(prev => ({ ...prev, context: e.target.value }))}
+                            placeholder="Background information, previous discussions, etc."
+                            rows={3}
+                            data-testid="meeting-context-input"
+                          />
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Urgency Level</Label>
+                            <Select 
+                              value={meetingWhy.urgency} 
+                              onValueChange={(value: any) => setMeetingWhy(prev => ({ ...prev, urgency: value }))}
+                            >
+                              <SelectTrigger data-testid="meeting-urgency-select">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="low">Low</SelectItem>
+                                <SelectItem value="normal">Normal</SelectItem>
+                                <SelectItem value="high">High</SelectItem>
+                                <SelectItem value="critical">Critical</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              checked={meetingWhy.decisionRequired}
+                              onCheckedChange={(checked) => setMeetingWhy(prev => ({ ...prev, decisionRequired: !!checked }))}
+                              data-testid="decision-required-checkbox"
+                            />
+                            <Label>Decision Required</Label>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* RAID Logs Integration */}
+                      {!raidLogsLoading && raidLogs.length > 0 && (
+                        <div className="space-y-2">
+                          <Label>Related RAID Items (Optional)</Label>
+                          <div className="max-h-32 overflow-y-auto border rounded p-2 space-y-1">
+                            {raidLogs.map((raidLog: any) => (
+                              <div key={raidLog.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  checked={selectedRaidLogs.includes(raidLog.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedRaidLogs(prev => [...prev, raidLog.id]);
+                                    } else {
+                                      setSelectedRaidLogs(prev => prev.filter(id => id !== raidLog.id));
+                                    }
+                                  }}
+                                  data-testid={`raid-checkbox-${raidLog.id}`}
+                                />
+                                <span className="text-sm">
+                                  <Badge variant="outline" className="mr-1">{raidLog.type}</Badge>
+                                  {raidLog.title}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                </div>
+
+                {/* Generated Agenda Display */}
+                {generatedAgenda && (
+                  <Card className="p-4 border-green-200 bg-green-50">
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <CheckSquare className="h-5 w-5 text-green-600" />
+                        <h4 className="font-medium text-green-800">AI-Generated Meeting Agenda</h4>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <h5 className="font-medium mb-2">Agenda Items</h5>
+                            <div className="space-y-2">
+                              {generatedAgenda.agenda.map((item, index) => (
+                                <div key={index} className="bg-white p-2 rounded border">
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">{item.item}</span>
+                                    <Badge variant="outline" className="text-xs">{item.timeAllocation}min</Badge>
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    Owner: {item.owner} | Type: {item.type}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-4">
+                            <div>
+                              <h5 className="font-medium mb-2">Meeting Structure</h5>
+                              <div className="bg-white p-2 rounded border text-sm">
+                                <div><strong>Opening:</strong> {generatedAgenda.meetingStructure.opening}</div>
+                                <div className="mt-1"><strong>Main Topics:</strong> {generatedAgenda.meetingStructure.mainTopics.join(', ')}</div>
+                                <div className="mt-1"><strong>Closing:</strong> {generatedAgenda.meetingStructure.closing}</div>
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <h5 className="font-medium mb-2">Preparation Notes</h5>
+                              <div className="bg-white p-2 rounded border text-sm">
+                                <ul className="list-disc pl-4 space-y-1">
+                                  {generatedAgenda.preparationNotes.map((note, index) => (
+                                    <li key={index}>{note}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <h5 className="font-medium mb-2">Best Practices</h5>
+                          <div className="bg-white p-2 rounded border text-sm">
+                            <ul className="list-disc pl-4 space-y-1">
+                              {generatedAgenda.bestPractices.map((practice, index) => (
+                                <li key={index}>{practice}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+              </div>
+            </Card>
+          </TabsContent>
+
+          {/* Meeting Management View */}
+          <TabsContent value="manage" className="space-y-6" data-testid="manage-meetings-content">
+            <Card className="p-6">
+              <h3 className="text-lg font-medium mb-4">Meeting Management</h3>
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <Card className="p-4 text-center">
+                    <Calendar className="h-8 w-8 mx-auto mb-2 text-red-600" />
+                    <h4 className="font-medium">Total Meetings</h4>
+                    <p className="text-2xl font-bold text-red-600">{meetings.length}</p>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                    <h4 className="font-medium">Completed</h4>
+                    <p className="text-2xl font-bold text-green-600">
+                      {meetings.filter((m: Communication) => m.status === 'sent').length}
+                    </p>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <Clock className="h-8 w-8 mx-auto mb-2 text-yellow-600" />
+                    <h4 className="font-medium">Pending</h4>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {meetings.filter((m: Communication) => m.status === 'draft').length}
+                    </p>
+                  </Card>
+                </div>
+                
+                <div className="text-center py-8 text-gray-500">
+                  <p>Meeting analytics and management features coming soon</p>
+                </div>
+              </div>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
@@ -3113,9 +4033,10 @@ export default function Communications() {
               <ChannelPreferences />
             </TabsContent>
 
-            {/* Execution Tab Content (P2P Emails, Group Emails, and Flyers Implementation) */}
+            {/* Execution Tab Content (Meetings, P2P Emails, Group Emails, and Flyers Implementation) */}
             <TabsContent value="execution" className="space-y-6" data-testid="execution-content">
               <div className="space-y-6">
+                <MeetingsExecutionModule />
                 <P2PEmailsExecutionModule />
                 <GroupEmailsExecutionModule />
                 <FlyersExecutionModule />
