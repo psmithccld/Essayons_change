@@ -271,15 +271,88 @@ export const raidLogs = pgTable("raid_logs", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Communication Templates Repository
+export const communicationTemplates = pgTable("communication_templates", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // flyer, email, meeting_agenda, newsletter
+  templateType: text("template_type").notNull(), // company_approved, custom, system_default
+  content: text("content").notNull(),
+  metadata: jsonb("metadata").default({}), // Template-specific metadata like color schemes, fonts, etc.
+  tags: text("tags").array().default([]), // For categorization and search
+  isActive: boolean("is_active").notNull().default(true),
+  usageCount: integer("usage_count").default(0), // Track how often template is used
+  createdById: uuid("created_by_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const communications = pgTable("communications", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
-  type: text("type").notNull(), // flyer, company_email, point_to_point_email, meeting_prompt
+  type: text("type").notNull(), // flyer, group_email, point_to_point_email, meeting_prompt
   title: text("title").notNull(),
   content: text("content").notNull(),
   targetAudience: text("target_audience").array().default([]),
   sendDate: timestamp("send_date"),
   status: text("status").notNull().default("draft"), // draft, scheduled, sent
+  // Enhanced fields for comprehensive communications
+  channelPreferences: jsonb("channel_preferences").default({}), // {flyers: boolean, groupEmails: boolean, p2pEmails: boolean, meetings: boolean}
+  visibilitySettings: text("visibility_settings").default("public"), // public, private (for P2P emails)
+  distributionMethod: text("distribution_method"), // email, print, digital_display, meeting
+  raidLogReferences: text("raid_log_references").array().default([]), // References to related RAID log entries
+  exportOptions: jsonb("export_options").default({}), // {powerpoint: boolean, canva: boolean, pdf: boolean}
+  // Meeting-specific data (5Ws)
+  meetingWho: text("meeting_who"), // Who should attend
+  meetingWhat: text("meeting_what"), // What will be discussed
+  meetingWhen: timestamp("meeting_when"), // When the meeting is scheduled
+  meetingWhere: text("meeting_where"), // Where the meeting will take place
+  meetingWhy: text("meeting_why"), // Why the meeting is necessary
+  // GPT-generated content tracking
+  isGptGenerated: boolean("is_gpt_generated").notNull().default(false),
+  gptPromptUsed: text("gpt_prompt_used"), // Original prompt if GPT-generated
+  gptInteractionId: uuid("gpt_interaction_id").references(() => gptInteractions.id, { onDelete: "set null" }), // Link to GPT interaction
+  templateId: uuid("template_id").references(() => communicationTemplates.id, { onDelete: "set null" }), // Reference to template used
+  createdById: uuid("created_by_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Communication Recipients tracking
+export const communicationRecipients = pgTable("communication_recipients", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  communicationId: uuid("communication_id").references(() => communications.id, { onDelete: "cascade" }).notNull(),
+  recipientType: text("recipient_type").notNull(), // internal_user, external_email, stakeholder
+  recipientUserId: uuid("recipient_user_id").references(() => users.id, { onDelete: "set null" }), // For internal users
+  recipientEmail: text("recipient_email"), // For external recipients
+  recipientName: text("recipient_name"),
+  recipientRole: text("recipient_role"), // Role or title of recipient
+  deliveryStatus: text("delivery_status").notNull().default("pending"), // pending, sent, delivered, failed, bounced
+  openedAt: timestamp("opened_at"), // Email open tracking
+  clickedAt: timestamp("clicked_at"), // Click tracking
+  respondedAt: timestamp("responded_at"), // Response tracking
+  notes: text("notes"), // Additional notes about this recipient
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Communication Strategy for phase-based guidance
+export const communicationStrategy = pgTable("communication_strategy", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
+  phase: text("phase").notNull(), // identify_need, develop_solution, implement_change, sustain_change, evaluate_results
+  strategyName: text("strategy_name").notNull(),
+  description: text("description"),
+  targetAudiences: jsonb("target_audiences").default([]), // Array of audience objects
+  keyMessages: jsonb("key_messages").default([]), // Array of key message objects
+  communicationChannels: text("communication_channels").array().default([]), // email, meeting, flyer, etc.
+  frequency: text("frequency"), // daily, weekly, monthly, as_needed
+  stakeholderMapping: jsonb("stakeholder_mapping").default({}), // Map stakeholders to communication preferences
+  resistancePoints: jsonb("resistance_points").default([]), // Identified resistance points and mitigation strategies
+  successMetrics: jsonb("success_metrics").default([]), // How to measure communication effectiveness
+  timeline: jsonb("timeline").default({}), // Communication timeline and milestones
+  isActive: boolean("is_active").notNull().default(true),
   createdById: uuid("created_by_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -421,6 +494,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   createdProcessMaps: many(processMaps),
   initiativeAssignments: many(userInitiativeAssignments, { relationName: "userAssignments" }),
   assignedInitiatives: many(userInitiativeAssignments, { relationName: "assignedBy" }),
+  // Communication Module Relations
+  createdCommunicationTemplates: many(communicationTemplates),
+  communicationRecipients: many(communicationRecipients),
+  createdCommunicationStrategies: many(communicationStrategy),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -437,6 +514,8 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   milestones: many(milestones),
   processMaps: many(processMaps),
   userAssignments: many(userInitiativeAssignments),
+  // Communication Module Relations
+  communicationStrategies: many(communicationStrategy),
 }));
 
 export const userInitiativeAssignmentsRelations = relations(userInitiativeAssignments, ({ one }) => ({
@@ -491,13 +570,56 @@ export const raidLogsRelations = relations(raidLogs, ({ one }) => ({
   }),
 }));
 
-export const communicationsRelations = relations(communications, ({ one }) => ({
+// Communication Templates Relations
+export const communicationTemplatesRelations = relations(communicationTemplates, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [communicationTemplates.createdById],
+    references: [users.id],
+  }),
+  communications: many(communications), // Communications that use this template
+}));
+
+// Communications Relations (Enhanced)
+export const communicationsRelations = relations(communications, ({ one, many }) => ({
   project: one(projects, {
     fields: [communications.projectId],
     references: [projects.id],
   }),
   createdBy: one(users, {
     fields: [communications.createdById],
+    references: [users.id],
+  }),
+  template: one(communicationTemplates, {
+    fields: [communications.templateId],
+    references: [communicationTemplates.id],
+  }),
+  gptInteraction: one(gptInteractions, {
+    fields: [communications.gptInteractionId],
+    references: [gptInteractions.id],
+  }),
+  recipients: many(communicationRecipients), // Communication recipients
+}));
+
+// Communication Recipients Relations
+export const communicationRecipientsRelations = relations(communicationRecipients, ({ one }) => ({
+  communication: one(communications, {
+    fields: [communicationRecipients.communicationId],
+    references: [communications.id],
+  }),
+  recipientUser: one(users, {
+    fields: [communicationRecipients.recipientUserId],
+    references: [users.id],
+  }),
+}));
+
+// Communication Strategy Relations
+export const communicationStrategyRelations = relations(communicationStrategy, ({ one }) => ({
+  project: one(projects, {
+    fields: [communicationStrategy.projectId],
+    references: [projects.id],
+  }),
+  createdBy: one(users, {
+    fields: [communicationStrategy.createdById],
     references: [users.id],
   }),
 }));
@@ -655,7 +777,30 @@ export const insertDeficiencySchema = insertRaidLogSchema.extend({
   probability: true, // Not used for deficiencies
 });
 
+// Communication Templates Insert Schema
+export const insertCommunicationTemplateSchema = createInsertSchema(communicationTemplates).omit({
+  id: true,
+  usageCount: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Enhanced Communications Insert Schema
 export const insertCommunicationSchema = createInsertSchema(communications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Communication Recipients Insert Schema
+export const insertCommunicationRecipientSchema = createInsertSchema(communicationRecipients).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Communication Strategy Insert Schema
+export const insertCommunicationStrategySchema = createInsertSchema(communicationStrategy).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -1096,8 +1241,21 @@ export type InsertAction = z.infer<typeof insertActionSchema>;
 export type InsertIssue = z.infer<typeof insertIssueSchema>;
 export type InsertDeficiency = z.infer<typeof insertDeficiencySchema>;
 
+// Communication Templates Types
+export type CommunicationTemplate = typeof communicationTemplates.$inferSelect;
+export type InsertCommunicationTemplate = z.infer<typeof insertCommunicationTemplateSchema>;
+
+// Enhanced Communications Types
 export type Communication = typeof communications.$inferSelect;
 export type InsertCommunication = z.infer<typeof insertCommunicationSchema>;
+
+// Communication Recipients Types
+export type CommunicationRecipient = typeof communicationRecipients.$inferSelect;
+export type InsertCommunicationRecipient = z.infer<typeof insertCommunicationRecipientSchema>;
+
+// Communication Strategy Types
+export type CommunicationStrategy = typeof communicationStrategy.$inferSelect;
+export type InsertCommunicationStrategy = z.infer<typeof insertCommunicationStrategySchema>;
 
 export type Survey = typeof surveys.$inferSelect;
 export type InsertSurvey = z.infer<typeof insertSurveySchema>;
