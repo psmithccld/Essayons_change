@@ -427,6 +427,26 @@ export const communicationStrategy = pgTable("communication_strategy", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Notifications system for user alerts
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type").notNull(), // initiative_assignment, stakeholder_added, raid_identified, phase_change
+  relatedId: uuid("related_id"), // Reference to related entity (project, stakeholder, raid log)
+  relatedType: text("related_type"), // Type of related entity (project, stakeholder, raid_log)
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  // Performance indexes for notification queries
+  userIdIdx: index("notifications_user_id_idx").on(table.userId),
+  isReadIdx: index("notifications_is_read_idx").on(table.isRead),
+  createdAtIdx: index("notifications_created_at_idx").on(table.createdAt),
+  // Composite index for common queries (user's unread notifications)
+  userUnreadIdx: index("notifications_user_unread_idx").on(table.userId, table.isRead, table.createdAt),
+}));
+
 export const surveys = pgTable("surveys", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
@@ -891,6 +911,14 @@ export const insertCommunicationStrategySchema = createInsertSchema(communicatio
   updatedAt: true,
 });
 
+// Notifications Insert Schema
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  type: z.enum(['initiative_assignment', 'stakeholder_added', 'raid_identified', 'phase_change']),
+});
+
 // Base schema without refinements for operations that need .omit()
 export const baseSurveySchema = createInsertSchema(surveys).omit({
   id: true,
@@ -1345,6 +1373,10 @@ export type InsertCommunicationRecipient = z.infer<typeof insertCommunicationRec
 // Communication Strategy Types
 export type CommunicationStrategy = typeof communicationStrategy.$inferSelect;
 export type InsertCommunicationStrategy = z.infer<typeof insertCommunicationStrategySchema>;
+
+// Notifications Types
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 export type Survey = typeof surveys.$inferSelect;
 export type InsertSurvey = z.infer<typeof insertSurveySchema>;

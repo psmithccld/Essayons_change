@@ -37,8 +37,8 @@ import {
   insertMilestoneSchema, insertChecklistTemplateSchema, insertProcessMapSchema,
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema,
   insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
-  insertUserGroupMembershipSchema, insertUserPermissionSchema,
-  type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions
+  insertUserGroupMembershipSchema, insertUserPermissionSchema, insertNotificationSchema,
+  type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification
 } from "@shared/schema";
 import * as openaiService from "./openai";
 import { sendTaskAssignmentNotification, sendBulkGroupEmail, sendP2PEmail } from "./services/emailService";
@@ -486,6 +486,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Notifications endpoints
+  // GET /api/notifications - get user's notifications (unread first, with pagination)
+  app.get("/api/notifications", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const unreadOnly = req.query.unread_only === 'true';
+      
+      const result = await storage.getNotifications(userId, { limit, offset, unreadOnly });
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  // POST /api/notifications/:id/read - mark single notification as read
+  app.post("/api/notifications/:id/read", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const notificationId = req.params.id;
+      
+      const success = await storage.markNotificationAsRead(notificationId, userId);
+      if (!success) {
+        return res.status(404).json({ error: "Notification not found or access denied" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
+
+  // POST /api/notifications/mark-all-read - mark all user notifications as read
+  app.post("/api/notifications/mark-all-read", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      
+      const count = await storage.markAllNotificationsAsRead(userId);
+      res.json({ success: true, markedAsRead: count });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(500).json({ error: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // DELETE /api/notifications/:id - delete single notification
+  app.delete("/api/notifications/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const notificationId = req.params.id;
+      
+      const success = await storage.deleteNotification(notificationId, userId);
+      if (!success) {
+        return res.status(404).json({ error: "Notification not found or access denied" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+      res.status(500).json({ error: "Failed to delete notification" });
+    }
+  });
+
+  // DELETE /api/notifications/clear-all - clear all user notifications
+  app.delete("/api/notifications/clear-all", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      
+      const count = await storage.clearAllNotifications(userId);
+      res.json({ success: true, deletedCount: count });
+    } catch (error) {
+      console.error("Error clearing all notifications:", error);
+      res.status(500).json({ error: "Failed to clear all notifications" });
+    }
+  });
+
+  // GET /api/notifications/unread-count - get unread notification count
+  app.get("/api/notifications/unread-count", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      
+      const count = await storage.getUnreadNotificationCount(userId);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching unread notification count:", error);
+      res.status(500).json({ error: "Failed to fetch unread notification count" });
+    }
+  });
+
   // Users
   app.get("/api/users", requirePermission('canSeeUsers'), async (req, res) => {
     try {
@@ -566,10 +658,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateProjectSchema = insertProjectSchema.partial().omit({ id: true, ownerId: true, createdAt: true, updatedAt: true });
       const validatedData = updateProjectSchema.parse(processedData);
       
+      // Get original project to check for status changes
+      const originalProject = await storage.getProject(req.params.id);
+      if (!originalProject) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      
       const project = await storage.updateProject(req.params.id, validatedData);
       if (!project) {
         return res.status(404).json({ error: "Project not found" });
       }
+      
+      // Create notifications for assigned users if status/phase changed
+      if (validatedData.status && validatedData.status !== originalProject.status) {
+        try {
+          const assignments = await storage.getInitiativeAssignments(req.params.id);
+          if (assignments.length > 0) {
+            const notificationPromises = assignments.map(assignment => 
+              storage.createNotification({
+                userId: assignment.userId,
+                title: "Initiative Status Changed",
+                message: `The status of initiative "${project.name}" has changed from ${originalProject.status} to ${project.status}`,
+                type: "phase_change",
+                relatedId: project.id,
+                relatedType: "project"
+              })
+            );
+            
+            await Promise.all(notificationPromises);
+          }
+        } catch (notificationError) {
+          console.error("Error creating phase change notifications:", notificationError);
+          // Don't fail the project update if notification creation fails
+        }
+      }
+      
       res.json(project);
     } catch (error) {
       console.error("Error updating project:", error);
@@ -630,6 +753,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
               role: assignment.role,
               assignedById: req.userId || DEMO_USER_ID
             });
+            
+            // Create notification for the assigned user
+            try {
+              await storage.createNotification({
+                userId: assignment.userId,
+                title: "Initiative Assignment",
+                message: `You have been assigned to the copied initiative "${copiedProject.name}" as ${assignment.role}`,
+                type: "initiative_assignment",
+                relatedId: copiedProject.id,
+                relatedType: "project"
+              });
+            } catch (notificationError) {
+              console.error("Error creating assignment notification during copy:", notificationError);
+              // Don't fail the copy if notification creation fails
+            }
           }
         } catch (assignmentError) {
           console.error("Error copying assignments:", assignmentError);
@@ -1866,6 +2004,33 @@ Return the refined content in JSON format:
         projectId: req.params.projectId
       });
       const stakeholder = await storage.createStakeholder(validatedData);
+      
+      // Create notifications for project team members about new stakeholder
+      try {
+        const [project, assignments] = await Promise.all([
+          storage.getProject(req.params.projectId),
+          storage.getInitiativeAssignments(req.params.projectId)
+        ]);
+        
+        if (project && assignments.length > 0) {
+          const notificationPromises = assignments.map(assignment => 
+            storage.createNotification({
+              userId: assignment.userId,
+              title: "New Stakeholder Added",
+              message: `A new stakeholder "${stakeholder.name}" (${stakeholder.role}) has been added to the initiative "${project.name}"`,
+              type: "stakeholder_added",
+              relatedId: stakeholder.id,
+              relatedType: "stakeholder"
+            })
+          );
+          
+          await Promise.all(notificationPromises);
+        }
+      } catch (notificationError) {
+        console.error("Error creating stakeholder notifications:", notificationError);
+        // Don't fail the stakeholder creation if notification creation fails
+      }
+      
       res.status(201).json(stakeholder);
     } catch (error) {
       console.error("Error creating stakeholder:", error);
@@ -1907,6 +2072,35 @@ Return the refined content in JSON format:
       }
       
       const result = await storage.importStakeholders(req.params.projectId, sourceProjectId, stakeholderIds);
+      
+      // Create notifications for project team members about imported stakeholders
+      if (result.imported > 0) {
+        try {
+          const [project, assignments] = await Promise.all([
+            storage.getProject(req.params.projectId),
+            storage.getInitiativeAssignments(req.params.projectId)
+          ]);
+          
+          if (project && assignments.length > 0) {
+            const notificationPromises = assignments.map(assignment => 
+              storage.createNotification({
+                userId: assignment.userId,
+                title: "Stakeholders Imported",
+                message: `${result.imported} stakeholder(s) have been imported to the initiative "${project.name}"`,
+                type: "stakeholder_added",
+                relatedId: req.params.projectId,
+                relatedType: "project"
+              })
+            );
+            
+            await Promise.all(notificationPromises);
+          }
+        } catch (notificationError) {
+          console.error("Error creating stakeholder import notifications:", notificationError);
+          // Don't fail the import if notification creation fails
+        }
+      }
+      
       res.json({ imported: result.imported, skipped: result.skipped });
     } catch (error) {
       console.error("Error importing stakeholders:", error);
@@ -1957,6 +2151,26 @@ Return the refined content in JSON format:
       
       const raidLog = await storage.createRaidLog(validatedData);
       
+      // Create notification for assigned user if RAID log has an assignee
+      if (raidLog.assigneeId) {
+        try {
+          const project = await storage.getProject(req.params.projectId);
+          if (project) {
+            await storage.createNotification({
+              userId: raidLog.assigneeId,
+              title: "RAID Log Assignment",
+              message: `You have been assigned to a ${raidLog.type}: "${raidLog.title}" in the initiative "${project.name}"`,
+              type: "raid_identified",
+              relatedId: raidLog.id,
+              relatedType: "raid_log"
+            });
+          }
+        } catch (notificationError) {
+          console.error("Error creating RAID log assignment notification:", notificationError);
+          // Don't fail the RAID log creation if notification creation fails
+        }
+      }
+      
       // Apply backward compatibility mapping to response
       const normalizedRaidLog = {
         ...raidLog,
@@ -2000,9 +2214,35 @@ Return the refined content in JSON format:
         validatedData = insertRaidLogSchema.partial().parse(processedBody);
       }
       
+      // Get original RAID log to check for assignee changes
+      const originalRaidLog = await storage.getRaidLog(req.params.id);
+      if (!originalRaidLog) {
+        return res.status(404).json({ error: "RAID log not found" });
+      }
+      
       const raidLog = await storage.updateRaidLog(req.params.id, validatedData);
       if (!raidLog) {
         return res.status(404).json({ error: "RAID log not found" });
+      }
+      
+      // Create notification for new assignee if assignee was changed
+      if (validatedData.assigneeId && validatedData.assigneeId !== originalRaidLog.assigneeId) {
+        try {
+          const project = await storage.getProject(raidLog.projectId);
+          if (project) {
+            await storage.createNotification({
+              userId: validatedData.assigneeId,
+              title: "RAID Log Assignment",
+              message: `You have been assigned to a ${raidLog.type}: "${raidLog.title}" in the initiative "${project.name}"`,
+              type: "raid_identified",
+              relatedId: raidLog.id,
+              relatedType: "raid_log"
+            });
+          }
+        } catch (notificationError) {
+          console.error("Error creating RAID log assignment notification:", notificationError);
+          // Don't fail the update if notification creation fails
+        }
       }
       
       // Apply backward compatibility mapping to response
@@ -2634,6 +2874,25 @@ Return the refined content in JSON format:
       
       const validatedData = insertUserInitiativeAssignmentSchema.parse(assignmentData);
       const assignment = await storage.assignUserToInitiative(validatedData);
+      
+      // Create notification for the assigned user
+      try {
+        const project = await storage.getProject(validatedData.projectId);
+        if (project) {
+          await storage.createNotification({
+            userId: validatedData.userId,
+            title: "Initiative Assignment",
+            message: `You have been assigned to the initiative "${project.name}" as ${validatedData.role}`,
+            type: "initiative_assignment",
+            relatedId: validatedData.projectId,
+            relatedType: "project"
+          });
+        }
+      } catch (notificationError) {
+        console.error("Error creating assignment notification:", notificationError);
+        // Don't fail the assignment if notification creation fails
+      }
+      
       res.status(201).json(assignment);
     } catch (error) {
       console.error("Error creating user initiative assignment:", error);
