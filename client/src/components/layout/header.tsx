@@ -126,9 +126,16 @@ export default function Header() {
     <header className="bg-card border-b border-border px-6 py-4" data-testid="header">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-6">
-          <div>
-            <h1 className="text-2xl font-semibold text-foreground">Your Logo Here</h1>
-            <p className="text-sm text-muted-foreground">Monitor and manage organizational change initiatives</p>
+          <div className="flex items-center space-x-3">
+            <img 
+              src="/images/essayons-logo-cropped.png" 
+              alt="Essayons Change" 
+              className="h-10 w-auto"
+            />
+            <div>
+              <h1 className="text-2xl font-semibold text-foreground">Essayons Change</h1>
+              <p className="text-sm text-muted-foreground">Monitor and manage organizational change initiatives</p>
+            </div>
           </div>
           
           {/* Initiative Dropdown */}

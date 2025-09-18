@@ -234,10 +234,12 @@ export default function Sidebar() {
     <div className="flex flex-col h-full bg-card text-card-foreground border-r border-border">
       <div className="p-4 border-b border-border flex-shrink-0">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-            <Briefcase className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <h1 className="text-lg font-semibold text-foreground">Security Center</h1>
+          <img 
+            src="/images/essayons-logo-cropped.png" 
+            alt="Essayons Change" 
+            className="h-8 w-auto"
+          />
+          <h1 className="text-lg font-semibold text-foreground">Essayons Change</h1>
         </div>
       </div>
 
