@@ -438,7 +438,7 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">No assignee</SelectItem>
+                      <SelectItem value="unassigned">No assignee</SelectItem>
                       {users.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.name}
@@ -654,7 +654,7 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">No owner</SelectItem>
+                      <SelectItem value="unassigned">No owner</SelectItem>
                       {users.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.name}
