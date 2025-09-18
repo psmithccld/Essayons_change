@@ -68,9 +68,10 @@ const PROCESS_SYMBOLS = {
   manual: { name: "Manual Process", icon: Move, shape: "trapezoid", color: "#f97316" },
   delay: { name: "Delay", icon: Clock, shape: "delay", color: "#84cc16" },
   storage: { name: "Storage", icon: Triangle, shape: "triangle", color: "#6366f1" },
+  thoughtBubble: { name: "Thought Bubble", icon: Circle, shape: "ellipse", color: "#ec4899" },
 };
 
-export default function ProcessMapping() {
+export default function DevelopmentMaps() {
   const [canvas, setCanvas] = useState<FabricCanvas | null>(null);
   const [currentProcessMap, setCurrentProcessMap] = useState<ProcessMap | null>(null);
   const [isNewProcessMapOpen, setIsNewProcessMapOpen] = useState(false);
@@ -909,7 +910,7 @@ export default function ProcessMapping() {
             {/* Saved Process Maps */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Process Maps</CardTitle>
+                <CardTitle className="text-sm">Development Maps</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {isLoading ? (
@@ -946,7 +947,7 @@ export default function ProcessMapping() {
             {/* Process Symbols */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Process Symbols</CardTitle>
+                <CardTitle className="text-sm">Development Symbols</CardTitle>
                 <p className="text-xs text-muted-foreground">Click a symbol, then click on canvas to place</p>
               </CardHeader>
               <CardContent className="space-y-4">

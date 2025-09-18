@@ -7,6 +7,7 @@ import {
   insertMilestoneSchema, insertChecklistTemplateSchema, insertMindMapSchema, insertProcessMapSchema,
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema,
   insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
+  insertUserGroupMembershipSchema, insertUserPermissionSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions
 } from "@shared/schema";
 import * as openaiService from "./openai";

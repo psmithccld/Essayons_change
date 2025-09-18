@@ -17,7 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Users, Plus, Shield, UserCheck, Search, MoreHorizontal, Edit, Trash2, UserPlus, Eye, EyeOff } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { insertUserSchema, type User, type Role, type UserInitiativeAssignment, type Permissions } from "@shared/schema";
+import { insertUserSchema, insertUserGroupMembershipSchema, insertUserPermissionSchema, type User, type Role, type UserInitiativeAssignment, type Permissions, type UserGroup, type UserGroupMembership, type UserPermission } from "@shared/schema";
 import { RouteGuard } from "@/components/auth/RouteGuard";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -48,6 +48,10 @@ function UserManagementContent() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [viewingUserInitiatives, setViewingUserInitiatives] = useState<User | null>(null);
+  const [viewingUserSecurity, setViewingUserSecurity] = useState<User | null>(null);
+  const [isGroupAssignmentOpen, setIsGroupAssignmentOpen] = useState(false);
+  const [isIndividualPermissionsOpen, setIsIndividualPermissionsOpen] = useState(false);
+  const [selectedUserForSecurity, setSelectedUserForSecurity] = useState<User | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -74,6 +78,35 @@ function UserManagementContent() {
   const { data: userInitiatives = [] } = useQuery<UserInitiativeAssignment[]>({
     queryKey: ["/api/users", viewingUserInitiatives?.id, "initiatives"],
     enabled: !!viewingUserInitiatives?.id
+  });
+
+  // Security Management Center Integration - Fetch user groups
+  const { data: userGroups = [] } = useQuery<UserGroup[]>({
+    queryKey: ["/api/user-groups"],
+    enabled: !!userPermissions?.permissions?.canSeeGroups
+  });
+
+  // Fetch user group memberships for selected user
+  const { data: userGroupMemberships = [] } = useQuery<UserGroupMembership[]>({
+    queryKey: ["/api/users", selectedUserForSecurity?.id, "groups"],
+    enabled: !!selectedUserForSecurity?.id && !!userPermissions?.permissions?.canSeeGroups
+  });
+
+  // Fetch individual user permissions for selected user
+  const { data: userIndividualPermissions } = useQuery<UserPermission | null>({
+    queryKey: ["/api/users", selectedUserForSecurity?.id, "individual-permissions"],
+    enabled: !!selectedUserForSecurity?.id && !!userPermissions?.permissions?.canSeeSecuritySettings
+  });
+
+  // Fetch user security summary for selected user
+  const { data: userSecuritySummary } = useQuery<{
+    rolePermissions: Permissions;
+    groupPermissions: Permissions[];
+    individualPermissions?: Permissions;
+    resolvedPermissions: Permissions;
+  }>({
+    queryKey: ["/api/users", selectedUserForSecurity?.id, "security-summary"],
+    enabled: !!selectedUserForSecurity?.id && !!userPermissions?.permissions?.canSeeSecuritySettings
   });
 
   // Create user mutation
@@ -112,6 +145,64 @@ function UserManagementContent() {
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to delete user", variant: "destructive" });
+    }
+  });
+
+  // Security Management Center Mutations
+
+  // Assign user to group mutation
+  const assignUserToGroupMutation = useMutation({
+    mutationFn: ({ userId, groupId }: { userId: string, groupId: string }) => 
+      apiRequest("POST", "/api/user-group-memberships", { userId, groupId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", selectedUserForSecurity?.id, "groups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", selectedUserForSecurity?.id, "security-summary"] });
+      toast({ title: "Success", description: "User assigned to group successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to assign user to group", variant: "destructive" });
+    }
+  });
+
+  // Remove user from group mutation
+  const removeUserFromGroupMutation = useMutation({
+    mutationFn: ({ userId, groupId }: { userId: string, groupId: string }) => 
+      apiRequest("DELETE", "/api/user-group-memberships/remove", { userId, groupId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", selectedUserForSecurity?.id, "groups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", selectedUserForSecurity?.id, "security-summary"] });
+      toast({ title: "Success", description: "User removed from group successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to remove user from group", variant: "destructive" });
+    }
+  });
+
+  // Set individual user permissions mutation
+  const setIndividualPermissionsMutation = useMutation({
+    mutationFn: ({ userId, permissions }: { userId: string, permissions: Permissions }) => 
+      apiRequest("POST", `/api/users/${userId}/individual-permissions`, { permissions }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", selectedUserForSecurity?.id, "individual-permissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", selectedUserForSecurity?.id, "security-summary"] });
+      toast({ title: "Success", description: "Individual permissions set successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to set individual permissions", variant: "destructive" });
+    }
+  });
+
+  // Clear individual user permissions mutation
+  const clearIndividualPermissionsMutation = useMutation({
+    mutationFn: (userId: string) => 
+      apiRequest("DELETE", `/api/users/${userId}/individual-permissions`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", selectedUserForSecurity?.id, "individual-permissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", selectedUserForSecurity?.id, "security-summary"] });
+      toast({ title: "Success", description: "Individual permissions cleared successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to clear individual permissions", variant: "destructive" });
     }
   });
 
@@ -185,8 +276,8 @@ function UserManagementContent() {
           <h1 className="text-2xl font-semibold text-foreground">User Management</h1>
           <p className="text-sm text-muted-foreground">Manage users, roles, and permissions</p>
         </div>
-        {/* RBAC: Only show Add User button if user has canCreateUsers permission */}
-        {userPermissions?.permissions?.canCreateUsers && (
+        {/* RBAC: Only show Add User button if user has canModifyUsers permission */}
+        {userPermissions?.permissions?.canModifyUsers && (
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-add-user">
@@ -471,6 +562,37 @@ function UserManagementContent() {
                               <UserPlus className="mr-2 h-4 w-4" />
                               View Initiatives
                             </DropdownMenuItem>
+
+                            {/* Security Management Center Integration */}
+                            {userPermissions?.permissions?.canSeeSecuritySettings && (
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedUserForSecurity(user);
+                                setViewingUserSecurity(user);
+                              }} data-testid={`button-security-${user.id}`}>
+                                <Shield className="mr-2 h-4 w-4" />
+                                Security Overview
+                              </DropdownMenuItem>
+                            )}
+
+                            {userPermissions?.permissions?.canSeeGroups && (
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedUserForSecurity(user);
+                                setIsGroupAssignmentOpen(true);
+                              }} data-testid={`button-groups-${user.id}`}>
+                                <Users className="mr-2 h-4 w-4" />
+                                Group Assignments
+                              </DropdownMenuItem>
+                            )}
+
+                            {userPermissions?.permissions?.canSeeSecuritySettings && (
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedUserForSecurity(user);
+                                setIsIndividualPermissionsOpen(true);
+                              }} data-testid={`button-permissions-${user.id}`}>
+                                <UserCheck className="mr-2 h-4 w-4" />
+                                Individual Permissions
+                              </DropdownMenuItem>
+                            )}
                             {/* RBAC: Only show delete option if user has canDeleteUsers permission */}
                             {userPermissions?.permissions?.canDeleteUsers && (
                               <AlertDialog>
@@ -651,13 +773,249 @@ function UserManagementContent() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Security Overview Dialog */}
+      <Dialog open={!!viewingUserSecurity} onOpenChange={() => {setViewingUserSecurity(null); setSelectedUserForSecurity(null);}}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Security Overview - {viewingUserSecurity?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            {userSecuritySummary && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <Shield className="w-8 h-8 text-primary" />
+                        <div>
+                          <p className="font-semibold">Role Permissions</p>
+                          <p className="text-sm text-muted-foreground">
+                            {Object.values(userSecuritySummary.rolePermissions).filter(Boolean).length} enabled
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <Users className="w-8 h-8 text-secondary" />
+                        <div>
+                          <p className="font-semibold">Group Permissions</p>
+                          <p className="text-sm text-muted-foreground">
+                            {userSecuritySummary.groupPermissions.length} groups
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <UserCheck className="w-8 h-8 text-accent" />
+                        <div>
+                          <p className="font-semibold">Individual Permissions</p>
+                          <p className="text-sm text-muted-foreground">
+                            {userSecuritySummary.individualPermissions ? 
+                              Object.values(userSecuritySummary.individualPermissions).filter(Boolean).length + " enabled" : 
+                              "None set"}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Resolved Permissions Summary</h3>
+                  <div className="text-sm text-muted-foreground mb-4">
+                    These are the final permissions this user has, combining role, group, and individual permissions with "most permissive wins" logic.
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {Object.entries(userSecuritySummary.resolvedPermissions).map(([permission, enabled]) => (
+                      <div key={permission} className={`p-3 rounded-lg border ${enabled ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <div className="flex items-center space-x-2">
+                          {enabled ? (
+                            <UserCheck className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <UserCheck className="w-4 h-4 text-red-400" />
+                          )}
+                          <span className="text-sm font-medium">{permission}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Group Assignment Dialog */}
+      <Dialog open={isGroupAssignmentOpen} onOpenChange={() => {setIsGroupAssignmentOpen(false); setSelectedUserForSecurity(null);}}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Group Assignments - {selectedUserForSecurity?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* Current Group Memberships */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Current Groups</h3>
+              {userGroupMemberships.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  This user is not assigned to any groups.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {userGroupMemberships.map((membership: UserGroupMembership) => {
+                    const group = userGroups.find(g => g.id === membership.groupId);
+                    return (
+                      <div key={membership.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <p className="font-medium">{group?.name || membership.groupId}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {group?.description || 'No description'}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeUserFromGroupMutation.mutate({
+                            userId: selectedUserForSecurity!.id,
+                            groupId: membership.groupId
+                          })}
+                          disabled={removeUserFromGroupMutation.isPending}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Available Groups */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Available Groups</h3>
+              <div className="space-y-2">
+                {userGroups
+                  .filter(group => !userGroupMemberships.some(m => m.groupId === group.id))
+                  .map((group: UserGroup) => (
+                    <div key={group.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{group.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {group.description || 'No description'}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => assignUserToGroupMutation.mutate({
+                          userId: selectedUserForSecurity!.id,
+                          groupId: group.id
+                        })}
+                        disabled={assignUserToGroupMutation.isPending}
+                      >
+                        Assign
+                      </Button>
+                    </div>
+                  ))
+                }
+              </div>
+              {userGroups.filter(group => !userGroupMemberships.some(m => m.groupId === group.id)).length === 0 && (
+                <div className="text-center py-4 text-muted-foreground">
+                  All available groups are already assigned.
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Individual Permissions Dialog */}
+      <Dialog open={isIndividualPermissionsOpen} onOpenChange={() => {setIsIndividualPermissionsOpen(false); setSelectedUserForSecurity(null);}}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Individual Permissions - {selectedUserForSecurity?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="text-sm text-muted-foreground">
+              Individual permissions override role and group permissions. Use sparingly for specific user needs.
+            </div>
+
+            {userIndividualPermissions ? (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Current Individual Permissions</h3>
+                  <Button
+                    variant="outline"
+                    onClick={() => clearIndividualPermissionsMutation.mutate(selectedUserForSecurity!.id)}
+                    disabled={clearIndividualPermissionsMutation.isPending}
+                  >
+                    Clear All
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.entries(userIndividualPermissions.permissions).map(([permission, enabled]) => (
+                    <div key={permission} className={`p-3 rounded-lg border ${enabled ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                      <div className="flex items-center space-x-2">
+                        {enabled ? (
+                          <UserCheck className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <UserCheck className="w-4 h-4 text-gray-400" />
+                        )}
+                        <span className="text-sm font-medium">{permission}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <UserCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Individual Permissions Set</h3>
+                <p className="text-muted-foreground mb-4">
+                  This user relies on role and group permissions only.
+                </p>
+                <Button
+                  onClick={() => {
+                    // Set default permissions (all false)
+                    const defaultPermissions: Permissions = {} as Permissions;
+                    Object.keys(userPermissions?.permissions || {}).forEach(key => {
+                      defaultPermissions[key as keyof Permissions] = false;
+                    });
+                    setIndividualPermissionsMutation.mutate({
+                      userId: selectedUserForSecurity!.id,
+                      permissions: defaultPermissions
+                    });
+                  }}
+                  disabled={setIndividualPermissionsMutation.isPending}
+                >
+                  Set Individual Permissions
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 export default function UserManagement() {
   return (
-    <RouteGuard permission="canViewUsers">
+    <RouteGuard permission="canSeeUsers">
       <UserManagementContent />
     </RouteGuard>
   );

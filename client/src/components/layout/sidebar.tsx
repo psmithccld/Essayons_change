@@ -67,17 +67,17 @@ const allNavigationItems: NavigationItem[] = [
   { id: "checklist-templates", icon: ListChecks, label: "Checklist Templates", path: "/checklist-templates" },
   { id: "gantt", icon: ChartGantt, label: "Gantt Charts", path: "/gantt" },
   { id: "raid-logs", icon: AlertTriangle, label: "RAID Logs", path: "/raid-logs" },
-  { id: "progress-reports", icon: ChartBar, label: "Progress Reports", path: "/reports", permissions: ["canViewReports"] },
+  { id: "progress-reports", icon: ChartBar, label: "Progress Reports", path: "/reports", permissions: ["canSeeReports"] },
   { id: "communications", icon: Megaphone, label: "Communications", path: "/communications" },
   { id: "stakeholders", icon: Users, label: "Stakeholders", path: "/stakeholders" },
   { id: "surveys", icon: ClipboardCheck, label: "Readiness Surveys", path: "/surveys" },
   { id: "gpt-coach", icon: Bot, label: "GPT Coach", path: "/gpt-coach" },
-  { id: "user-management", icon: Users, label: "User Management", path: "/users", permissions: ["canViewUsers"] },
-  { id: "initiative-management", icon: Briefcase, label: "Initiative Management", path: "/initiatives", permissions: ["canViewAllProjects", "canCreateProjects", "canEditAllProjects"], requireAll: false },
-  { id: "security-management", icon: Shield, label: "Security & Roles", path: "/security", permissions: ["canViewRoles"] },
+  { id: "user-management", icon: Users, label: "User Management", path: "/users", permissions: ["canSeeUsers"] },
+  { id: "initiative-management", icon: Briefcase, label: "Initiative Management", path: "/initiatives", permissions: ["canSeeAllProjects", "canModifyProjects", "canEditAllProjects"], requireAll: false },
+  { id: "security-management", icon: Shield, label: "Security & Roles", path: "/security", permissions: ["canSeeRoles"] },
   { id: "fishbone", icon: Fish, label: "Fishbone Analysis", path: "/fishbone" },
-  { id: "process-mapping", icon: GitBranch, label: "Process Mapping", path: "/process-mapping", permissions: ["canViewAllProjects", "canCreateProjects"], requireAll: false },
-  { id: "mind-maps", icon: Brain, label: "Mind Maps", path: "/mind-maps", permissions: ["canViewAllProjects", "canCreateProjects"], requireAll: false }
+  { id: "process-mapping", icon: GitBranch, label: "Development Maps", path: "/process-mapping", permissions: ["canSeeAllProjects", "canModifyProjects"], requireAll: false },
+  { id: "mind-maps", icon: Brain, label: "Mind Maps", path: "/mind-maps", permissions: ["canSeeAllProjects", "canModifyProjects"], requireAll: false }
 ];
 
 const SIDEBAR_ORDER_KEY = "sidebarOrder";
