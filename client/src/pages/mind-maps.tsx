@@ -633,8 +633,8 @@ export default function MindMaps() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center p-2 border-b bg-muted/50">
-        <div className="flex items-center space-x-2">
+      <div className="flex items-center border-b bg-muted/50">
+        <div className="flex items-center space-x-2 p-4">
           <Button
             variant={tools.mode === 'select' ? 'default' : 'outline'}
             size="sm"
