@@ -41,7 +41,7 @@ import {
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions
 } from "@shared/schema";
 import * as openaiService from "./openai";
-import { sendTaskAssignmentNotification, sendBulkGroupEmail } from "./services/emailService";
+import { sendTaskAssignmentNotification, sendBulkGroupEmail, sendP2PEmail } from "./services/emailService";
 import { z } from "zod";
 
 // Input validation schemas
@@ -82,6 +82,39 @@ const refineGroupEmailContentSchema = z.object({
   refinementRequest: z.string().min(1, "Refinement request is required"),
   context: z.object({}).optional(),
   tone: z.enum(['professional', 'friendly', 'urgent', 'formal']).default('professional'),
+  urgency: z.enum(['low', 'normal', 'high', 'critical']).default('normal')
+});
+
+// P2P Email Content Generation schema
+const generateP2PEmailContentSchema = z.object({
+  projectName: z.string().min(1, "Project name is required"),
+  recipientName: z.string().min(1, "Recipient name is required"),
+  recipientRole: z.string().optional(),
+  changeDescription: z.string().optional(),
+  communicationPurpose: z.enum(['check_in', 'update', 'request', 'follow_up', 'collaboration', 'feedback']),
+  keyMessages: z.array(z.string()).optional(),
+  raidLogContext: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    type: z.string(),
+    description: z.string()
+  })).optional(),
+  tone: z.enum(['professional', 'friendly', 'formal', 'conversational']).default('professional'),
+  urgency: z.enum(['low', 'normal', 'high', 'critical']).default('normal'),
+  relationship: z.enum(['colleague', 'manager', 'stakeholder', 'external']).default('colleague')
+});
+
+// P2P Email Content Refinement schema
+const refineP2PEmailContentSchema = z.object({
+  currentContent: z.object({
+    title: z.string(),
+    content: z.string(),
+    callToAction: z.string().optional()
+  }),
+  refinementRequest: z.string().min(1, "Refinement request is required"),
+  recipientName: z.string().min(1, "Recipient name is required"),
+  relationship: z.enum(['colleague', 'manager', 'stakeholder', 'external']).default('colleague'),
+  tone: z.enum(['professional', 'friendly', 'formal', 'conversational']).default('professional'),
   urgency: z.enum(['low', 'normal', 'high', 'critical']).default('normal')
 });
 
@@ -891,7 +924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Communication Templates
-  app.get("/api/communication-templates", requirePermission('canSeeCommunications'), async (req, res) => {
+  app.get("/api/communication-templates", requireAuthAndPermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       const templates = await storage.getCommunicationTemplates();
       res.json(templates);
@@ -901,7 +934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/communication-templates/active", requirePermission('canSeeCommunications'), async (req, res) => {
+  app.get("/api/communication-templates/active", requireAuthAndPermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       const templates = await storage.getActiveCommunicationTemplates();
       res.json(templates);
@@ -911,7 +944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/communication-templates/category/:category", requirePermission('canSeeCommunications'), async (req, res) => {
+  app.get("/api/communication-templates/category/:category", requireAuthAndPermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       const templates = await storage.getCommunicationTemplatesByCategory(req.params.category);
       res.json(templates);
@@ -921,7 +954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/communication-templates/:id", requirePermission('canSeeCommunications'), async (req, res) => {
+  app.get("/api/communication-templates/:id", requireAuthAndPermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       const template = await storage.getCommunicationTemplate(req.params.id);
       if (!template) {
@@ -934,7 +967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/communication-templates", requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/communication-templates", requireAuthAndPermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       const processedData = {
         ...req.body,
@@ -950,7 +983,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/communication-templates/:id", requirePermission('canEditCommunications'), async (req, res) => {
+  app.put("/api/communication-templates/:id", requireAuthAndPermission('canEditCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       const template = await storage.updateCommunicationTemplate(req.params.id, req.body);
       if (!template) {
@@ -963,7 +996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/communication-templates/:id", requirePermission('canDeleteCommunications'), async (req, res) => {
+  app.delete("/api/communication-templates/:id", requireAuthAndPermission('canDeleteCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       const success = await storage.deleteCommunicationTemplate(req.params.id);
       if (!success) {
@@ -977,7 +1010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Increment template usage count
-  app.post("/api/communication-templates/:id/usage", requirePermission('canSeeCommunications'), async (req, res) => {
+  app.post("/api/communication-templates/:id/usage", requireAuthAndPermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       await storage.incrementTemplateUsage(req.params.id);
       res.json({ success: true });
@@ -1122,6 +1155,161 @@ Return the refined content in JSON format:
     } catch (error) {
       console.error("Error refining group email content:", error);
       res.status(500).json({ error: "Failed to refine group email content" });
+    }
+  });
+
+  // GPT Content Generation for P2P Emails
+  app.post("/api/gpt/generate-p2p-email-content", requireAuthAndPermission('canSendEmails'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // SECURITY: Input validation with Zod
+      const validatedInput = generateP2PEmailContentSchema.parse(req.body);
+      const { 
+        projectName, 
+        recipientName, 
+        recipientRole, 
+        changeDescription, 
+        communicationPurpose, 
+        keyMessages, 
+        raidLogContext, 
+        tone, 
+        urgency,
+        relationship 
+      } = validatedInput;
+
+      // SECURITY: Rate limiting check for P2P content generation
+      if (!checkRateLimit(req.userId!, 20, 300000)) { // 20 generations per 5 minutes
+        return res.status(429).json({ 
+          error: "Rate limit exceeded. Please wait before generating more content." 
+        });
+      }
+
+      const raidContextString = raidLogContext && raidLogContext.length > 0 
+        ? `\n\nRelated Project Information:\n${raidLogContext.map((item: any) => `${item.type.toUpperCase()}: ${item.title} - ${item.description}`).join('\n')}`
+        : '';
+
+      const purposeContext = {
+        'check_in': 'This is a personal check-in to see how they are feeling about the change',
+        'update': 'This is an update to keep them informed about progress or developments',
+        'request': 'This is a request for their help, input, or action on something specific',
+        'follow_up': 'This is a follow-up to a previous conversation or commitment',
+        'collaboration': 'This is an invitation to collaborate on something together',
+        'feedback': 'This is a request for their feedback or thoughts on something'
+      };
+
+      const relationshipContext = {
+        'colleague': 'This person is a peer/colleague',
+        'manager': 'This person is in a management role',
+        'stakeholder': 'This person is a project stakeholder',
+        'external': 'This person is external to the organization'
+      };
+
+      const prompt = `Create a personal, one-on-one email for a change initiative. This should be conversational and tailored to individual communication.
+
+Project: ${projectName}
+Recipient: ${recipientName}${recipientRole ? ` (${recipientRole})` : ''}
+Purpose: ${communicationPurpose} - ${purposeContext[communicationPurpose]}
+Relationship: ${relationship} - ${relationshipContext[relationship]}
+Tone: ${tone}
+Urgency: ${urgency}
+
+Change Description: ${changeDescription || 'General change initiative communication'}${raidContextString}
+
+Key Messages to Include: ${keyMessages && keyMessages.length > 0 ? keyMessages.join(', ') : 'General project update'}
+
+Create a personal email that:
+- Uses a ${tone} tone appropriate for a ${relationship}
+- Addresses ${recipientName} personally
+- Reflects ${urgency} urgency level
+- Focuses on the specific purpose: ${communicationPurpose}
+- Is conversational and feels like it's written person-to-person
+- Includes relevant context about the change initiative
+- Has a clear but not pushy call to action
+- Maintains professional standards while being personal
+
+Return the content in JSON format:
+{
+  "title": "personal email subject line",
+  "content": "personal email body content with proper line breaks",
+  "callToAction": "specific next step or call to action"
+}`;
+
+      const { openai } = await import("./openai");
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      });
+
+      const content = JSON.parse(response.choices[0].message.content || "{}");
+      res.json(content);
+    } catch (error) {
+      console.error("Error generating P2P email content:", error);
+      res.status(500).json({ error: "Failed to generate P2P email content" });
+    }
+  });
+
+  // GPT Content Refinement for P2P Emails
+  app.post("/api/gpt/refine-p2p-email-content", requireAuthAndPermission('canSendEmails'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // SECURITY: Input validation with Zod
+      const validatedInput = refineP2PEmailContentSchema.parse(req.body);
+      const { currentContent, refinementRequest, recipientName, relationship, tone, urgency } = validatedInput;
+
+      // SECURITY: Rate limiting check
+      if (!checkRateLimit(req.userId!, 20, 300000)) { // 20 refinements per 5 minutes
+        return res.status(429).json({ 
+          error: "Rate limit exceeded. Please wait before refining more content." 
+        });
+      }
+
+      const relationshipContext = {
+        'colleague': 'This person is a peer/colleague',
+        'manager': 'This person is in a management role', 
+        'stakeholder': 'This person is a project stakeholder',
+        'external': 'This person is external to the organization'
+      };
+
+      const prompt = `Refine this personal, one-on-one email based on the request:
+
+Current content:
+Subject: ${currentContent.title || 'No subject'}
+Content: ${currentContent.content || 'No content'}
+Call to Action: ${currentContent.callToAction || 'No CTA'}
+
+Recipient: ${recipientName}
+Relationship: ${relationship} - ${relationshipContext[relationship]}
+Refinement request: ${refinementRequest}
+Tone: ${tone}
+Urgency: ${urgency}
+
+Create refined personal email content that:
+- Maintains a ${tone} tone appropriate for a ${relationship}
+- Addresses ${recipientName} personally
+- Reflects ${urgency} urgency level
+- Incorporates the refinement request: ${refinementRequest}
+- Keeps the conversational, person-to-person feel
+- Maintains professional standards while being personal
+- Has clear but not pushy communication
+
+Return the refined content in JSON format:
+{
+  "title": "refined personal email subject",
+  "content": "refined personal email body",
+  "callToAction": "refined call to action"
+}`;
+
+      const { openai } = await import("./openai");
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      });
+
+      const refinedContent = JSON.parse(response.choices[0].message.content || "{}");
+      res.json(refinedContent);
+    } catch (error) {
+      console.error("Error refining P2P email content:", error);
+      res.status(500).json({ error: "Failed to refine P2P email content" });
     }
   });
 
@@ -1275,6 +1463,163 @@ Return the refined content in JSON format:
     } catch (error) {
       console.error("Error distributing flyer:", error);
       res.status(500).json({ error: "Failed to distribute flyer" });
+    }
+  });
+
+  // P2P Email Sending - SECURITY: Requires individual email permission and proper auth
+  app.post("/api/communications/:id/send-p2p", requireAuthAndPermission('canSendEmails'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { recipientEmail, recipientName, visibility, dryRun } = req.body;
+
+      // Validate input
+      if (!recipientEmail || !recipientName) {
+        return res.status(400).json({ error: "Recipient email and name are required" });
+      }
+
+      // Validate visibility setting
+      const validVisibilityOptions = ['private', 'team', 'archive'];
+      if (visibility && !validVisibilityOptions.includes(visibility)) {
+        return res.status(400).json({ 
+          error: "Invalid visibility setting. Must be 'private', 'team', or 'archive'" 
+        });
+      }
+
+      // SECURITY: Rate limiting check for P2P emails
+      if (!checkRateLimit(req.userId!, 10, 300000)) { // 10 P2P emails per 5 minutes
+        return res.status(429).json({ 
+          error: "Rate limit exceeded. Please wait before sending more personal emails." 
+        });
+      }
+
+      // Get communication
+      const communication = await storage.getCommunication(req.params.id);
+      if (!communication) {
+        return res.status(404).json({ error: "Communication not found" });
+      }
+
+      // Validate communication type
+      if (communication.type !== 'point_to_point_email') {
+        return res.status(400).json({ error: "Communication must be a point-to-point email" });
+      }
+
+      // Get project
+      const project = await storage.getProject(communication.projectId);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      // Get sender info
+      const sender = await storage.getUser(req.userId!);
+      if (!sender) {
+        return res.status(404).json({ error: "Sender not found" });
+      }
+
+      // Handle DRY RUN mode
+      if (dryRun) {
+        console.log(`[DRY RUN] P2P Email - Would send "${communication.title}" to ${recipientName} (${recipientEmail})`);
+        return res.json({
+          success: true,
+          dryRun: true,
+          message: `DRY RUN: Would send personal email to ${recipientName}`,
+          emailPreview: {
+            subject: `Personal Communication: ${communication.title}`,
+            recipient: { name: recipientName, email: recipientEmail },
+            sender: sender.name,
+            visibility,
+            content: communication.content
+          }
+        });
+      }
+
+      // SECURITY: Environment safety check for live sending
+      const safetyCheck = checkEnvironmentSafety('email');
+      if (!safetyCheck.safe) {
+        return res.status(403).json({ 
+          error: safetyCheck.message,
+          hint: "Email service not configured properly"
+        });
+      }
+
+      // Get RAID log context if referenced
+      let raidLogInfo: { title: string; type: string; description: string }[] = [];
+      if (communication.raidLogReferences && communication.raidLogReferences.length > 0) {
+        try {
+          const raidLogs = await Promise.all(
+            communication.raidLogReferences.map(id => storage.getRaidLog(id))
+          );
+          raidLogInfo = raidLogs
+            .filter(log => log !== undefined)
+            .map(log => ({
+              title: log!.title,
+              type: log!.type,
+              description: log!.description
+            }));
+        } catch (error) {
+          console.warn('Error fetching RAID logs for P2P email context:', error);
+        }
+      }
+
+      // Send P2P email
+      const emailSent = await sendP2PEmail(
+        recipientEmail,
+        recipientName,
+        communication.title,
+        communication.content,
+        project.name,
+        sender.name,
+        visibility as 'private' | 'team' | 'archive',
+        raidLogInfo.length > 0 ? raidLogInfo : undefined
+      );
+
+      if (!emailSent) {
+        return res.status(500).json({ error: "Failed to send personal email" });
+      }
+
+      // Update communication status
+      const updatedCommunication = await storage.updateCommunication(req.params.id, {
+        status: 'sent',
+        sendDate: new Date(),
+        distributionMethod: 'email'
+      });
+
+      // Create recipient record
+      await storage.createCommunicationRecipient({
+        communicationId: communication.id,
+        recipientType: 'external_email',
+        recipientEmail,
+        recipientName,
+        recipientRole: communication.metadata?.recipientRole || undefined,
+        deliveryStatus: 'sent'
+      });
+
+      // SECURITY: Log P2P email sending
+      console.log(`[P2P EMAIL SENT] User ${req.userId}`, {
+        communicationId: req.params.id,
+        recipientEmail,
+        recipientName,
+        visibility,
+        projectId: communication.projectId,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({
+        success: true,
+        dryRun: false,
+        message: `Personal email sent successfully to ${recipientName}`,
+        communication: updatedCommunication,
+        recipient: {
+          name: recipientName,
+          email: recipientEmail
+        },
+        environmentInfo: {
+          nodeEnv: process.env.NODE_ENV,
+          emailConfigured: !!process.env.SENDGRID_API_KEY
+        }
+      });
+
+    } catch (error) {
+      console.error("Error sending P2P email:", error);
+      res.status(500).json({ error: "Failed to send personal email" });
     }
   });
 

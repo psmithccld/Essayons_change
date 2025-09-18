@@ -42,6 +42,742 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { type CommunicationStrategy, type CommunicationTemplate, type Communication, type Stakeholder, insertCommunicationStrategySchema } from "@shared/schema";
 import { z } from "zod";
 
+// P2P Emails Execution Module Component
+function P2PEmailsExecutionModule() {
+  const { currentProject } = useCurrentProject();
+  const [activeView, setActiveView] = useState<'repository' | 'create' | 'manage'>('repository');
+  const [selectedTemplate, setSelectedTemplate] = useState<CommunicationTemplate | null>(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [emailContent, setEmailContent] = useState({ title: '', content: '', callToAction: '' });
+  const [currentEmail, setCurrentEmail] = useState<Communication | null>(null);
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [distributionEmail, setDistributionEmail] = useState<Communication | null>(null);
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientRole, setRecipientRole] = useState('');
+  const [selectedRaidLogs, setSelectedRaidLogs] = useState<string[]>([]);
+  const [tone, setTone] = useState('professional');
+  const [urgency, setUrgency] = useState('normal');
+  const [communicationPurpose, setCommunicationPurpose] = useState('update');
+  const [relationship, setRelationship] = useState('colleague');
+  const [visibility, setVisibility] = useState('private');
+  const { toast } = useToast();
+
+  // Fetch communication templates for P2P emails
+  const { data: templates = [], isLoading: templatesLoading } = useQuery({
+    queryKey: ['/api/communication-templates/category/p2p_email']
+  });
+
+  // Fetch created P2P emails
+  const { data: communications = [], isLoading: communicationsLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'communications'],
+    enabled: !!currentProject?.id
+  });
+
+  const p2pEmails = communications.filter((comm: Communication) => comm.type === 'point_to_point_email');
+
+  // Fetch stakeholders for recipient selection
+  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
+    enabled: !!currentProject?.id
+  });
+
+  // Fetch RAID logs for context integration
+  const { data: raidLogs = [], isLoading: raidLogsLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'raid-logs'],
+    enabled: !!currentProject?.id
+  });
+
+  // Create P2P email mutation
+  const createP2PEmailMutation = useMutation({
+    mutationFn: (data: any) => apiRequest(`/api/projects/${currentProject?.id}/communications`, {
+      method: 'POST',
+      body: {
+        ...data,
+        type: 'point_to_point_email',
+        status: 'draft'
+      }
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      toast({ title: "P2P email created successfully" });
+      setShowCreateModal(false);
+      setEmailContent({ title: '', content: '', callToAction: '' });
+      setSelectedRaidLogs([]);
+      setRecipientEmail('');
+      setRecipientName('');
+      setRecipientRole('');
+    },
+    onError: () => {
+      toast({ title: "Failed to create P2P email", variant: "destructive" });
+    }
+  });
+
+  // GPT content generation for P2P emails
+  const generateP2PContentMutation = useMutation({
+    mutationFn: (data: any) => apiRequest('/api/gpt/generate-p2p-email-content', {
+      method: 'POST',
+      body: data
+    }),
+    onSuccess: (content) => {
+      setEmailContent(content);
+      setIsGeneratingContent(false);
+      toast({ title: "Personal email content generated successfully" });
+    },
+    onError: () => {
+      setIsGeneratingContent(false);
+      toast({ title: "Failed to generate personal email content", variant: "destructive" });
+    }
+  });
+
+  // Send P2P email mutation
+  const sendP2PEmailMutation = useMutation({
+    mutationFn: ({ emailId, recipientEmail, recipientName, dryRun }: { 
+      emailId: string; 
+      recipientEmail: string;
+      recipientName: string;
+      dryRun?: boolean 
+    }) => 
+      apiRequest(`/api/communications/${emailId}/send-p2p`, {
+        method: 'POST',
+        body: { 
+          recipientEmail,
+          recipientName,
+          visibility,
+          dryRun: dryRun || false
+        }
+      }),
+    onSuccess: (data, { dryRun }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      
+      if (dryRun) {
+        toast({ 
+          title: "Dry Run Complete", 
+          description: "Email preview generated successfully. No email was actually sent.",
+          variant: "default"
+        });
+      } else {
+        toast({ 
+          title: "Personal Email Sent", 
+          description: `Email successfully sent to ${recipientName}.`
+        });
+      }
+      
+      setShowSendModal(false);
+      setDistributionEmail(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to send personal email", variant: "destructive" });
+    }
+  });
+
+  const handleStakeholderSelect = (stakeholder: any) => {
+    setRecipientEmail(stakeholder.email || '');
+    setRecipientName(stakeholder.name || '');
+    setRecipientRole(stakeholder.role || '');
+  };
+
+  const handleGenerateP2PContent = () => {
+    if (!currentProject || !recipientName) {
+      toast({ title: "Please enter recipient name before generating content", variant: "destructive" });
+      return;
+    }
+    
+    setIsGeneratingContent(true);
+    
+    // Get selected RAID log context
+    const raidLogContext = selectedRaidLogs.length > 0 
+      ? raidLogs.filter((log: any) => selectedRaidLogs.includes(log.id))
+      : [];
+    
+    generateP2PContentMutation.mutate({
+      projectName: currentProject.name,
+      recipientName,
+      recipientRole,
+      changeDescription: currentProject.description,
+      communicationPurpose,
+      keyMessages: ['Personal communication regarding change initiative'],
+      raidLogContext,
+      tone,
+      urgency,
+      relationship
+    });
+  };
+
+  const handleSaveP2PEmail = () => {
+    if (!emailContent.title || !emailContent.content) {
+      toast({ title: "Please fill in subject and content", variant: "destructive" });
+      return;
+    }
+
+    if (!recipientEmail || !recipientName) {
+      toast({ title: "Please specify recipient details", variant: "destructive" });
+      return;
+    }
+
+    createP2PEmailMutation.mutate({
+      title: emailContent.title,
+      content: emailContent.content,
+      targetAudience: [recipientName],
+      templateId: selectedTemplate?.id || null,
+      raidLogReferences: selectedRaidLogs,
+      isGptGenerated: isGeneratingContent,
+      visibilitySettings: visibility,
+      // Store recipient info in metadata
+      metadata: {
+        recipientEmail,
+        recipientName,
+        recipientRole,
+        communicationPurpose,
+        relationship,
+        tone,
+        urgency
+      }
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <User className="w-5 h-5" />
+            <span>Person-to-Person Emails</span>
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              variant={activeView === 'repository' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveView('repository')}
+              data-testid="button-p2p-repository"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Repository
+            </Button>
+            <Button
+              variant={activeView === 'create' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveView('create')}
+              data-testid="button-p2p-create"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create
+            </Button>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {activeView === 'repository' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">Personal Email Repository</h3>
+              <Button
+                onClick={() => setActiveView('create')}
+                data-testid="button-new-p2p-email"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Personal Email
+              </Button>
+            </div>
+            
+            <div className="grid gap-4">
+              {communicationsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-20 w-full" />
+                  ))}
+                </div>
+              ) : p2pEmails.length === 0 ? (
+                <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
+                  <User className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No Personal Emails Created</h3>
+                  <p className="text-muted-foreground mb-4">Create your first personal email to get started</p>
+                  <Button onClick={() => setActiveView('create')} data-testid="button-create-first-p2p">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Personal Email
+                  </Button>
+                </div>
+              ) : (
+                p2pEmails.map((email: Communication) => (
+                  <Card key={email.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-medium">{email.title}</h4>
+                            <Badge variant={
+                              email.visibilitySettings === 'private' ? 'destructive' :
+                              email.visibilitySettings === 'team' ? 'default' : 'secondary'
+                            }>
+                              {email.visibilitySettings === 'private' ? 'Private' :
+                               email.visibilitySettings === 'team' ? 'Team Visible' : 'Archived'}
+                            </Badge>
+                            <Badge variant={email.status === 'sent' ? 'default' : 'outline'}>
+                              {email.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {email.content}
+                          </p>
+                          <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                            <span>To: {email.targetAudience?.join(', ') || 'Unknown'}</span>
+                            <span>Created: {new Date(email.createdAt).toLocaleDateString()}</span>
+                            {email.isGptGenerated && (
+                              <Badge variant="outline">
+                                <Bot className="w-3 h-3 mr-1" />
+                                AI Generated
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex space-x-2 ml-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setCurrentEmail(email);
+                              setShowPreviewModal(true);
+                            }}
+                            data-testid={`button-preview-p2p-${email.id}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          {email.status === 'draft' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setDistributionEmail(email);
+                                setRecipientEmail(email.metadata?.recipientEmail || '');
+                                setRecipientName(email.metadata?.recipientName || '');
+                                setShowSendModal(true);
+                              }}
+                              data-testid={`button-send-p2p-${email.id}`}
+                            >
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeView === 'create' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">Create Personal Email</h3>
+              <Button
+                variant="outline"
+                onClick={() => setActiveView('repository')}
+                data-testid="button-back-to-repository"
+              >
+                Back to Repository
+              </Button>
+            </div>
+
+            {/* Recipient Selection */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">1. Select Recipient</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="recipient-email">Recipient Email</Label>
+                    <Input
+                      id="recipient-email"
+                      type="email"
+                      placeholder="Enter email address"
+                      value={recipientEmail}
+                      onChange={(e) => setRecipientEmail(e.target.value)}
+                      data-testid="input-recipient-email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="recipient-name">Recipient Name</Label>
+                    <Input
+                      id="recipient-name"
+                      placeholder="Enter recipient name"
+                      value={recipientName}
+                      onChange={(e) => setRecipientName(e.target.value)}
+                      data-testid="input-recipient-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="recipient-role">Role (Optional)</Label>
+                    <Input
+                      id="recipient-role"
+                      placeholder="e.g., Department Manager"
+                      value={recipientRole}
+                      onChange={(e) => setRecipientRole(e.target.value)}
+                      data-testid="input-recipient-role"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="relationship">Relationship</Label>
+                    <Select value={relationship} onValueChange={setRelationship}>
+                      <SelectTrigger data-testid="select-relationship">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="colleague">Colleague</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="stakeholder">Stakeholder</SelectItem>
+                        <SelectItem value="external">External Contact</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Stakeholder Quick Select */}
+                {stakeholders.length > 0 && (
+                  <div>
+                    <Label className="text-sm">Or select from stakeholders:</Label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {stakeholders.slice(0, 5).map((stakeholder: any) => (
+                        <Button
+                          key={stakeholder.id}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleStakeholderSelect(stakeholder)}
+                          data-testid={`button-select-stakeholder-${stakeholder.id}`}
+                        >
+                          {stakeholder.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Communication Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">2. Communication Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="purpose">Communication Purpose</Label>
+                  <Select value={communicationPurpose} onValueChange={setCommunicationPurpose}>
+                    <SelectTrigger data-testid="select-purpose">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="check_in">Check-in</SelectItem>
+                      <SelectItem value="update">Update</SelectItem>
+                      <SelectItem value="request">Request</SelectItem>
+                      <SelectItem value="follow_up">Follow-up</SelectItem>
+                      <SelectItem value="collaboration">Collaboration</SelectItem>
+                      <SelectItem value="feedback">Feedback</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tone">Tone</Label>
+                  <Select value={tone} onValueChange={setTone}>
+                    <SelectTrigger data-testid="select-tone">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="professional">Professional</SelectItem>
+                      <SelectItem value="friendly">Friendly</SelectItem>
+                      <SelectItem value="formal">Formal</SelectItem>
+                      <SelectItem value="conversational">Conversational</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="urgency">Urgency</Label>
+                  <Select value={urgency} onValueChange={setUrgency}>
+                    <SelectTrigger data-testid="select-urgency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Privacy Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">3. Privacy & Visibility</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="visibility">Visibility Settings</Label>
+                  <Select value={visibility} onValueChange={setVisibility}>
+                    <SelectTrigger data-testid="select-visibility">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="private">Private - Only visible to me</SelectItem>
+                      <SelectItem value="team">Shared with Team - Visible to project team</SelectItem>
+                      <SelectItem value="archive">Project Archive - Stored in project records</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {visibility === 'private' && "This email will only be visible to you and can be found in your personal communications."}
+                    {visibility === 'team' && "This email will be visible to all project team members for transparency."}
+                    {visibility === 'archive' && "This email will be archived with the project for future reference and reporting."}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Content Generation */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">4. Email Content</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* AI Content Generation */}
+                <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                  <div className="space-y-1">
+                    <h4 className="font-medium">AI-Powered Personal Email</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Generate personalized email content tailored for one-on-one communication
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleGenerateP2PContent}
+                    disabled={isGeneratingContent || !recipientName}
+                    data-testid="button-generate-p2p-content"
+                  >
+                    {isGeneratingContent ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                        Generating...
+                      </div>
+                    ) : (
+                      <>
+                        <Bot className="w-4 h-4 mr-2" />
+                        Generate Personal Email
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Manual Content Entry */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email-subject">Subject Line</Label>
+                    <Input
+                      id="email-subject"
+                      placeholder="Enter email subject"
+                      value={emailContent.title}
+                      onChange={(e) => setEmailContent(prev => ({ ...prev, title: e.target.value }))}
+                      data-testid="input-email-subject"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email-content">Email Content</Label>
+                    <Textarea
+                      id="email-content"
+                      placeholder="Write your personal email message..."
+                      value={emailContent.content}
+                      onChange={(e) => setEmailContent(prev => ({ ...prev, content: e.target.value }))}
+                      rows={8}
+                      data-testid="textarea-email-content"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="call-to-action">Call to Action (Optional)</Label>
+                    <Input
+                      id="call-to-action"
+                      placeholder="What should the recipient do next?"
+                      value={emailContent.callToAction}
+                      onChange={(e) => setEmailContent(prev => ({ ...prev, callToAction: e.target.value }))}
+                      data-testid="input-call-to-action"
+                    />
+                  </div>
+                </div>
+
+                {/* RAID Log Integration */}
+                {raidLogs.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Include RAID Log Context (Optional)</Label>
+                    <div className="max-h-32 overflow-y-auto space-y-2">
+                      {raidLogs.map((log: any) => (
+                        <div key={log.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            checked={selectedRaidLogs.includes(log.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedRaidLogs(prev => [...prev, log.id]);
+                              } else {
+                                setSelectedRaidLogs(prev => prev.filter(id => id !== log.id));
+                              }
+                            }}
+                            data-testid={`checkbox-raid-log-${log.id}`}
+                          />
+                          <span className="text-sm">{log.type.toUpperCase()}: {log.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEmailContent({ title: '', content: '', callToAction: '' });
+                      setSelectedRaidLogs([]);
+                    }}
+                    data-testid="button-clear-content"
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    onClick={handleSaveP2PEmail}
+                    disabled={!emailContent.title || !emailContent.content || !recipientEmail}
+                    data-testid="button-save-p2p-email"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Personal Email
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Send P2P Email Modal */}
+        <Dialog open={showSendModal} onOpenChange={setShowSendModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Send Personal Email</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Recipient</Label>
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="font-medium">{recipientName}</p>
+                  <p className="text-sm text-muted-foreground">{recipientEmail}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Email Subject</Label>
+                <p className="text-sm">{distributionEmail?.title}</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Visibility</Label>
+                <Badge variant={
+                  visibility === 'private' ? 'destructive' :
+                  visibility === 'team' ? 'default' : 'secondary'
+                }>
+                  {visibility === 'private' ? 'Private' :
+                   visibility === 'team' ? 'Team Visible' : 'Archived'}
+                </Badge>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowSendModal(false)}
+                  data-testid="button-cancel-send"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (distributionEmail) {
+                      sendP2PEmailMutation.mutate({
+                        emailId: distributionEmail.id,
+                        recipientEmail,
+                        recipientName,
+                        dryRun: true
+                      });
+                    }
+                  }}
+                  data-testid="button-preview-send"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  Preview
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (distributionEmail) {
+                      sendP2PEmailMutation.mutate({
+                        emailId: distributionEmail.id,
+                        recipientEmail,
+                        recipientName,
+                        dryRun: false
+                      });
+                    }
+                  }}
+                  data-testid="button-confirm-send"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Send Email
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Preview Modal */}
+        <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Email Preview</DialogTitle>
+            </DialogHeader>
+            {currentEmail && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Subject</Label>
+                  <p className="font-medium">{currentEmail.title}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Content</Label>
+                  <div className="p-4 bg-muted rounded-lg whitespace-pre-wrap text-sm">
+                    {currentEmail.content}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Metadata</Label>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <span>Purpose: {currentEmail.metadata?.communicationPurpose || 'N/A'}</span>
+                    <span>Tone: {currentEmail.metadata?.tone || 'N/A'}</span>
+                    <span>Urgency: {currentEmail.metadata?.urgency || 'N/A'}</span>
+                    <span>Relationship: {currentEmail.metadata?.relationship || 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowPreviewModal(false)}
+                    data-testid="button-close-preview"
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
 // Group Emails Execution Module Component
 function GroupEmailsExecutionModule() {
   const { currentProject } = useCurrentProject();
@@ -2377,9 +3113,10 @@ export default function Communications() {
               <ChannelPreferences />
             </TabsContent>
 
-            {/* Execution Tab Content (Flyers and Group Emails Implementation) */}
+            {/* Execution Tab Content (P2P Emails, Group Emails, and Flyers Implementation) */}
             <TabsContent value="execution" className="space-y-6" data-testid="execution-content">
               <div className="space-y-6">
+                <P2PEmailsExecutionModule />
                 <GroupEmailsExecutionModule />
                 <FlyersExecutionModule />
               </div>
