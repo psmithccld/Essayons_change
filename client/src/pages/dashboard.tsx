@@ -8,7 +8,7 @@ import {
   Bot, Lightbulb, ChartLine, ExternalLink,
   CheckCircle, Clock, AlertCircle, Link as LinkIcon
 } from "lucide-react";
-import changeProcessFlowImage from "@assets/image_1757964076529.png";
+import changeProcessFlowImage from "/images/change-process-flow.png";
 
 interface DashboardStats {
   activeProjects: number;
