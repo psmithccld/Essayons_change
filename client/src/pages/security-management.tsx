@@ -1400,7 +1400,7 @@ function SecurityManagementContent() {
   const activeUsers = users.filter((user: User) => user.isActive).length;
   const totalRoles = roles.length;
 
-  if (!userPermissions?.canViewRoles) {
+  if (!userPermissions?.canSeeRoles) {
     return (
       <div className="flex items-center justify-center min-h-96">
         <Card className="w-96">
