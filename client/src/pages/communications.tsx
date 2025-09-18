@@ -39,8 +39,628 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type CommunicationStrategy, type Stakeholder, insertCommunicationStrategySchema } from "@shared/schema";
+import { type CommunicationStrategy, type CommunicationTemplate, type Communication, type Stakeholder, insertCommunicationStrategySchema } from "@shared/schema";
 import { z } from "zod";
+
+// Flyers Execution Module Component
+function FlyersExecutionModule() {
+  const { currentProject } = useCurrentProject();
+  const [activeView, setActiveView] = useState<'repository' | 'create' | 'manage'>('repository');
+  const [selectedTemplate, setSelectedTemplate] = useState<CommunicationTemplate | null>(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [flyerContent, setFlyerContent] = useState({ title: '', content: '', callToAction: '' });
+  const [currentFlyer, setCurrentFlyer] = useState<Communication | null>(null);
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showDistributeModal, setShowDistributeModal] = useState(false);
+  const [distributionFlyer, setDistributionFlyer] = useState<Communication | null>(null);
+  const { toast } = useToast();
+
+  // Fetch communication templates
+  const { data: templates = [], isLoading: templatesLoading } = useQuery({
+    queryKey: ['/api/communication-templates/category/flyer']
+  });
+
+  // Fetch created flyers
+  const { data: flyers = [], isLoading: flyersLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'communications'],
+    enabled: !!currentProject?.id
+  });
+
+  const flyerFlyers = flyers.filter((comm: Communication) => comm.type === 'flyer');
+
+  // Create flyer mutation
+  const createFlyerMutation = useMutation({
+    mutationFn: (data: any) => apiRequest(`/api/projects/${currentProject?.id}/communications`, {
+      method: 'POST',
+      body: {
+        ...data,
+        type: 'flyer',
+        status: 'draft'
+      }
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      toast({ title: "Flyer created successfully" });
+      setShowCreateModal(false);
+      setFlyerContent({ title: '', content: '', callToAction: '' });
+    },
+    onError: () => {
+      toast({ title: "Failed to create flyer", variant: "destructive" });
+    }
+  });
+
+  // GPT content generation
+  const generateContentMutation = useMutation({
+    mutationFn: (data: any) => apiRequest('/api/gpt/generate-flyer-content', {
+      method: 'POST',
+      body: data
+    }),
+    onSuccess: (content) => {
+      setFlyerContent(content);
+      setIsGeneratingContent(false);
+      toast({ title: "Content generated successfully" });
+    },
+    onError: () => {
+      setIsGeneratingContent(false);
+      toast({ title: "Failed to generate content", variant: "destructive" });
+    }
+  });
+
+  // Increment template usage
+  const incrementUsageMutation = useMutation({
+    mutationFn: (templateId: string) => apiRequest(`/api/communication-templates/${templateId}/usage`, {
+      method: 'POST'
+    }),
+  });
+
+  const handleTemplateSelect = (template: CommunicationTemplate) => {
+    setSelectedTemplate(template);
+    incrementUsageMutation.mutate(template.id);
+    setFlyerContent({
+      title: template.name,
+      content: template.content,
+      callToAction: 'Learn more about this change'
+    });
+    setShowTemplateModal(false);
+    setShowCreateModal(true);
+  };
+
+  const handleGenerateContent = () => {
+    if (!currentProject) return;
+    
+    setIsGeneratingContent(true);
+    generateContentMutation.mutate({
+      projectName: currentProject.name,
+      changeDescription: currentProject.description,
+      targetAudience: ['All Staff'],
+      keyMessages: ['Important change initiative', 'Benefits for the organization']
+    });
+  };
+
+  const handleSaveFlyer = () => {
+    if (!flyerContent.title || !flyerContent.content) {
+      toast({ title: "Please fill in title and content", variant: "destructive" });
+      return;
+    }
+
+    createFlyerMutation.mutate({
+      title: flyerContent.title,
+      content: flyerContent.content,
+      targetAudience: ['All Staff'],
+      templateId: selectedTemplate?.id || null,
+      isGptGenerated: isGeneratingContent,
+      exportOptions: { powerpoint: true, canva: true, pdf: true }
+    });
+  };
+
+  const filteredTemplates = templates.filter((template: CommunicationTemplate) => 
+    template.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+    (selectedCategory === 'all' || template.category === selectedCategory)
+  );
+
+  const filteredFlyers = flyerFlyers.filter((flyer: Communication) =>
+    flyer.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Distribution mutation with enhanced UX feedback
+  const distributeFlyerMutation = useMutation({
+    mutationFn: ({ flyerId, method, recipients, dryRun }: { 
+      flyerId: string; 
+      method: string; 
+      recipients?: string[]; 
+      dryRun?: boolean 
+    }) => 
+      apiRequest(`/api/communications/${flyerId}/distribute`, {
+        method: 'POST',
+        body: { 
+          distributionMethod: method,
+          recipients: recipients || [],
+          dryRun: dryRun || false
+        },
+        headers: {
+          'x-user-id': '550e8400-e29b-41d4-a716-446655440000' // Demo user ID for development
+        }
+      }),
+    onSuccess: (data, { method, dryRun }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      
+      if (dryRun) {
+        toast({ 
+          title: "Dry Run Complete", 
+          description: `Would distribute to ${data.distributionResult?.sent || 0} recipients via ${method}. No emails were actually sent.`,
+          variant: "default"
+        });
+      } else {
+        const successCount = data.distributionResult?.sent || 0;
+        const failCount = data.distributionResult?.failed || 0;
+        toast({ 
+          title: "Distribution Complete", 
+          description: `Successfully sent to ${successCount} recipients${failCount > 0 ? `, ${failCount} failed` : ''} via ${method}.`,
+          variant: failCount > 0 ? "destructive" : "default"
+        });
+      }
+      
+      setShowDistributeModal(false);
+    },
+    onError: (error: any) => {
+      let errorMessage = "Failed to distribute flyer";
+      
+      if (error?.message?.includes('Rate limit')) {
+        errorMessage = "Rate limit exceeded. Please wait before sending more distributions.";
+      } else if (error?.message?.includes('production')) {
+        errorMessage = "Email distribution disabled in production environment.";
+      } else if (error?.message?.includes('Authentication')) {
+        errorMessage = "Authentication required. Please log in.";
+      } else if (error?.message?.includes('permission')) {
+        errorMessage = "Insufficient permissions for bulk email distribution.";
+      }
+      
+      toast({ 
+        title: "Distribution Failed", 
+        description: errorMessage,
+        variant: "destructive" 
+      });
+    }
+  });
+
+  // Export mutation with enhanced UX feedback
+  const exportFlyerMutation = useMutation({
+    mutationFn: ({ flyerId, format }: { flyerId: string; format: string }) => 
+      apiRequest(`/api/communications/${flyerId}/export`, {
+        method: 'POST',
+        body: { format },
+        headers: {
+          'x-user-id': '550e8400-e29b-41d4-a716-446655440000' // Demo user ID for development
+        }
+      }),
+    onSuccess: (data, { format }) => {
+      // Create and trigger download
+      if (data.downloadUrl) {
+        const link = document.createElement('a');
+        link.href = data.downloadUrl;
+        link.download = data.filename || `flyer.${format === 'canva' ? 'png' : format}`;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toast({ 
+          title: "Export Complete", 
+          description: `${data.filename} has been downloaded successfully.`,
+          variant: "default"
+        });
+      } else {
+        toast({ title: `Flyer exported to ${format} format successfully` });
+      }
+    },
+    onError: (error: any) => {
+      let errorMessage = "Failed to export flyer";
+      
+      if (error?.message?.includes('Rate limit')) {
+        errorMessage = "Export rate limit exceeded. Please wait before requesting more exports.";
+      } else if (error?.message?.includes('Authentication')) {
+        errorMessage = "Authentication required. Please log in.";
+      } else if (error?.message?.includes('permission')) {
+        errorMessage = "Insufficient permissions to export communications.";
+      } else if (error?.message?.includes('format')) {
+        errorMessage = "Invalid export format specified.";
+      }
+      
+      toast({ 
+        title: "Export Failed", 
+        description: errorMessage,
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const handleDistribute = (flyer: Communication) => {
+    setDistributionFlyer(flyer);
+    setShowDistributeModal(true);
+  };
+
+  const handleExport = (flyer: Communication, format: string) => {
+    exportFlyerMutation.mutate({ flyerId: flyer.id, format });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header with Action Buttons */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold">Flyers Execution</h2>
+          <p className="text-muted-foreground">Create, manage, and distribute flyers for your change initiative</p>
+        </div>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => setShowTemplateModal(true)}
+            className="flex items-center gap-2"
+            data-testid="button-new-flyer"
+          >
+            <Plus className="w-4 h-4" />
+            New Flyer
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setActiveView(activeView === 'repository' ? 'manage' : 'repository')}
+            data-testid="button-toggle-view"
+          >
+            {activeView === 'repository' ? <Settings className="w-4 h-4 mr-2" /> : <FileText className="w-4 h-4 mr-2" />}
+            {activeView === 'repository' ? 'Manage' : 'Repository'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Search and Filter Bar */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <Input
+            placeholder="Search flyers and templates..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            data-testid="input-search"
+          />
+        </div>
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger className="w-[200px]" data-testid="select-category">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            <SelectItem value="flyer">Flyers</SelectItem>
+            <SelectItem value="announcement">Announcements</SelectItem>
+            <SelectItem value="update">Updates</SelectItem>
+            <SelectItem value="training">Training</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Main Content */}
+      <Tabs value={activeView} onValueChange={setActiveView as any} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="repository" data-testid="tab-repository">
+            <FileText className="w-4 h-4 mr-2" />
+            Repository
+          </TabsTrigger>
+          <TabsTrigger value="create" data-testid="tab-create">
+            <Plus className="w-4 h-4 mr-2" />
+            Create New
+          </TabsTrigger>
+          <TabsTrigger value="manage" data-testid="tab-manage">
+            <Settings className="w-4 h-4 mr-2" />
+            Templates
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Repository View */}
+        <TabsContent value="repository" className="space-y-4" data-testid="repository-content">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {flyersLoading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <Card key={i} className="p-4">
+                  <Skeleton className="h-4 w-3/4 mb-2" />
+                  <Skeleton className="h-20 w-full mb-4" />
+                  <div className="flex gap-2">
+                    <Skeleton className="h-8 w-16" />
+                    <Skeleton className="h-8 w-16" />
+                  </div>
+                </Card>
+              ))
+            ) : filteredFlyers.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-muted-foreground">
+                <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">No flyers found</h3>
+                <p className="text-sm">Create your first flyer to get started</p>
+              </div>
+            ) : (
+              filteredFlyers.map((flyer: Communication) => (
+                <Card key={flyer.id} className="p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-medium text-sm line-clamp-2" data-testid={`text-flyer-title-${flyer.id}`}>
+                      {flyer.title}
+                    </h3>
+                    <Badge variant={flyer.status === 'sent' ? 'default' : 'secondary'}>
+                      {flyer.status}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                    {flyer.content.substring(0, 100)}...
+                  </p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setCurrentFlyer(flyer);
+                      setShowPreviewModal(true);
+                    }} data-testid={`button-preview-${flyer.id}`}>
+                      <Eye className="w-3 h-3 mr-1" />
+                      Preview
+                    </Button>
+                    <Button size="sm" variant="outline" data-testid={`button-edit-${flyer.id}`}>
+                      <Edit className="w-3 h-3 mr-1" />
+                      Edit
+                    </Button>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Create New View */}
+        <TabsContent value="create" className="space-y-6" data-testid="create-content">
+          <Card className="p-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Create New Flyer</h3>
+                <Button 
+                  variant="outline" 
+                  onClick={handleGenerateContent}
+                  disabled={isGeneratingContent || !currentProject}
+                  data-testid="button-generate-content"
+                >
+                  {isGeneratingContent ? (
+                    <>
+                      <Clock className="w-4 h-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Bot className="w-4 h-4 mr-2" />
+                      Generate with AI
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              <div className="grid gap-4">
+                <div>
+                  <Label htmlFor="title">Flyer Title</Label>
+                  <Input
+                    id="title"
+                    value={flyerContent.title}
+                    onChange={(e) => setFlyerContent({ ...flyerContent, title: e.target.value })}
+                    placeholder="Enter flyer title..."
+                    data-testid="input-flyer-title"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="content">Content</Label>
+                  <Textarea
+                    id="content"
+                    value={flyerContent.content}
+                    onChange={(e) => setFlyerContent({ ...flyerContent, content: e.target.value })}
+                    placeholder="Enter flyer content..."
+                    rows={8}
+                    data-testid="textarea-flyer-content"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="cta">Call to Action</Label>
+                  <Input
+                    id="cta"
+                    value={flyerContent.callToAction}
+                    onChange={(e) => setFlyerContent({ ...flyerContent, callToAction: e.target.value })}
+                    placeholder="Enter call to action..."
+                    data-testid="input-flyer-cta"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button onClick={handleSaveFlyer} disabled={createFlyerMutation.isPending} data-testid="button-save-flyer">
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Flyer
+                </Button>
+                <Button variant="outline" onClick={() => setShowPreviewModal(true)} data-testid="button-preview-flyer">
+                  <Eye className="w-4 h-4 mr-2" />
+                  Preview
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </TabsContent>
+
+        {/* Template Management View */}
+        <TabsContent value="manage" className="space-y-4" data-testid="manage-content">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {templatesLoading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <Card key={i} className="p-4">
+                  <Skeleton className="h-4 w-3/4 mb-2" />
+                  <Skeleton className="h-20 w-full mb-4" />
+                  <Skeleton className="h-8 w-full" />
+                </Card>
+              ))
+            ) : filteredTemplates.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-muted-foreground">
+                <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">No templates found</h3>
+                <p className="text-sm">Add templates to help create consistent flyers</p>
+              </div>
+            ) : (
+              filteredTemplates.map((template: CommunicationTemplate) => (
+                <Card key={template.id} className="p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => handleTemplateSelect(template)}>
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-medium text-sm line-clamp-2" data-testid={`text-template-title-${template.id}`}>
+                      {template.name}
+                    </h3>
+                    <Badge variant="outline">
+                      {template.templateType}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                    {template.description}
+                  </p>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Used {template.usageCount || 0} times</span>
+                    <Badge variant={template.isActive ? 'default' : 'secondary'}>
+                      {template.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Template Selection Modal */}
+      <Dialog open={showTemplateModal} onOpenChange={setShowTemplateModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Select a Template</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredTemplates.map((template: CommunicationTemplate) => (
+              <Card key={template.id} className="p-4 hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => handleTemplateSelect(template)}>
+                <h3 className="font-medium mb-2">{template.name}</h3>
+                <p className="text-sm text-muted-foreground mb-4">{template.description}</p>
+                <div className="text-xs text-muted-foreground">
+                  Used {template.usageCount || 0} times • {template.templateType}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Modal */}
+      <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Flyer Preview</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="border rounded-lg p-6 bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/20 dark:to-background">
+              <h2 className="text-xl font-bold mb-4 text-center">
+                {currentFlyer?.title || flyerContent.title}
+              </h2>
+              <div className="prose max-w-none text-sm">
+                {currentFlyer?.content || flyerContent.content}
+              </div>
+              {(currentFlyer || flyerContent.callToAction) && (
+                <div className="mt-6 text-center">
+                  <Button variant="default" data-testid="button-preview-cta">
+                    {currentFlyer?.['callToAction'] || flyerContent.callToAction}
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 justify-center">
+              <Button 
+                variant="outline" 
+                onClick={() => handleExport(currentFlyer!, 'powerpoint')}
+                disabled={!currentFlyer || exportFlyerMutation.isPending}
+                data-testid="button-export-powerpoint"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Export to PowerPoint
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => handleExport(currentFlyer!, 'canva')}
+                disabled={!currentFlyer || exportFlyerMutation.isPending}
+                data-testid="button-export-canva"
+              >
+                <TrendingUp className="w-4 h-4 mr-2" />
+                Export to Canva
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => handleDistribute(currentFlyer!)}
+                disabled={!currentFlyer}
+                data-testid="button-distribute"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Distribute
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Distribution Modal */}
+      <Dialog open={showDistributeModal} onOpenChange={setShowDistributeModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Distribute Flyer</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              How would you like to distribute "{distributionFlyer?.title}"?
+            </p>
+            <div className="space-y-2">
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => distributeFlyerMutation.mutate({ 
+                  flyerId: distributionFlyer!.id, 
+                  method: 'group_email' 
+                })}
+                disabled={distributeFlyerMutation.isPending}
+                data-testid="button-distribute-group-email"
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                Distribute by Group Email
+              </Button>
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => distributeFlyerMutation.mutate({ 
+                  flyerId: distributionFlyer!.id, 
+                  method: 'p2p_email' 
+                })}
+                disabled={distributeFlyerMutation.isPending}
+                data-testid="button-distribute-p2p-email"
+              >
+                <User className="w-4 h-4 mr-2" />
+                Distribute by P2P Email
+              </Button>
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => {
+                  // Just close modal for "store only" option
+                  setShowDistributeModal(false);
+                  toast({ title: "Flyer stored for records only" });
+                }}
+                data-testid="button-store-only"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Store for Records Only
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 // Frontend-only interface for resistance points (not persisted to database)
 // These are used only for local state management and GPT API interactions
@@ -934,19 +1554,9 @@ export default function Communications() {
               <ChannelPreferences />
             </TabsContent>
 
-            {/* Execution Tab Content (Existing) */}
+            {/* Execution Tab Content (Flyers Implementation) */}
             <TabsContent value="execution" className="space-y-6" data-testid="execution-content">
-              <div className="text-center py-8 text-muted-foreground">
-                <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-medium mb-2">Communication Execution</h3>
-                <p className="text-sm">
-                  This section will contain communication templates, scheduling, and delivery tracking.
-                </p>
-                <Button variant="outline" className="mt-4" data-testid="button-coming-soon">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Coming Soon
-                </Button>
-              </div>
+              <FlyersExecutionModule />
             </TabsContent>
           </Tabs>
         </CardContent>

@@ -1285,3 +1285,17 @@ export type InsertUserGroupMembership = z.infer<typeof insertUserGroupMembership
 
 export type UserPermission = typeof userPermissions.$inferSelect;
 export type InsertUserPermission = z.infer<typeof insertUserPermissionSchema>;
+
+// Security validation schemas for API endpoints
+export const distributionRequestSchema = z.object({
+  distributionMethod: z.enum(['email', 'slack', 'teams']).default('email'),
+  recipients: z.array(z.string().email()).optional(),
+  dryRun: z.boolean().default(false)
+});
+
+export const exportRequestSchema = z.object({
+  format: z.enum(['powerpoint', 'pdf', 'canva'])
+});
+
+export type DistributionRequest = z.infer<typeof distributionRequestSchema>;
+export type ExportRequest = z.infer<typeof exportRequestSchema>;

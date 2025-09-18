@@ -1,13 +1,14 @@
 import bcrypt from 'bcrypt';
 import { 
   users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
-  userGroups, userGroupMemberships, userPermissions, communicationStrategy,
+  userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type Survey, type InsertSurvey,
   type SurveyResponse, type InsertSurveyResponse, type GptInteraction, type InsertGptInteraction,
   type Milestone, type InsertMilestone, type ChecklistTemplate, type InsertChecklistTemplate,
   type ProcessMap, type InsertProcessMap, type CommunicationStrategy, type InsertCommunicationStrategy,
+  type CommunicationTemplate, type InsertCommunicationTemplate,
   type Role, type InsertRole, type UserInitiativeAssignment, type InsertUserInitiativeAssignment,
   type Permissions, type UserGroup, type InsertUserGroup, type UserGroupMembership, 
   type InsertUserGroupMembership, type UserPermission, type InsertUserPermission
@@ -77,6 +78,16 @@ export interface IStorage {
   createCommunicationStrategy(strategy: InsertCommunicationStrategy): Promise<CommunicationStrategy>;
   updateCommunicationStrategy(id: string, strategy: Partial<InsertCommunicationStrategy>): Promise<CommunicationStrategy | undefined>;
   deleteCommunicationStrategy(id: string): Promise<boolean>;
+
+  // Communication Templates
+  getCommunicationTemplates(): Promise<CommunicationTemplate[]>;
+  getCommunicationTemplatesByCategory(category: string): Promise<CommunicationTemplate[]>;
+  getActiveCommunicationTemplates(): Promise<CommunicationTemplate[]>;
+  getCommunicationTemplate(id: string): Promise<CommunicationTemplate | undefined>;
+  createCommunicationTemplate(template: InsertCommunicationTemplate): Promise<CommunicationTemplate>;
+  updateCommunicationTemplate(id: string, template: Partial<InsertCommunicationTemplate>): Promise<CommunicationTemplate | undefined>;
+  deleteCommunicationTemplate(id: string): Promise<boolean>;
+  incrementTemplateUsage(id: string): Promise<void>;
 
   // Surveys
   getSurveysByProject(projectId: string): Promise<Survey[]>;
@@ -909,6 +920,52 @@ export class DatabaseStorage implements IStorage {
   async deleteMilestone(id: string): Promise<boolean> {
     const result = await db.delete(milestones).where(eq(milestones.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Communication Templates
+  async getCommunicationTemplates(): Promise<CommunicationTemplate[]> {
+    return await db.select().from(communicationTemplates).orderBy(desc(communicationTemplates.createdAt));
+  }
+
+  async getCommunicationTemplatesByCategory(category: string): Promise<CommunicationTemplate[]> {
+    return await db.select().from(communicationTemplates)
+      .where(eq(communicationTemplates.category, category))
+      .orderBy(desc(communicationTemplates.createdAt));
+  }
+
+  async getActiveCommunicationTemplates(): Promise<CommunicationTemplate[]> {
+    return await db.select().from(communicationTemplates)
+      .where(eq(communicationTemplates.isActive, true))
+      .orderBy(desc(communicationTemplates.createdAt));
+  }
+
+  async getCommunicationTemplate(id: string): Promise<CommunicationTemplate | undefined> {
+    const [template] = await db.select().from(communicationTemplates).where(eq(communicationTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createCommunicationTemplate(template: InsertCommunicationTemplate): Promise<CommunicationTemplate> {
+    const [created] = await db.insert(communicationTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateCommunicationTemplate(id: string, template: Partial<InsertCommunicationTemplate>): Promise<CommunicationTemplate | undefined> {
+    const [updated] = await db.update(communicationTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(communicationTemplates.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteCommunicationTemplate(id: string): Promise<boolean> {
+    const result = await db.delete(communicationTemplates).where(eq(communicationTemplates.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async incrementTemplateUsage(id: string): Promise<void> {
+    await db.update(communicationTemplates)
+      .set({ usageCount: sql`${communicationTemplates.usageCount} + 1` })
+      .where(eq(communicationTemplates.id, id));
   }
 
   // Checklist Templates

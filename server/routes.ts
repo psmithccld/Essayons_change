@@ -1,9 +1,39 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+
+// SECURITY: Session type declaration
+declare module 'express-session' {
+  interface SessionData {
+    userId?: string;
+    user?: {
+      id: string;
+      username: string;
+      name: string;
+      roleId: string;
+      isActive: boolean;
+    };
+  }
+}
+
+interface SessionRequest extends Request {
+  session: {
+    userId?: string;
+    user?: {
+      id: string;
+      username: string;
+      name: string;
+      roleId: string;
+      isActive: boolean;
+    };
+    regenerate(callback: (err?: any) => void): void;
+    destroy(callback: (err?: any) => void): void;
+    save(callback?: (err?: any) => void): void;
+  };
+}
 import { storage } from "./storage";
 import { 
   insertProjectSchema, insertTaskSchema, insertStakeholderSchema, insertRaidLogSchema,
-  insertCommunicationSchema, insertCommunicationStrategySchema, insertSurveySchema, baseSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
+  insertCommunicationSchema, insertCommunicationStrategySchema, insertCommunicationTemplateSchema, insertSurveySchema, baseSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
   insertMilestoneSchema, insertChecklistTemplateSchema, insertProcessMapSchema,
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema,
   insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
@@ -12,37 +42,166 @@ import {
 } from "@shared/schema";
 import * as openaiService from "./openai";
 import { sendTaskAssignmentNotification } from "./services/emailService";
+import { z } from "zod";
 
-// SECURITY: Permission enforcement middleware
-interface AuthenticatedRequest extends Request {
+// Input validation schemas
+const distributionRequestSchema = z.object({
+  distributionMethod: z.enum(['email', 'print', 'digital_display']),
+  recipients: z.array(z.string().email()).optional(),
+  dryRun: z.boolean().default(false),
+  environment: z.string().optional()
+});
+
+const exportRequestSchema = z.object({
+  format: z.enum(['powerpoint', 'pdf', 'canva'])
+});
+
+// Rate limiting store (in production, use Redis)
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+// Rate limiting helper
+const checkRateLimit = (userId: string, limit: number = 10, windowMs: number = 60000): boolean => {
+  const now = Date.now();
+  const userLimit = rateLimitStore.get(userId);
+  
+  if (!userLimit || now > userLimit.resetTime) {
+    rateLimitStore.set(userId, { count: 1, resetTime: now + windowMs });
+    return true;
+  }
+  
+  if (userLimit.count >= limit) {
+    return false;
+  }
+  
+  userLimit.count++;
+  return true;
+};
+
+// Environment safety check
+const checkEnvironmentSafety = (operation: 'email' | 'bulk_email'): { safe: boolean; message?: string } => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const allowProductionEmail = process.env.ALLOW_PRODUCTION_EMAIL === 'true';
+  
+  if (isProduction && !allowProductionEmail && operation === 'bulk_email') {
+    return {
+      safe: false,
+      message: 'Bulk email distribution is disabled in production without explicit configuration'
+    };
+  }
+  
+  if (isDevelopment && !process.env.SENDGRID_API_KEY) {
+    return {
+      safe: false,
+      message: 'Email service not configured in development environment'
+    };
+  }
+  
+  return { safe: true };
+};
+
+// SECURITY: Session-based authentication interfaces
+interface AuthenticatedRequest extends SessionRequest {
   userId?: string;
+  user?: {
+    id: string;
+    username: string;
+    name: string;
+    roleId: string;
+    isActive: boolean;
+  };
 }
 
-// For demo purposes, using a hardcoded user ID - in production, get from session/token
-const DEMO_USER_ID = "550e8400-e29b-41d4-a716-446655440000";
+// SECURITY: Authentication middleware - uses secure session-based authentication
+const requireAuth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    // SECURITY: Block x-user-id header in production to prevent spoofing
+    if (process.env.NODE_ENV === 'production' && req.headers['x-user-id']) {
+      console.warn('Blocked x-user-id header in production environment');
+      return res.status(400).json({ error: "Invalid authentication method" });
+    }
+    
+    // Get userId from session (secure, server-side stored)
+    let userId = req.session?.userId;
+    
+    // SECURITY: Only allow demo user fallback in development environment
+    if (!userId && process.env.NODE_ENV === 'development') {
+      // Check if x-user-id header is provided for development convenience
+      const headerUserId = req.headers['x-user-id'] as string;
+      if (headerUserId) {
+        userId = headerUserId;
+        console.warn('Using x-user-id header in development mode - NOT SECURE FOR PRODUCTION');
+      } else {
+        // Fall back to demo user only in development
+        userId = "550e8400-e29b-41d4-a716-446655440000";
+        console.warn('Using demo user ID in development mode');
+      }
+    }
+    
+    if (!userId) {
+      return res.status(401).json({ error: "Authentication required. Please log in." });
+    }
+    
+    // Verify user exists and is active
+    const user = await storage.getUser(userId);
+    if (!user || !user.isActive) {
+      // Clear invalid session
+      if (req.session) {
+        req.session.userId = undefined;
+        req.session.user = undefined;
+      }
+      return res.status(401).json({ error: "Invalid or inactive user account." });
+    }
+    
+    // Store user info for use in route handlers
+    req.userId = userId;
+    req.user = {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      roleId: user.roleId,
+      isActive: user.isActive
+    };
+    
+    // Update session with current user data
+    if (req.session && process.env.NODE_ENV !== 'development') {
+      req.session.userId = user.id;
+      req.session.user = req.user;
+    }
+    
+    next();
+  } catch (error) {
+    console.error("Authentication error:", error);
+    res.status(500).json({ error: "Authentication check failed" });
+  }
+};
 
-// Permission middleware factory
+// Permission middleware factory - requires authentication first
 const requirePermission = (permission: keyof Permissions) => {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      // In production, extract userId from session/token
-      const userId = req.userId || DEMO_USER_ID;
+      if (!req.userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
       
-      const hasPermission = await storage.checkUserPermission(userId, permission);
+      const hasPermission = await storage.checkUserPermission(req.userId, permission);
       if (!hasPermission) {
         return res.status(403).json({ 
           error: `Access denied. Required permission: ${permission}` 
         });
       }
       
-      // Store userId for use in route handlers
-      req.userId = userId;
       next();
     } catch (error) {
       console.error("Error checking permission:", error);
       res.status(500).json({ error: "Permission check failed" });
     }
   };
+};
+
+// Combined middleware for auth + permission
+const requireAuthAndPermission = (permission: keyof Permissions) => {
+  return [requireAuth, requirePermission(permission)];
 };
 
 // Helper function to build complete RAID log from template-specific data
@@ -118,8 +277,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Authentication
-  app.post("/api/auth/login", async (req, res) => {
+  // SECURITY: Authentication endpoints with session management
+  app.post("/api/auth/login", async (req: SessionRequest, res) => {
     try {
       const { username, password } = req.body;
       
@@ -132,29 +291,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid username or password" });
       }
       
+      if (!user.isActive) {
+        return res.status(401).json({ error: "Account is inactive" });
+      }
+      
       // Get user role information
       const role = await storage.getRole(user.roleId);
       if (!role) {
         return res.status(500).json({ error: "User role not found" });
       }
       
-      // User already has passwordHash removed by storage layer
-      res.json({
-        user: user,
-        role,
-        permissions: role.permissions
+      // SECURITY: Regenerate session ID to prevent session fixation attacks
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error("Session regeneration error:", err);
+          return res.status(500).json({ error: "Session creation failed" });
+        }
+        
+        // Store user information in session
+        req.session.userId = user.id;
+        req.session.user = {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          roleId: user.roleId,
+          isActive: user.isActive
+        };
+        
+        // Save session
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            return res.status(500).json({ error: "Session creation failed" });
+          }
+          
+          // Return user data and permissions (passwordHash already removed by storage layer)
+          res.json({
+            user: user,
+            role,
+            permissions: role.permissions,
+            sessionEstablished: true
+          });
+        });
       });
     } catch (error) {
       console.error("Error during login:", error);
       res.status(500).json({ error: "Login failed" });
     }
   });
+  
+  // SECURITY: Logout endpoint that destroys sessions
+  app.post("/api/auth/logout", async (req: SessionRequest, res) => {
+    try {
+      if (req.session) {
+        req.session.destroy((err) => {
+          if (err) {
+            console.error("Session destruction error:", err);
+            return res.status(500).json({ error: "Logout failed" });
+          }
+          
+          // Clear the session cookie
+          res.clearCookie('essayons.sid');
+          res.json({ message: "Logged out successfully" });
+        });
+      } else {
+        res.json({ message: "No active session found" });
+      }
+    } catch (error) {
+      console.error("Error during logout:", error);
+      res.status(500).json({ error: "Logout failed" });
+    }
+  });
+  
+  // SECURITY: Check authentication status endpoint
+  app.get("/api/auth/status", async (req: SessionRequest, res) => {
+    try {
+      if (req.session?.userId) {
+        // Verify user still exists and is active
+        const user = await storage.getUser(req.session.userId);
+        if (user && user.isActive) {
+          const role = await storage.getRole(user.roleId);
+          return res.json({
+            authenticated: true,
+            user: {
+              id: user.id,
+              username: user.username,
+              name: user.name,
+              roleId: user.roleId,
+              isActive: user.isActive
+            },
+            role,
+            permissions: role?.permissions
+          });
+        } else {
+          // User no longer exists or is inactive, clear session
+          req.session.destroy(() => {});
+        }
+      }
+      
+      res.json({ authenticated: false });
+    } catch (error) {
+      console.error("Error checking auth status:", error);
+      res.status(500).json({ error: "Authentication status check failed" });
+    }
+  });
 
   // RBAC: User permissions endpoint for frontend permission gating
-  app.get("/api/users/me/permissions", async (req: AuthenticatedRequest, res) => {
+  app.get("/api/users/me/permissions", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      // For demo purposes, using a hardcoded user ID - in production, get from session/token
-      const userId = req.userId || DEMO_USER_ID;
+      const userId = req.userId!; // Always available after requireAuth middleware
       
       const permissions = await storage.getUserPermissions(userId);
       const user = await storage.getUser(userId);
@@ -191,10 +436,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard
-  app.get("/api/dashboard/stats", async (req, res) => {
+  app.get("/api/dashboard/stats", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      // For demo, using a default user ID - in production, get from auth
-      const userId = "550e8400-e29b-41d4-a716-446655440000";
+      const userId = req.userId!;
       const stats = await storage.getDashboardStats(userId);
       res.json(stats);
     } catch (error) {
@@ -204,9 +448,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Projects
-  app.get("/api/projects", async (req, res) => {
+  app.get("/api/projects", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = "550e8400-e29b-41d4-a716-446655440000";
+      const userId = req.userId!;
       const projects = await storage.getProjects(userId);
       res.json(projects);
     } catch (error) {
@@ -233,7 +477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Convert date strings to Date objects before validation
       const processedData = {
         ...req.body,
-        ownerId: req.userId || DEMO_USER_ID, // Use authenticated user ID
+        ownerId: req.userId!, // Use authenticated user ID
         startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
         endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
       };
@@ -575,11 +819,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/checklist-templates", async (req, res) => {
+  app.post("/api/checklist-templates", requireAuthAndPermission('canModifyChecklistTemplates'), async (req: AuthenticatedRequest, res) => {
     try {
       const processedData = {
         ...req.body,
-        createdById: "550e8400-e29b-41d4-a716-446655440000", // For demo, using default user ID
+        createdById: req.userId!,
       };
       
       const validatedData = insertChecklistTemplateSchema.parse(processedData);
@@ -614,6 +858,358 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting checklist template:", error);
       res.status(500).json({ error: "Failed to delete checklist template" });
+    }
+  });
+
+  // Communication Templates
+  app.get("/api/communication-templates", requirePermission('canSeeCommunications'), async (req, res) => {
+    try {
+      const templates = await storage.getCommunicationTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching communication templates:", error);
+      res.status(500).json({ error: "Failed to fetch communication templates" });
+    }
+  });
+
+  app.get("/api/communication-templates/active", requirePermission('canSeeCommunications'), async (req, res) => {
+    try {
+      const templates = await storage.getActiveCommunicationTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching active communication templates:", error);
+      res.status(500).json({ error: "Failed to fetch active communication templates" });
+    }
+  });
+
+  app.get("/api/communication-templates/category/:category", requirePermission('canSeeCommunications'), async (req, res) => {
+    try {
+      const templates = await storage.getCommunicationTemplatesByCategory(req.params.category);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching communication templates by category:", error);
+      res.status(500).json({ error: "Failed to fetch communication templates by category" });
+    }
+  });
+
+  app.get("/api/communication-templates/:id", requirePermission('canSeeCommunications'), async (req, res) => {
+    try {
+      const template = await storage.getCommunicationTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Communication template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching communication template:", error);
+      res.status(500).json({ error: "Failed to fetch communication template" });
+    }
+  });
+
+  app.post("/api/communication-templates", requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const processedData = {
+        ...req.body,
+        createdById: req.userId || DEMO_USER_ID,
+      };
+      
+      const validatedData = insertCommunicationTemplateSchema.parse(processedData);
+      const template = await storage.createCommunicationTemplate(validatedData);
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating communication template:", error);
+      res.status(400).json({ error: "Failed to create communication template" });
+    }
+  });
+
+  app.put("/api/communication-templates/:id", requirePermission('canEditCommunications'), async (req, res) => {
+    try {
+      const template = await storage.updateCommunicationTemplate(req.params.id, req.body);
+      if (!template) {
+        return res.status(404).json({ error: "Communication template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating communication template:", error);
+      res.status(400).json({ error: "Failed to update communication template" });
+    }
+  });
+
+  app.delete("/api/communication-templates/:id", requirePermission('canDeleteCommunications'), async (req, res) => {
+    try {
+      const success = await storage.deleteCommunicationTemplate(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Communication template not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting communication template:", error);
+      res.status(500).json({ error: "Failed to delete communication template" });
+    }
+  });
+
+  // Increment template usage count
+  app.post("/api/communication-templates/:id/usage", requirePermission('canSeeCommunications'), async (req, res) => {
+    try {
+      await storage.incrementTemplateUsage(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error incrementing template usage:", error);
+      res.status(500).json({ error: "Failed to increment template usage" });
+    }
+  });
+
+  // GPT Content Generation for Flyers
+  app.post("/api/gpt/generate-flyer-content", requirePermission('canModifyCommunications'), async (req, res) => {
+    try {
+      const { projectName, changeDescription, targetAudience, keyMessages, template } = req.body;
+      
+      if (!projectName || !targetAudience) {
+        return res.status(400).json({ error: "Project name and target audience are required" });
+      }
+
+      const content = await openaiService.generateChangeContent('flyer', {
+        projectName,
+        changeDescription: changeDescription || '',
+        targetAudience: Array.isArray(targetAudience) ? targetAudience : [targetAudience],
+        keyMessages: Array.isArray(keyMessages) ? keyMessages : (keyMessages ? [keyMessages] : [])
+      });
+
+      res.json(content);
+    } catch (error) {
+      console.error("Error generating flyer content:", error);
+      res.status(500).json({ error: "Failed to generate flyer content" });
+    }
+  });
+
+  // GPT Content Refinement for Flyers
+  app.post("/api/gpt/refine-flyer-content", requirePermission('canModifyCommunications'), async (req, res) => {
+    try {
+      const { currentContent, refinementRequest, context } = req.body;
+      
+      if (!currentContent || !refinementRequest) {
+        return res.status(400).json({ error: "Current content and refinement request are required" });
+      }
+
+      const prompt = `Refine this flyer content based on the request:
+
+Current content:
+Title: ${currentContent.title || 'No title'}
+Content: ${currentContent.content || 'No content'}
+Call to Action: ${currentContent.callToAction || 'No CTA'}
+
+Refinement request: ${refinementRequest}
+
+Context: ${JSON.stringify(context || {})}
+
+Return the refined content in JSON format:
+{
+  "title": "refined title",
+  "content": "refined content body",
+  "callToAction": "refined call to action"
+}`;
+
+      const { openai } = await import("./openai");
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      });
+
+      const refinedContent = JSON.parse(response.choices[0].message.content || "{}");
+      res.json(refinedContent);
+    } catch (error) {
+      console.error("Error refining flyer content:", error);
+      res.status(500).json({ error: "Failed to refine flyer content" });
+    }
+  });
+
+  // Flyer Distribution - SECURITY: Requires bulk email permission and proper auth
+  app.post("/api/communications/:id/distribute", requireAuthAndPermission('canSendBulkEmails'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // SECURITY: Input validation with Zod
+      const validatedInput = distributionRequestSchema.parse(req.body);
+      const { distributionMethod, recipients, dryRun } = validatedInput;
+      
+      // SECURITY: Rate limiting check
+      if (!checkRateLimit(req.userId!, 5, 300000)) { // 5 distributions per 5 minutes
+        return res.status(429).json({ 
+          error: "Rate limit exceeded. Please wait before sending more distributions." 
+        });
+      }
+      
+      // SECURITY: Environment safety check
+      const safetyCheck = checkEnvironmentSafety('bulk_email');
+      if (!safetyCheck.safe) {
+        return res.status(403).json({ 
+          error: safetyCheck.message,
+          hint: "Set ALLOW_PRODUCTION_EMAIL=true if you intend to send emails in production"
+        });
+      }
+
+      const communication = await storage.getCommunication(req.params.id);
+      if (!communication) {
+        return res.status(404).json({ error: "Communication not found" });
+      }
+
+      const project = await storage.getProject(communication.projectId);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      let distributionResult = { sent: 0, failed: 0, results: [] as any[] };
+
+      if (distributionMethod === 'email') {
+        // Get recipient list
+        let emailList: string[] = [];
+        
+        if (recipients && Array.isArray(recipients)) {
+          emailList = recipients;
+        } else if (communication.targetAudience && communication.targetAudience.length > 0) {
+          // For demo purposes, generate email addresses from target audience
+          // In production, this would be resolved from stakeholder database
+          emailList = communication.targetAudience.map(audience => 
+            `${audience.toLowerCase().replace(/\s+/g, '.')}@company.com`
+          );
+        } else {
+          return res.status(400).json({ error: "No recipients specified for email distribution" });
+        }
+        
+        // SECURITY: Log distribution attempt
+        console.log(`[DISTRIBUTION] User ${req.userId} initiating ${dryRun ? 'DRY RUN' : 'LIVE'} email distribution`, {
+          communicationId: req.params.id,
+          recipientCount: emailList.length,
+          projectId: communication.projectId,
+          timestamp: new Date().toISOString()
+        });
+        
+        // DRY RUN mode - simulate without sending
+        if (dryRun) {
+          distributionResult = {
+            sent: emailList.length,
+            failed: 0,
+            results: emailList.map(email => ({ email, success: true, note: 'DRY RUN - not actually sent' }))
+          };
+          console.log(`[DRY RUN] Would distribute to ${emailList.length} recipients:`, emailList);
+        } else {
+          // Import and use email service
+          const { sendBulkFlyerDistribution } = await import("./services/emailService");
+          
+          distributionResult = await sendBulkFlyerDistribution(
+            emailList,
+            communication.title,
+            communication.content,
+            project.name,
+            distributionMethod
+          );
+        }
+      }
+
+      // Update communication with distribution method and status (only for live runs)
+      const updatedCommunication = await storage.updateCommunication(req.params.id, {
+        distributionMethod,
+        status: dryRun ? 'draft' : (distributionResult.sent > 0 ? 'sent' : 'failed'),
+        sendDate: dryRun ? undefined : new Date()
+      });
+      
+      // SECURITY: Log distribution result
+      console.log(`[DISTRIBUTION RESULT] User ${req.userId}`, {
+        communicationId: req.params.id,
+        success: distributionResult.sent > 0,
+        sent: distributionResult.sent,
+        failed: distributionResult.failed,
+        dryRun,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({ 
+        success: distributionResult.sent > 0,
+        dryRun,
+        message: dryRun 
+          ? `DRY RUN: Would distribute to ${distributionResult.sent} recipients via ${distributionMethod}`
+          : `Flyer distributed via ${distributionMethod}. Sent: ${distributionResult.sent}, Failed: ${distributionResult.failed}`,
+        communication: updatedCommunication,
+        distributionResult,
+        environmentInfo: {
+          nodeEnv: process.env.NODE_ENV,
+          emailConfigured: !!process.env.SENDGRID_API_KEY
+        }
+      });
+    } catch (error) {
+      console.error("Error distributing flyer:", error);
+      res.status(500).json({ error: "Failed to distribute flyer" });
+    }
+  });
+
+  // Flyer Export - SECURITY: Requires communication permissions and proper auth
+  app.post("/api/communications/:id/export", requireAuthAndPermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // SECURITY: Input validation with Zod
+      const validatedInput = exportRequestSchema.parse(req.body);
+      const { format } = validatedInput;
+      
+      // SECURITY: Rate limiting for exports
+      if (!checkRateLimit(req.userId!, 20, 300000)) { // 20 exports per 5 minutes
+        return res.status(429).json({ 
+          error: "Export rate limit exceeded. Please wait before requesting more exports." 
+        });
+      }
+      
+      // SECURITY: Log export attempt
+      console.log(`[EXPORT] User ${req.userId} requesting ${format} export`, {
+        communicationId: req.params.id,
+        format,
+        timestamp: new Date().toISOString()
+      });
+
+      const communication = await storage.getCommunication(req.params.id);
+      if (!communication) {
+        return res.status(404).json({ error: "Communication not found" });
+      }
+
+      // Import export service
+      const { exportService } = await import("./services/exportService");
+      
+      let downloadUrl: string;
+      let fileExtension: string;
+      
+      switch (format) {
+        case 'powerpoint':
+          downloadUrl = await exportService.exportToPowerPoint(communication);
+          fileExtension = 'pptx';
+          break;
+        case 'pdf':
+          downloadUrl = await exportService.exportToPDF(communication);
+          fileExtension = 'pdf';
+          break;
+        case 'canva':
+          downloadUrl = await exportService.exportToCanvaPNG(communication);
+          fileExtension = 'png';
+          break;
+        default:
+          return res.status(400).json({ error: "Unsupported export format" });
+      }
+      
+      const exportResult = {
+        format,
+        downloadUrl,
+        filename: `${communication.title.replace(/[^a-zA-Z0-9]/g, '_')}.${fileExtension}`,
+        success: true,
+        generatedAt: new Date().toISOString(),
+        generatedBy: req.userId
+      };
+      
+      // SECURITY: Log successful export
+      console.log(`[EXPORT SUCCESS] User ${req.userId}`, {
+        communicationId: req.params.id,
+        format,
+        filename: exportResult.filename,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json(exportResult);
+    } catch (error) {
+      console.error("Error exporting flyer:", error);
+      res.status(500).json({ error: "Failed to export flyer" });
     }
   });
 
@@ -811,12 +1407,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects/:projectId/communications", async (req, res) => {
+  app.post("/api/projects/:projectId/communications", requireAuthAndPermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertCommunicationSchema.parse({
         ...req.body,
         projectId: req.params.projectId,
-        createdById: "550e8400-e29b-41d4-a716-446655440000"
+        createdById: req.userId!
       });
       const communication = await storage.createCommunication(validatedData);
       res.status(201).json(communication);
@@ -876,12 +1472,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects/:projectId/communication-strategies", requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/projects/:projectId/communication-strategies", requireAuthAndPermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertCommunicationStrategySchema.parse({
         ...req.body,
         projectId: req.params.projectId,
-        createdById: req.userId || DEMO_USER_ID
+        createdById: req.userId!
       });
       const strategy = await storage.createCommunicationStrategy(validatedData);
       res.status(201).json(strategy);
@@ -931,12 +1527,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects/:projectId/surveys", async (req, res) => {
+  app.post("/api/projects/:projectId/surveys", requireAuthAndPermission('canModifySurveys'), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertSurveySchema.parse({
         ...req.body,
         projectId: req.params.projectId,
-        createdById: "550e8400-e29b-41d4-a716-446655440000"
+        createdById: req.userId!
       });
       const survey = await storage.createSurvey(validatedData);
       res.status(201).json(survey);

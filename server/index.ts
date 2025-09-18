@@ -1,11 +1,51 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import ConnectPgSimple from "connect-pg-simple";
+import ws from "ws";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
 
 const app = express();
+
+// SECURITY: Configure session management with PostgreSQL store
+neonConfig.webSocketConstructor = ws;
+const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
+const PgSession = ConnectPgSimple(session);
+
+app.use(session({
+  store: new PgSession({
+    pool: pgPool,
+    tableName: 'session', // Uses PostgreSQL session table
+    createTableIfMissing: true,
+  }),
+  secret: process.env.SESSION_SECRET || 'fallback-secret-for-development-only',
+  resave: false,
+  saveUninitialized: false,
+  name: 'essayons.sid', // Custom session name
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true, // Prevent XSS attacks
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'strict' // CSRF protection
+  }
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// SECURITY: Serve exports directory statically for file downloads with proper cache headers
+app.use('/exports', express.static('exports', {
+  maxAge: '1d', // Cache for 1 day
+  etag: true,
+  lastModified: true,
+  setHeaders: (res, path) => {
+    // Security headers for file downloads
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+  }
+}));
 
 app.use((req, res, next) => {
   const start = Date.now();
