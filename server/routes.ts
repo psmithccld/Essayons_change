@@ -3482,6 +3482,437 @@ Return the refined content in JSON format:
     }
   });
 
+  // =====================================
+  // COMPREHENSIVE REPORTS SYSTEM ENDPOINTS
+  // =====================================
+
+  // Define report parameter validation schema
+  const reportParamsSchema = z.object({
+    authorizedProjectIds: z.array(z.string()).optional(),
+    dateFrom: z.string().datetime().optional(),
+    dateTo: z.string().datetime().optional(),
+    sortBy: z.string().optional(),
+    sortOrder: z.enum(['asc', 'desc']).optional(),
+  });
+
+  // A. User Reports
+  app.post('/api/reports/users/login-activity', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      
+      // Override with authorized projects for security
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      // Convert date strings to Date objects
+      if (params.dateFrom) params.dateFrom = new Date(params.dateFrom);
+      if (params.dateTo) params.dateTo = new Date(params.dateTo);
+      
+      const report = await storage.getUserLoginActivityReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('User login activity report error:', error);
+      res.status(500).json({ error: 'Failed to generate user login activity report' });
+    }
+  });
+
+  app.post('/api/reports/users/role-assignment', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      const report = await storage.getRoleAssignmentReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Role assignment report error:', error);
+      res.status(500).json({ error: 'Failed to generate role assignment report' });
+    }
+  });
+
+  app.post('/api/reports/users/initiatives-participation', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      const report = await storage.getInitiativesParticipationReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Initiatives participation report error:', error);
+      res.status(500).json({ error: 'Failed to generate initiatives participation report' });
+    }
+  });
+
+  // B. Task Reports
+  app.post('/api/reports/tasks/status', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      // Convert date strings to Date objects
+      if (params.dateFrom) params.dateFrom = new Date(params.dateFrom);
+      if (params.dateTo) params.dateTo = new Date(params.dateTo);
+      
+      const report = await storage.getTaskStatusReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Task status report error:', error);
+      res.status(500).json({ error: 'Failed to generate task status report' });
+    }
+  });
+
+  app.post('/api/reports/tasks/upcoming-deadlines', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      // Default to 30 days ahead if not specified
+      if (!params.daysAhead) params.daysAhead = 30;
+      
+      const report = await storage.getUpcomingDeadlinesReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Upcoming deadlines report error:', error);
+      res.status(500).json({ error: 'Failed to generate upcoming deadlines report' });
+    }
+  });
+
+  app.post('/api/reports/tasks/overdue', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      const report = await storage.getOverdueTasksReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Overdue tasks report error:', error);
+      res.status(500).json({ error: 'Failed to generate overdue tasks report' });
+    }
+  });
+
+  app.post('/api/reports/tasks/completion-trend', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      // Convert date strings to Date objects
+      if (params.dateFrom) params.dateFrom = new Date(params.dateFrom);
+      if (params.dateTo) params.dateTo = new Date(params.dateTo);
+      
+      const report = await storage.getTaskCompletionTrendReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Task completion trend report error:', error);
+      res.status(500).json({ error: 'Failed to generate task completion trend report' });
+    }
+  });
+
+  // C. RAID Reports
+  app.post('/api/reports/raid/items', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      // Convert date strings to Date objects
+      if (params.dateFrom) params.dateFrom = new Date(params.dateFrom);
+      if (params.dateTo) params.dateTo = new Date(params.dateTo);
+      
+      const report = await storage.getRaidItemReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('RAID item report error:', error);
+      res.status(500).json({ error: 'Failed to generate RAID item report' });
+    }
+  });
+
+  app.post('/api/reports/raid/high-severity-risks', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      const report = await storage.getHighSeverityRisksReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('High severity risks report error:', error);
+      res.status(500).json({ error: 'Failed to generate high severity risks report' });
+    }
+  });
+
+  app.post('/api/reports/raid/open-issues', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      const report = await storage.getOpenIssuesByInitiativeReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Open issues report error:', error);
+      res.status(500).json({ error: 'Failed to generate open issues report' });
+    }
+  });
+
+  app.post('/api/reports/raid/dependencies-at-risk', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      // Default to 30 days ahead if not specified
+      if (!params.daysAhead) params.daysAhead = 30;
+      
+      const report = await storage.getDependenciesAtRiskReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Dependencies at risk report error:', error);
+      res.status(500).json({ error: 'Failed to generate dependencies at risk report' });
+    }
+  });
+
+  // D. Stakeholder Reports
+  app.post('/api/reports/stakeholders/directory', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      const report = await storage.getStakeholderDirectoryReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Stakeholder directory report error:', error);
+      res.status(500).json({ error: 'Failed to generate stakeholder directory report' });
+    }
+  });
+
+  app.post('/api/reports/stakeholders/cross-initiative-load', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      const report = await storage.getCrossInitiativeStakeholderLoadReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Cross-initiative stakeholder load report error:', error);
+      res.status(500).json({ error: 'Failed to generate cross-initiative stakeholder load report' });
+    }
+  });
+
+  app.post('/api/reports/stakeholders/engagement', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      // Convert date strings to Date objects
+      if (params.dateFrom) params.dateFrom = new Date(params.dateFrom);
+      if (params.dateTo) params.dateTo = new Date(params.dateTo);
+      
+      const report = await storage.getStakeholderEngagementReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Stakeholder engagement report error:', error);
+      res.status(500).json({ error: 'Failed to generate stakeholder engagement report' });
+    }
+  });
+
+  // E. Readiness & Surveys Reports
+  app.post('/api/reports/readiness/phase-scores', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      const report = await storage.getPhaseReadinessScoreReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Phase readiness score report error:', error);
+      res.status(500).json({ error: 'Failed to generate phase readiness score report' });
+    }
+  });
+
+  app.post('/api/reports/surveys/responses', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      // Convert date strings to Date objects
+      if (params.dateFrom) params.dateFrom = new Date(params.dateFrom);
+      if (params.dateTo) params.dateTo = new Date(params.dateTo);
+      
+      const report = await storage.getSurveyResponseReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Survey response report error:', error);
+      res.status(500).json({ error: 'Failed to generate survey response report' });
+    }
+  });
+
+  app.post('/api/reports/surveys/sentiment-trend', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      // Convert date strings to Date objects
+      if (params.dateFrom) params.dateFrom = new Date(params.dateFrom);
+      if (params.dateTo) params.dateTo = new Date(params.dateTo);
+      
+      const report = await storage.getSentimentTrendReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Sentiment trend report error:', error);
+      res.status(500).json({ error: 'Failed to generate sentiment trend report' });
+    }
+  });
+
+  app.post('/api/reports/surveys/understanding-gaps', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      const report = await storage.getUnderstandingGapsReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Understanding gaps report error:', error);
+      res.status(500).json({ error: 'Failed to generate understanding gaps report' });
+    }
+  });
+
+  app.post('/api/reports/surveys/post-mortem-success', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      const report = await storage.getPostMortemSuccessReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Post-mortem success report error:', error);
+      res.status(500).json({ error: 'Failed to generate post-mortem success report' });
+    }
+  });
+
+  app.post('/api/reports/surveys/response-rates', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      // Convert date strings to Date objects
+      if (params.dateFrom) params.dateFrom = new Date(params.dateFrom);
+      if (params.dateTo) params.dateTo = new Date(params.dateTo);
+      
+      const report = await storage.getSurveyResponseRateReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Survey response rate report error:', error);
+      res.status(500).json({ error: 'Failed to generate survey response rate report' });
+    }
+  });
+
+  // F. Cross-Cutting Reports
+  app.post('/api/reports/cross-cutting/change-health', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      const report = await storage.getChangeHealthDashboard(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Change health dashboard error:', error);
+      res.status(500).json({ error: 'Failed to generate change health dashboard' });
+    }
+  });
+
+  app.post('/api/reports/cross-cutting/org-readiness-heatmap', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      const report = await storage.getOrgReadinessHeatmap(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Org readiness heatmap error:', error);
+      res.status(500).json({ error: 'Failed to generate org readiness heatmap' });
+    }
+  });
+
+  app.post('/api/reports/cross-cutting/stakeholder-sentiment', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const params = req.body;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      params.authorizedProjectIds = authorizedProjectIds;
+      
+      // Convert date strings to Date objects
+      if (params.dateFrom) params.dateFrom = new Date(params.dateFrom);
+      if (params.dateTo) params.dateTo = new Date(params.dateTo);
+      
+      const report = await storage.getStakeholderSentimentReport(params);
+      res.json(report);
+    } catch (error) {
+      console.error('Stakeholder sentiment report error:', error);
+      res.status(500).json({ error: 'Failed to generate stakeholder sentiment report' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

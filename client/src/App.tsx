@@ -21,6 +21,7 @@ import UserManagement from "@/pages/user-management";
 import InitiativeManagement from "@/pages/initiative-management";
 import SecurityManagement from "@/pages/security-management";
 import ChangeProcessFlow from "@/pages/fishbone";
+import Reports from "@/pages/reports";
 
 function Router() {
   return (
@@ -44,6 +45,7 @@ function Router() {
             <Route path="/security" component={SecurityManagement} />
             <Route path="/process-mapping" component={ProcessMapping} />
             <Route path="/change-process-flow" component={ChangeProcessFlow} />
+            <Route path="/reports" component={Reports} />
             <Route component={NotFound} />
           </Switch>
         </main>
