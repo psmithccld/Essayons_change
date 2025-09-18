@@ -219,7 +219,7 @@ export default function Dashboard() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Change Process Flow</CardTitle>
-              <Button variant="ghost" size="sm" data-testid="button-view-details">
+              <Button variant="ghost" size="sm" data-testid="button-view-details" onClick={() => window.location.href = '/change-process-flow'}>
                 View Details
               </Button>
             </div>

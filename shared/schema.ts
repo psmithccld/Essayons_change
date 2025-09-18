@@ -188,6 +188,7 @@ export const projects = pgTable("projects", {
   deliverables: jsonb("deliverables").default([]), // Array of deliverable objects
   stakeholderRequirements: text("stakeholder_requirements"), // Stakeholder needs
   businessJustification: text("business_justification"), // Business case
+  currentPhase: text("current_phase").notNull().default("identify_need"), // Change process phase
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
