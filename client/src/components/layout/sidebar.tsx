@@ -40,7 +40,7 @@ const allNavigationItems: NavigationItem[] = [
   { id: "checklist-templates", icon: ListChecks, label: "Checklist Templates", path: "/checklist-templates" },
   { id: "gantt", icon: ChartGantt, label: "Gantt Charts", path: "/gantt" },
   { id: "raid-logs", icon: AlertTriangle, label: "RAID Logs", path: "/raid-logs" },
-  { id: "progress-reports", icon: ChartBar, label: "Progress Reports", path: "/reports", permissions: ["canSeeReports"] },
+  { id: "reports", icon: ChartBar, label: "Reports", path: "/reports", permissions: ["canSeeReports"] },
   { id: "communications", icon: Megaphone, label: "Communications", path: "/communications" },
   { id: "stakeholders", icon: Users, label: "Stakeholders", path: "/stakeholders" },
   { id: "surveys", icon: ClipboardCheck, label: "Readiness Surveys", path: "/surveys" },
