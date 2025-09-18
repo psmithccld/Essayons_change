@@ -15,8 +15,10 @@ interface UserWithPermissions {
 export function usePermissions() {
   const query = useQuery<UserWithPermissions>({
     queryKey: ['/api/users/me/permissions'],
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: false,
+    staleTime: 1 * 60 * 1000, // Reduced to 1 minute to prevent stale data issues
+    refetchOnWindowFocus: true, // Refetch when window gets focus to ensure fresh data
+    retry: 3, // Retry on failure
+    refetchInterval: 30 * 1000, // Refetch every 30 seconds to keep data fresh
   });
 
   const permissions = query.data?.permissions;

@@ -27,10 +27,11 @@ export function RouteGuard({
   fallback,
   customCheck
 }: RouteGuardProps) {
-  const { isLoading, isError, hasPermission, hasAllPermissions, hasAnyPermission } = usePermissions();
+  const { isLoading, isError, hasPermission, hasAllPermissions, hasAnyPermission, permissions: userPermissions } = usePermissions();
 
   // Show loading state while checking permissions
-  if (isLoading) {
+  // Also ensure we don't proceed if permissions object is undefined (additional safety check)
+  if (isLoading || !userPermissions) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="space-y-4 w-full max-w-md">
@@ -69,17 +70,43 @@ export function RouteGuard({
 
   if (customCheck) {
     hasAccess = customCheck();
+    console.log("[RouteGuard] CustomCheck result:", { hasAccess, timestamp: new Date().toISOString() });
   } else if (permission) {
     hasAccess = hasPermission(permission);
+    console.log("[RouteGuard] Single permission check:", { 
+      permission, 
+      hasAccess, 
+      permissionValue: userPermissions?.[permission],
+      timestamp: new Date().toISOString() 
+    });
   } else if (permissions.length > 0) {
     hasAccess = requireAll ? hasAllPermissions(...permissions) : hasAnyPermission(...permissions);
+    console.log("[RouteGuard] Multiple permissions check:", { 
+      permissions, 
+      requireAll, 
+      hasAccess, 
+      timestamp: new Date().toISOString() 
+    });
   } else {
     // No permissions specified, allow access
     hasAccess = true;
+    console.log("[RouteGuard] No permissions required - allowing access", { timestamp: new Date().toISOString() });
   }
+
+  console.log("[RouteGuard] Final access decision:", { 
+    hasAccess, 
+    willShowAccessDenied: !hasAccess,
+    timestamp: new Date().toISOString() 
+  });
 
   // If no access, handle redirect or show fallback
   if (!hasAccess) {
+    console.log("[RouteGuard] DENYING ACCESS - showing access denied page", { 
+      redirectTo, 
+      hasFallback: !!fallback,
+      timestamp: new Date().toISOString() 
+    });
+    
     if (redirectTo) {
       return <Redirect to={redirectTo} />;
     }
@@ -91,6 +118,8 @@ export function RouteGuard({
     // Default access denied page
     return <AccessDeniedPage />;
   }
+
+  console.log("[RouteGuard] ALLOWING ACCESS - rendering children", { timestamp: new Date().toISOString() });
 
   return <>{children}</>;
 }
