@@ -276,7 +276,7 @@ export default function Sidebar() {
       {/* Logo Header */}
       <div className="p-4 sm:p-6 border-b border-border flex-shrink-0">
         <div className="flex items-center justify-center">
-          <div className="w-10 h-10 flex items-center justify-center bg-white rounded-lg p-1">
+          <div className="w-16 h-16 flex items-center justify-center bg-white rounded-lg p-2">
             <img 
               src="/images/essayons-logo.png" 
               alt="Essayons Change Logo" 
