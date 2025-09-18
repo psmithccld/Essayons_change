@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Bell, Plus } from "lucide-react";
+import { Bell, Plus, User, Shield, Briefcase, ChevronDown } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { insertProjectSchema, type InsertProject } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
+import { usePermissions } from "@/hooks/use-permissions";
+import { Link } from "wouter";
 import { z } from "zod";
 
 const projectFormSchema = insertProjectSchema.extend({
@@ -30,6 +33,15 @@ export default function Header() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { currentProject, setCurrentProject, projects, isLoading } = useCurrentProject();
+  const { user, hasAnyPermission } = usePermissions();
+
+  // Generate user initials from name
+  const getUserInitials = (name: string) => {
+    if (!name) return "U";
+    const parts = name.trim().split(" ");
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  };
 
   const form = useForm<ProjectFormData>({
     resolver: zodResolver(projectFormSchema),
@@ -114,8 +126,8 @@ export default function Header() {
               </SelectContent>
             </Select>
           </div>
-        </div>
-        <div className="flex items-center space-x-4">
+
+          {/* New Initiative Button - Moved to left side */}
           <Button 
             onClick={() => setIsNewProjectOpen(true)}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
@@ -124,6 +136,9 @@ export default function Header() {
             <Plus className="w-4 h-4 mr-2" />
             New Initiative
           </Button>
+        </div>
+        
+        <div className="flex items-center space-x-4">
           <div className="relative">
             <Bell 
               className="text-muted-foreground w-5 h-5 cursor-pointer hover:text-foreground" 
@@ -131,6 +146,45 @@ export default function Header() {
             />
             <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full"></span>
           </div>
+          
+          {/* User Settings Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="relative h-10 w-10 rounded-full" data-testid="button-user-settings">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                  <span className="text-sm font-medium text-primary-foreground">
+                    {getUserInitials(user?.name || "")}
+                  </span>
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {hasAnyPermission('canSeeUsers') && (
+                <DropdownMenuItem asChild>
+                  <Link href="/users" className="flex items-center w-full" data-testid="nav-user-management">
+                    <User className="w-4 h-4 mr-2" />
+                    User Management
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {hasAnyPermission('canSeeRoles') && (
+                <DropdownMenuItem asChild>
+                  <Link href="/security" className="flex items-center w-full" data-testid="nav-security-roles">
+                    <Shield className="w-4 h-4 mr-2" />
+                    Security & Roles
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {hasAnyPermission('canSeeAllProjects', 'canModifyProjects', 'canEditAllProjects') && (
+                <DropdownMenuItem asChild>
+                  <Link href="/initiatives" className="flex items-center w-full" data-testid="nav-initiative-management">
+                    <Briefcase className="w-4 h-4 mr-2" />
+                    Initiative Management
+                  </Link>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

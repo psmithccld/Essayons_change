@@ -72,9 +72,6 @@ const allNavigationItems: NavigationItem[] = [
   { id: "stakeholders", icon: Users, label: "Stakeholders", path: "/stakeholders" },
   { id: "surveys", icon: ClipboardCheck, label: "Readiness Surveys", path: "/surveys" },
   { id: "gpt-coach", icon: Bot, label: "GPT Coach", path: "/gpt-coach" },
-  { id: "user-management", icon: Users, label: "User Management", path: "/users", permissions: ["canSeeUsers"] },
-  { id: "initiative-management", icon: Briefcase, label: "Initiative Management", path: "/initiatives", permissions: ["canSeeAllProjects", "canModifyProjects", "canEditAllProjects"], requireAll: false },
-  { id: "security-management", icon: Shield, label: "Security & Roles", path: "/security", permissions: ["canSeeRoles"] },
   { id: "fishbone", icon: Fish, label: "Fishbone Analysis", path: "/fishbone" },
   { id: "process-mapping", icon: GitBranch, label: "Development Maps", path: "/process-mapping", permissions: ["canSeeAllProjects", "canModifyProjects"], requireAll: false },
   { id: "mind-maps", icon: Brain, label: "Mind Maps", path: "/mind-maps", permissions: ["canSeeAllProjects", "canModifyProjects"], requireAll: false }
