@@ -1020,6 +1020,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Repository API Endpoints
+  
+  // Advanced search for communications
+  app.post('/api/communications/search', requireAuth, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const searchParams = req.body;
+      
+      // SECURITY: Override client-sent projectIds with server-validated project access
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      
+      // If client sent specific projectIds, validate them against authorized projects
+      if (searchParams.projectIds && Array.isArray(searchParams.projectIds)) {
+        searchParams.projectIds = await storage.validateUserProjectAccess(req.userId!, searchParams.projectIds);
+        if (searchParams.projectIds.length === 0) {
+          return res.status(403).json({ error: 'Access denied to requested projects' });
+        }
+      } else {
+        // If no specific projects requested, search all authorized projects
+        searchParams.projectIds = authorizedProjectIds;
+      }
+      
+      // Ensure user can only search projects they have access to
+      if (searchParams.projectIds.length === 0) {
+        return res.json({ communications: [], total: 0 });
+      }
+      
+      const result = await storage.searchCommunications(searchParams);
+      res.json(result);
+    } catch (error) {
+      console.error('Communication search error:', error);
+      res.status(500).json({ error: 'Failed to search communications' });
+    }
+  });
+
+  // Get communication metrics and analytics
+  app.get('/api/communications/metrics', requireAuth, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { projectId, type } = req.query;
+      
+      // SECURITY: ALWAYS get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      
+      // SECURITY: Validate project access if specific project requested
+      if (projectId && !authorizedProjectIds.includes(projectId as string)) {
+        return res.status(403).json({ error: 'Access denied to requested project' });
+      }
+      
+      // SECURITY: Pass authorizedProjectIds to storage for SQL-level filtering
+      const metrics = await storage.getCommunicationMetrics({
+        projectId: projectId as string | undefined,
+        type: type as string | undefined,
+        authorizedProjectIds
+      });
+      res.json(metrics);
+    } catch (error) {
+      console.error('Communication metrics error:', error);
+      res.status(500).json({ error: 'Failed to get communication metrics' });
+    }
+  });
+
+  // Get communication version history
+  app.get('/api/communications/:id/versions', requireAuth, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // SECURITY: Get user's authorized projects for access control
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      
+      // SECURITY: Storage method now validates communication access internally
+      const versions = await storage.getCommunicationVersionHistory(id, authorizedProjectIds);
+      
+      // Return 403 if empty result due to unauthorized access
+      if (versions.length === 0) {
+        // Check if communication exists but user doesn't have access
+        const communication = await storage.getCommunication(id);
+        if (communication && !authorizedProjectIds.includes(communication.projectId)) {
+          return res.status(403).json({ error: 'Access denied to communication version history' });
+        }
+      }
+      
+      res.json(versions);
+    } catch (error) {
+      console.error('Communication version history error:', error);
+      res.status(500).json({ error: 'Failed to get communication version history' });
+    }
+  });
+
+  // Archive communications (bulk action)
+  app.post('/api/communications/archive', requireAuth, requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: 'Invalid or empty ids array' });
+      }
+      
+      // SECURITY: Validate that user has access to all communications being archived
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      
+      // Check each communication to ensure user has access to its project
+      for (const id of ids) {
+        const communication = await storage.getCommunication(id);
+        if (!communication || !authorizedProjectIds.includes(communication.projectId)) {
+          return res.status(403).json({ error: `Access denied to communication ${id}` });
+        }
+      }
+      
+      const result = await storage.archiveCommunications(ids, req.userId!);
+      res.json(result);
+    } catch (error) {
+      console.error('Archive communications error:', error);
+      res.status(500).json({ error: 'Failed to archive communications' });
+    }
+  });
+
+  // Update communication engagement metrics
+  app.patch('/api/communications/:id/engagement', requireAuth, requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const engagement = req.body;
+      await storage.updateCommunicationEngagement(id, engagement);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Update communication engagement error:', error);
+      res.status(500).json({ error: 'Failed to update communication engagement' });
+    }
+  });
+
+  // Get communications by stakeholder
+  app.get('/api/communications/by-stakeholder/:stakeholderId', requireAuth, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { stakeholderId } = req.params;
+      const { projectId } = req.query;
+      
+      // SECURITY: Validate project access if specific project requested
+      if (projectId) {
+        const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+        if (!authorizedProjectIds.includes(projectId as string)) {
+          return res.status(403).json({ error: 'Access denied to requested project' });
+        }
+      }
+      
+      const communications = await storage.getCommunicationsByStakeholder(
+        stakeholderId, 
+        projectId as string | undefined
+      );
+      res.json(communications);
+    } catch (error) {
+      console.error('Get communications by stakeholder error:', error);
+      res.status(500).json({ error: 'Failed to get communications by stakeholder' });
+    }
+  });
+
   // GPT Content Generation for Flyers
   app.post("/api/gpt/generate-flyer-content", requirePermission('canModifyCommunications'), async (req, res) => {
     try {

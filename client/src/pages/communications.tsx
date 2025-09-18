@@ -37,7 +37,8 @@ import {
   MapPin,
   Users2,
   Timer,
-  CheckSquare
+  CheckSquare,
+  Archive
 } from "lucide-react";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -46,6 +47,7 @@ import { useToast } from "@/hooks/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type CommunicationStrategy, type CommunicationTemplate, type Communication, type Stakeholder, insertCommunicationStrategySchema } from "@shared/schema";
 import { z } from "zod";
+import CommunicationRepository from "@/components/CommunicationRepository";
 
 // P2P Emails Execution Module Component
 function P2PEmailsExecutionModule() {
@@ -4016,12 +4018,16 @@ export default function Communications() {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="strategy" data-testid="tab-strategy">
                 Strategy
               </TabsTrigger>
               <TabsTrigger value="execution" data-testid="tab-execution">
                 Execution
+              </TabsTrigger>
+              <TabsTrigger value="repository" data-testid="tab-repository">
+                <Archive className="w-4 h-4 mr-2" />
+                Repository
               </TabsTrigger>
             </TabsList>
 
@@ -4041,6 +4047,22 @@ export default function Communications() {
                 <GroupEmailsExecutionModule />
                 <FlyersExecutionModule />
               </div>
+            </TabsContent>
+
+            {/* Repository Tab Content - Unified Archive and Search System */}
+            <TabsContent value="repository" className="space-y-6" data-testid="repository-content">
+              <CommunicationRepository
+                onCreateNew={(type) => {
+                  // Switch to execution tab and trigger creation based on type
+                  setActiveTab("execution");
+                  // You could add specific handlers here for different communication types
+                }}
+                onViewCommunication={(communication) => {
+                  // Handle viewing/editing a communication
+                  console.log("Viewing communication:", communication);
+                  // You could open a modal or navigate to edit view
+                }}
+              />
             </TabsContent>
           </Tabs>
         </CardContent>

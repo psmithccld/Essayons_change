@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, jsonb, uuid, decimal, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, jsonb, uuid, decimal, unique, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -312,6 +312,19 @@ export const communications = pgTable("communications", {
   distributionMethod: text("distribution_method"), // email, print, digital_display, meeting
   raidLogReferences: text("raid_log_references").array().default([]), // References to related RAID log entries
   exportOptions: jsonb("export_options").default({}), // {powerpoint: boolean, canva: boolean, pdf: boolean}
+  // Repository-specific enhancements
+  tags: text("tags").array().default([]), // Tags for categorization and search
+  priority: text("priority").default("medium"), // low, medium, high, critical - for repository sorting
+  effectivenessRating: decimal("effectiveness_rating", { precision: 3, scale: 2 }), // User-rated effectiveness (1.00-5.00)
+  engagementScore: decimal("engagement_score", { precision: 5, scale: 2 }).default("0.00"), // Calculated engagement score
+  viewCount: integer("view_count").default(0), // How many times this communication was viewed
+  shareCount: integer("share_count").default(0), // How many times this communication was shared
+  lastViewedAt: timestamp("last_viewed_at"), // Last time this communication was viewed
+  archivedAt: timestamp("archived_at"), // When this communication was archived
+  archivedById: uuid("archived_by_id").references(() => users.id, { onDelete: "set null" }), // Who archived it
+  isArchived: boolean("is_archived").notNull().default(false), // Archive status
+  version: integer("version").notNull().default(1), // Version number for version history
+  parentId: uuid("parent_id").references(() => communications.id, { onDelete: "set null" }), // Reference to parent version
   // Meeting-specific data (5Ws)
   meetingWho: text("meeting_who"), // Who should attend
   meetingWhat: text("meeting_what"), // What will be discussed
@@ -336,7 +349,44 @@ export const communications = pgTable("communications", {
   createdById: uuid("created_by_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+  // Additional repository metadata
+  metadata: jsonb("metadata").default({}), // Extended metadata for analytics and custom fields
+}, (table) => ({
+  // Performance indexes for Repository operations
+  projectIdIdx: index("communications_project_id_idx").on(table.projectId),
+  typeIdx: index("communications_type_idx").on(table.type),
+  statusIdx: index("communications_status_idx").on(table.status),
+  createdAtIdx: index("communications_created_at_idx").on(table.createdAt),
+  // Composite indexes for common queries
+  projectTypeIdx: index("communications_project_type_idx").on(table.projectId, table.type),
+  projectStatusIdx: index("communications_project_status_idx").on(table.projectId, table.status),
+  // GIN index for tag searches
+  tagsIdx: index("communications_tags_gin_idx").using("gin", table.tags),
+  // Trigram indexes for text search performance
+  titleTextIdx: index("communications_title_trgm_idx").using("gin", sql`${table.title} gin_trgm_ops`),
+  contentTextIdx: index("communications_content_trgm_idx").using("gin", sql`${table.content} gin_trgm_ops`),
+}));
+
+// Communication Versions table for proper version history tracking
+export const communicationVersions = pgTable("communication_versions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  communicationId: uuid("communication_id").references(() => communications.id, { onDelete: "cascade" }).notNull(),
+  version: integer("version").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  targetAudience: text("target_audience").array().default([]),
+  status: text("status").notNull(),
+  type: text("type").notNull(),
+  tags: text("tags").array().default([]),
+  priority: text("priority"),
+  effectivenessRating: decimal("effectiveness_rating", { precision: 3, scale: 2 }),
+  metadata: jsonb("metadata").default({}),
+  changeDescription: text("change_description"), // Description of what changed in this version
+  editorId: uuid("editor_id").references(() => users.id, { onDelete: "set null" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueVersionPerCommunication: unique().on(table.communicationId, table.version),
+}));
 
 // Communication Recipients tracking
 export const communicationRecipients = pgTable("communication_recipients", {
@@ -608,6 +658,11 @@ export const communicationsRelations = relations(communications, ({ one, many })
     fields: [communications.createdById],
     references: [users.id],
   }),
+  archivedBy: one(users, {
+    fields: [communications.archivedById],
+    references: [users.id],
+    relationName: "communicationArchiver",
+  }),
   template: one(communicationTemplates, {
     fields: [communications.templateId],
     references: [communicationTemplates.id],
@@ -616,6 +671,12 @@ export const communicationsRelations = relations(communications, ({ one, many })
     fields: [communications.gptInteractionId],
     references: [gptInteractions.id],
   }),
+  parentVersion: one(communications, {
+    fields: [communications.parentId],
+    references: [communications.id],
+    relationName: "versionHistory",
+  }),
+  childVersions: many(communications, { relationName: "versionHistory" }),
   recipients: many(communicationRecipients), // Communication recipients
 }));
 
@@ -809,6 +870,11 @@ export const insertCommunicationSchema = createInsertSchema(communications).omit
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertCommunicationVersionSchema = createInsertSchema(communicationVersions).omit({
+  id: true,
+  createdAt: true,
 });
 
 // Communication Recipients Insert Schema
@@ -1267,6 +1333,10 @@ export type InsertCommunicationTemplate = z.infer<typeof insertCommunicationTemp
 // Enhanced Communications Types
 export type Communication = typeof communications.$inferSelect;
 export type InsertCommunication = z.infer<typeof insertCommunicationSchema>;
+
+// Communication Versions Types
+export type CommunicationVersion = typeof communicationVersions.$inferSelect;
+export type InsertCommunicationVersion = z.infer<typeof insertCommunicationVersionSchema>;
 
 // Communication Recipients Types
 export type CommunicationRecipient = typeof communicationRecipients.$inferSelect;

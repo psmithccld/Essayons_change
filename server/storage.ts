@@ -1,10 +1,10 @@
 import bcrypt from 'bcrypt';
 import { 
-  users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
+  users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
-  type Communication, type InsertCommunication, type Survey, type InsertSurvey,
+  type Communication, type InsertCommunication, type CommunicationVersion, type InsertCommunicationVersion, type Survey, type InsertSurvey,
   type SurveyResponse, type InsertSurveyResponse, type GptInteraction, type InsertGptInteraction,
   type Milestone, type InsertMilestone, type ChecklistTemplate, type InsertChecklistTemplate,
   type ProcessMap, type InsertProcessMap, type CommunicationStrategy, type InsertCommunicationStrategy,
@@ -41,6 +41,10 @@ export interface IStorage {
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: string, project: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: string): Promise<boolean>;
+  
+  // SECURITY: Authorization helpers for BOLA prevention
+  getUserAuthorizedProjectIds(userId: string): Promise<string[]>;
+  validateUserProjectAccess(userId: string, projectIds: string[]): Promise<string[]>;
 
   // Tasks
   getTasksByProject(projectId: string): Promise<Task[]>;
@@ -70,6 +74,38 @@ export interface IStorage {
   createCommunication(communication: InsertCommunication): Promise<Communication>;
   updateCommunication(id: string, communication: Partial<InsertCommunication>): Promise<Communication | undefined>;
   deleteCommunication(id: string): Promise<boolean>;
+
+  // Repository-specific methods
+  searchCommunications(params: {
+    query?: string;
+    projectIds?: string[];
+    types?: string[];
+    statuses?: string[];
+    tags?: string[];
+    dateFrom?: Date;
+    dateTo?: Date;
+    createdBy?: string[];
+    limit?: number;
+    offset?: number;
+    sortBy?: 'createdAt' | 'updatedAt' | 'title' | 'engagementScore' | 'effectivenessRating';
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<{ communications: Communication[]; total: number; }>;
+  getCommunicationMetrics(params: { 
+    projectId?: string; 
+    type?: string; 
+    authorizedProjectIds?: string[];
+  }): Promise<{
+    totalCommunications: number;
+    byType: Record<string, number>;
+    byStatus: Record<string, number>;
+    avgEngagementScore: number;
+    avgEffectivenessRating: number;
+    mostUsedTags: Array<{ tag: string; count: number }>;
+  }>;
+  getCommunicationVersionHistory(communicationId: string, authorizedProjectIds: string[]): Promise<CommunicationVersion[]>;
+  archiveCommunications(ids: string[], userId: string): Promise<{ archived: number; errors: string[] }>;
+  updateCommunicationEngagement(id: string, engagement: { viewCount?: number; shareCount?: number; lastViewedAt?: Date }): Promise<void>;
+  getCommunicationsByStakeholder(stakeholderId: string, projectId?: string): Promise<Communication[]>;
 
   // Communication Strategies
   getCommunicationStrategiesByProject(projectId: string): Promise<CommunicationStrategy[]>;
@@ -292,7 +328,69 @@ export class DatabaseStorage implements IStorage {
 
   // Projects
   async getProjects(userId: string): Promise<Project[]> {
-    return await db.select().from(projects).where(eq(projects.ownerId, userId)).orderBy(desc(projects.createdAt));
+    const userProjects = await db.select().from(projects).where(eq(projects.ownerId, userId)).orderBy(desc(projects.createdAt));
+    
+    // Get projects where user has assignments
+    const assignedProjects = await db.select({
+      id: projects.id,
+      name: projects.name,
+      description: projects.description,
+      status: projects.status,
+      startDate: projects.startDate,
+      endDate: projects.endDate,
+      progress: projects.progress,
+      ownerId: projects.ownerId,
+      priority: projects.priority,
+      category: projects.category,
+      objectives: projects.objectives,
+      scope: projects.scope,
+      successCriteria: projects.successCriteria,
+      budget: projects.budget,
+      assumptions: projects.assumptions,
+      constraints: projects.constraints,
+      risks: projects.risks,
+      deliverables: projects.deliverables,
+      stakeholderRequirements: projects.stakeholderRequirements,
+      businessJustification: projects.businessJustification,
+      currentPhase: projects.currentPhase,
+      createdAt: projects.createdAt,
+      updatedAt: projects.updatedAt,
+    })
+      .from(projects)
+      .innerJoin(userInitiativeAssignments, eq(userInitiativeAssignments.projectId, projects.id))
+      .where(eq(userInitiativeAssignments.userId, userId));
+
+    // Combine and deduplicate projects
+    const allProjects = [...userProjects];
+    assignedProjects.forEach(assigned => {
+      if (!allProjects.find(p => p.id === assigned.id)) {
+        allProjects.push(assigned);
+      }
+    });
+    
+    return allProjects.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  // SECURITY: Get project IDs that user has access to (CRITICAL for BOLA prevention)
+  async getUserAuthorizedProjectIds(userId: string): Promise<string[]> {
+    const userProjects = await db.select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.ownerId, userId));
+    
+    const assignedProjects = await db.select({ id: projects.id })
+      .from(projects)
+      .innerJoin(userInitiativeAssignments, eq(userInitiativeAssignments.projectId, projects.id))
+      .where(eq(userInitiativeAssignments.userId, userId));
+
+    // Combine and deduplicate project IDs
+    const allProjectIds = new Set([...userProjects.map(p => p.id), ...assignedProjects.map(p => p.id)]);
+    return Array.from(allProjectIds);
+  }
+
+  // SECURITY: Validate that all provided project IDs are authorized for the user
+  async validateUserProjectAccess(userId: string, projectIds: string[]): Promise<string[]> {
+    const authorizedProjectIds = await this.getUserAuthorizedProjectIds(userId);
+    return projectIds.filter(id => authorizedProjectIds.includes(id));
   }
 
   async getProject(id: string): Promise<Project | undefined> {
@@ -465,8 +563,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCommunication(id: string, communication: Partial<InsertCommunication>): Promise<Communication | undefined> {
+    // Get current communication for version history
+    const [current] = await db.select().from(communications).where(eq(communications.id, id));
+    if (!current) return undefined;
+    
+    // Create version history before updating
+    await db.insert(communicationVersions).values({
+      communicationId: id,
+      version: current.version,
+      title: current.title,
+      content: current.content,
+      targetAudience: current.targetAudience,
+      status: current.status,
+      type: current.type,
+      tags: current.tags,
+      priority: current.priority,
+      effectivenessRating: current.effectivenessRating,
+      metadata: current.metadata,
+      changeDescription: 'Communication updated',
+      editorId: communication.createdById || current.createdById
+    });
+    
+    // Update communication with incremented version
     const [updated] = await db.update(communications)
-      .set({ ...communication, updatedAt: new Date() })
+      .set({ 
+        ...communication, 
+        version: current.version + 1,
+        updatedAt: new Date() 
+      })
       .where(eq(communications.id, id))
       .returning();
     return updated || undefined;
@@ -475,6 +599,328 @@ export class DatabaseStorage implements IStorage {
   async deleteCommunication(id: string): Promise<boolean> {
     const result = await db.delete(communications).where(eq(communications.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Repository-specific methods implementation
+  async searchCommunications(params: {
+    query?: string;
+    projectIds?: string[];
+    types?: string[];
+    statuses?: string[];
+    tags?: string[];
+    dateFrom?: Date;
+    dateTo?: Date;
+    createdBy?: string[];
+    limit?: number;
+    offset?: number;
+    sortBy?: 'createdAt' | 'updatedAt' | 'title' | 'engagementScore' | 'effectivenessRating';
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<{ communications: Communication[]; total: number; }> {
+    let query = db.select().from(communications);
+    let countQuery = db.select({ count: count() }).from(communications);
+
+    // Build WHERE conditions
+    const conditions: any[] = [];
+    
+    if (params.query) {
+      const searchTerm = `%${params.query}%`;
+      conditions.push(sql`(
+        ${communications.title} ILIKE ${searchTerm} OR 
+        ${communications.content} ILIKE ${searchTerm}
+      )`);
+    }
+
+    if (params.projectIds && params.projectIds.length > 0) {
+      conditions.push(inArray(communications.projectId, params.projectIds));
+    }
+
+    if (params.types && params.types.length > 0) {
+      conditions.push(inArray(communications.type, params.types));
+    }
+
+    if (params.statuses && params.statuses.length > 0) {
+      conditions.push(inArray(communications.status, params.statuses));
+    }
+
+    if (params.tags && params.tags.length > 0) {
+      // Check if any of the provided tags exist in the tags array
+      conditions.push(sql`${communications.tags} && ${params.tags}`);
+    }
+
+    if (params.dateFrom) {
+      conditions.push(sql`${communications.createdAt} >= ${params.dateFrom.toISOString()}`);
+    }
+
+    if (params.dateTo) {
+      conditions.push(sql`${communications.createdAt} <= ${params.dateTo.toISOString()}`);
+    }
+
+    if (params.createdBy && params.createdBy.length > 0) {
+      conditions.push(inArray(communications.createdById, params.createdBy));
+    }
+
+    // Apply conditions
+    if (conditions.length > 0) {
+      const whereCondition = conditions.reduce((acc, condition) => acc ? and(acc, condition) : condition);
+      query = query.where(whereCondition);
+      countQuery = countQuery.where(whereCondition);
+    }
+
+    // Get total count
+    const [{ count: totalCount }] = await countQuery;
+
+    // Apply sorting
+    const sortField = params.sortBy || 'createdAt';
+    const sortOrder = params.sortOrder || 'desc';
+    
+    if (sortOrder === 'asc') {
+      switch (sortField) {
+        case 'createdAt': query = query.orderBy(communications.createdAt); break;
+        case 'updatedAt': query = query.orderBy(communications.updatedAt); break;
+        case 'title': query = query.orderBy(communications.title); break;
+        case 'engagementScore': query = query.orderBy(communications.engagementScore); break;
+        case 'effectivenessRating': query = query.orderBy(communications.effectivenessRating); break;
+      }
+    } else {
+      switch (sortField) {
+        case 'createdAt': query = query.orderBy(desc(communications.createdAt)); break;
+        case 'updatedAt': query = query.orderBy(desc(communications.updatedAt)); break;
+        case 'title': query = query.orderBy(desc(communications.title)); break;
+        case 'engagementScore': query = query.orderBy(desc(communications.engagementScore)); break;
+        case 'effectivenessRating': query = query.orderBy(desc(communications.effectivenessRating)); break;
+      }
+    }
+
+    // Apply pagination
+    if (params.offset) {
+      query = query.offset(params.offset);
+    }
+    if (params.limit) {
+      query = query.limit(params.limit);
+    }
+
+    const results = await query;
+
+    return {
+      communications: results,
+      total: totalCount
+    };
+  }
+
+  async getCommunicationMetrics(params: { 
+    projectId?: string; 
+    type?: string; 
+    authorizedProjectIds?: string[];
+  }): Promise<{
+    totalCommunications: number;
+    byType: Record<string, number>;
+    byStatus: Record<string, number>;
+    avgEngagementScore: number;
+    avgEffectivenessRating: number;
+    mostUsedTags: Array<{ tag: string; count: number }>;
+  }> {
+    const conditions: any[] = [];
+    
+    // SECURITY: Always filter by authorized projects when provided
+    if (params.authorizedProjectIds && params.authorizedProjectIds.length > 0) {
+      if (params.projectId) {
+        // Verify requested projectId is in authorized list
+        if (params.authorizedProjectIds.includes(params.projectId)) {
+          conditions.push(eq(communications.projectId, params.projectId));
+        } else {
+          // Return empty metrics if requested projectId is not authorized
+          return {
+            totalCommunications: 0,
+            byType: {},
+            byStatus: {},
+            avgEngagementScore: 0,
+            avgEffectivenessRating: 0,
+            mostUsedTags: []
+          };
+        }
+      } else {
+        // Filter by all authorized projects when no specific projectId requested
+        conditions.push(inArray(communications.projectId, params.authorizedProjectIds));
+      }
+    } else if (params.projectId) {
+      // Legacy behavior: filter by specific project when no authorization filtering
+      conditions.push(eq(communications.projectId, params.projectId));
+    }
+    
+    if (params.type) {
+      conditions.push(eq(communications.type, params.type));
+    }
+    
+    const whereCondition = conditions.length > 0 
+      ? conditions.reduce((acc, condition) => acc ? and(acc, condition) : condition)
+      : undefined;
+    
+    // SQL aggregation for total count
+    let totalQuery = db.select({ count: count() }).from(communications);
+    if (whereCondition) {
+      totalQuery = totalQuery.where(whereCondition);
+    }
+    const [{ count: totalCommunications }] = await totalQuery;
+    
+    // SQL aggregation for type counts
+    let typeQuery = db.select({
+      type: communications.type,
+      count: count()
+    }).from(communications).groupBy(communications.type);
+    if (whereCondition) {
+      typeQuery = typeQuery.where(whereCondition);
+    }
+    const typeResults = await typeQuery;
+    const byType: Record<string, number> = {};
+    typeResults.forEach(result => {
+      byType[result.type] = result.count;
+    });
+    
+    // SQL aggregation for status counts
+    let statusQuery = db.select({
+      status: communications.status,
+      count: count()
+    }).from(communications).groupBy(communications.status);
+    if (whereCondition) {
+      statusQuery = statusQuery.where(whereCondition);
+    }
+    const statusResults = await statusQuery;
+    const byStatus: Record<string, number> = {};
+    statusResults.forEach(result => {
+      byStatus[result.status] = result.count;
+    });
+    
+    // SQL aggregation for engagement and effectiveness scores
+    let scoresQuery = db.select({
+      avgEngagement: sql<number>`AVG(CASE WHEN ${communications.engagementScore} > 0 THEN ${communications.engagementScore} END)`,
+      avgEffectiveness: sql<number>`AVG(CASE WHEN ${communications.effectivenessRating} > 0 THEN ${communications.effectivenessRating} END)`
+    }).from(communications);
+    if (whereCondition) {
+      scoresQuery = scoresQuery.where(whereCondition);
+    }
+    const [scores] = await scoresQuery;
+    
+    // SQL aggregation for tag counts (PostgreSQL specific)
+    let tagsQuery = db.select({
+      tag: sql<string>`unnest(${communications.tags})`,
+      count: sql<number>`count(*)`
+    }).from(communications).groupBy(sql`unnest(${communications.tags})`).orderBy(sql`count(*) DESC`).limit(10);
+    if (whereCondition) {
+      tagsQuery = tagsQuery.where(whereCondition);
+    }
+    const tagResults = await tagsQuery;
+    const mostUsedTags = tagResults.map(result => ({
+      tag: result.tag,
+      count: result.count
+    }));
+    
+    return {
+      totalCommunications,
+      byType,
+      byStatus,
+      avgEngagementScore: scores.avgEngagement || 0,
+      avgEffectivenessRating: scores.avgEffectiveness || 0,
+      mostUsedTags
+    };
+  }
+
+  async getCommunicationVersionHistory(communicationId: string, authorizedProjectIds: string[]): Promise<CommunicationVersion[]> {
+    // SECURITY: First verify the communication belongs to user's authorized projects
+    const communication = await db.select({ projectId: communications.projectId })
+      .from(communications)
+      .where(eq(communications.id, communicationId));
+    
+    if (communication.length === 0) {
+      // Communication not found
+      return [];
+    }
+    
+    if (!authorizedProjectIds.includes(communication[0].projectId)) {
+      // SECURITY: Communication belongs to unauthorized project - return empty array
+      return [];
+    }
+    
+    // Get version history from the dedicated version table
+    const versions = await db.select()
+      .from(communicationVersions)
+      .where(eq(communicationVersions.communicationId, communicationId))
+      .orderBy(desc(communicationVersions.version), desc(communicationVersions.createdAt));
+    
+    return versions;
+  }
+
+  async archiveCommunications(ids: string[], userId: string): Promise<{ archived: number; errors: string[] }> {
+    const results = { archived: 0, errors: [] as string[] };
+    
+    for (const id of ids) {
+      try {
+        const [updated] = await db.update(communications)
+          .set({
+            isArchived: true,
+            archivedAt: new Date(),
+            archivedById: userId,
+            updatedAt: new Date()
+          })
+          .where(eq(communications.id, id))
+          .returning();
+        
+        if (updated) {
+          results.archived++;
+        } else {
+          results.errors.push(`Communication ${id} not found`);
+        }
+      } catch (error) {
+        results.errors.push(`Failed to archive ${id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+    
+    return results;
+  }
+
+  async updateCommunicationEngagement(id: string, engagement: { 
+    viewCount?: number; 
+    shareCount?: number; 
+    lastViewedAt?: Date 
+  }): Promise<void> {
+    const updateData: any = { updatedAt: new Date() };
+    
+    if (engagement.viewCount !== undefined) {
+      updateData.viewCount = engagement.viewCount;
+    }
+    if (engagement.shareCount !== undefined) {
+      updateData.shareCount = engagement.shareCount;
+    }
+    if (engagement.lastViewedAt !== undefined) {
+      updateData.lastViewedAt = engagement.lastViewedAt;
+    }
+
+    await db.update(communications)
+      .set(updateData)
+      .where(eq(communications.id, id));
+  }
+
+  async getCommunicationsByStakeholder(stakeholderId: string, projectId?: string): Promise<Communication[]> {
+    // Get stakeholder details
+    const [stakeholder] = await db.select()
+      .from(stakeholders)
+      .where(eq(stakeholders.id, stakeholderId));
+
+    if (!stakeholder) return [];
+
+    let query = db.select()
+      .from(communications)
+      .where(sql`
+        ${communications.targetAudience} @> ${JSON.stringify([stakeholder.name])} OR
+        ${communications.targetAudience} @> ${JSON.stringify([stakeholder.role])}
+      `);
+
+    if (projectId) {
+      query = query.where(eq(communications.projectId, projectId));
+    } else if (stakeholder.projectId) {
+      query = query.where(eq(communications.projectId, stakeholder.projectId));
+    }
+
+    return await query.orderBy(desc(communications.createdAt));
   }
 
   // Communication Strategies
