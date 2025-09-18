@@ -174,10 +174,7 @@ function RoleFormDialog({ role, open, onOpenChange, userPermissions }: RoleFormD
   });
 
   const createRoleMutation = useMutation({
-    mutationFn: (data: InsertRole) => apiRequest("/api/roles", {
-      method: "POST",
-      body: JSON.stringify(data)
-    }),
+    mutationFn: (data: InsertRole) => apiRequest("POST", "/api/roles", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -198,10 +195,7 @@ function RoleFormDialog({ role, open, onOpenChange, userPermissions }: RoleFormD
   });
 
   const updateRoleMutation = useMutation({
-    mutationFn: (data: Partial<InsertRole>) => apiRequest(`/api/roles/${role!.id}`, {
-      method: "PUT",
-      body: JSON.stringify(data)
-    }),
+    mutationFn: (data: Partial<InsertRole>) => apiRequest("PUT", `/api/roles/${role!.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -714,10 +708,7 @@ function UserPermissionDialog({ user, open, onOpenChange, userPermissions }: Use
         : "/api/user-permissions";
       const method = existingPermission ? "PUT" : "POST";
       
-      return apiRequest(url, {
-        method,
-        body: JSON.stringify(data)
-      });
+      return apiRequest(method, url, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user-permissions"] });
@@ -1360,9 +1351,7 @@ function SecurityManagementContent() {
   const userPermissions = userPermissionsData?.permissions;
 
   const deleteRoleMutation = useMutation({
-    mutationFn: (roleId: string) => apiRequest(`/api/roles/${roleId}`, {
-      method: "DELETE"
-    }),
+    mutationFn: (roleId: string) => apiRequest("DELETE", `/api/roles/${roleId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -1562,10 +1551,7 @@ function GroupFormDialog({ group, open, onOpenChange, userPermissions }: GroupFo
   });
 
   const createGroupMutation = useMutation({
-    mutationFn: (data: InsertUserGroup) => apiRequest("/api/groups", {
-      method: "POST",
-      body: JSON.stringify(data)
-    }),
+    mutationFn: (data: InsertUserGroup) => apiRequest("POST", "/api/groups", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -1587,10 +1573,7 @@ function GroupFormDialog({ group, open, onOpenChange, userPermissions }: GroupFo
   });
 
   const updateGroupMutation = useMutation({
-    mutationFn: (data: Partial<InsertUserGroup>) => apiRequest(`/api/groups/${group!.id}`, {
-      method: "PUT",
-      body: JSON.stringify(data)
-    }),
+    mutationFn: (data: Partial<InsertUserGroup>) => apiRequest("PUT", `/api/groups/${group!.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -1939,10 +1922,7 @@ function GroupMembersDialog({ group, open, onOpenChange, userPermissions }: Grou
   });
 
   const addMemberMutation = useMutation({
-    mutationFn: (data: InsertUserGroupMembership) => apiRequest("/api/group-memberships", {
-      method: "POST",
-      body: JSON.stringify(data)
-    }),
+    mutationFn: (data: InsertUserGroupMembership) => apiRequest("POST", "/api/group-memberships", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/group-memberships"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -1961,9 +1941,7 @@ function GroupMembersDialog({ group, open, onOpenChange, userPermissions }: Grou
   });
 
   const removeMemberMutation = useMutation({
-    mutationFn: (membershipId: string) => apiRequest(`/api/group-memberships/${membershipId}`, {
-      method: "DELETE"
-    }),
+    mutationFn: (membershipId: string) => apiRequest("DELETE", `/api/group-memberships/${membershipId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/group-memberships"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -2154,9 +2132,7 @@ function GroupsTabContent({
   const { toast } = useToast();
 
   const deleteGroupMutation = useMutation({
-    mutationFn: (groupId: string) => apiRequest(`/api/groups/${groupId}`, {
-      method: "DELETE"
-    }),
+    mutationFn: (groupId: string) => apiRequest("DELETE", `/api/groups/${groupId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });

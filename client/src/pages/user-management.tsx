@@ -111,7 +111,7 @@ function UserManagementContent() {
 
   // Create user mutation
   const createUserMutation = useMutation({
-    mutationFn: (userData: Omit<CreateUserFormData, 'confirmPassword'>) => apiRequest("/api/users", "POST", userData),
+    mutationFn: (userData: Omit<CreateUserFormData, 'confirmPassword'>) => apiRequest("POST", "/api/users", userData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/with-roles"] });
       setIsCreateDialogOpen(false);
@@ -125,7 +125,7 @@ function UserManagementContent() {
   // Update user mutation
   const updateUserMutation = useMutation({
     mutationFn: ({ id, ...userData }: EditUserFormData & { id: string }) => 
-      apiRequest(`/api/users/${id}`, "PUT", userData),
+      apiRequest("PUT", `/api/users/${id}`, userData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/with-roles"] });
       setEditingUser(null);
@@ -138,7 +138,7 @@ function UserManagementContent() {
 
   // Delete user mutation
   const deleteUserMutation = useMutation({
-    mutationFn: (userId: string) => apiRequest(`/api/users/${userId}`, "DELETE"),
+    mutationFn: (userId: string) => apiRequest("DELETE", `/api/users/${userId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/with-roles"] });
       toast({ title: "Success", description: "User deleted successfully" });
