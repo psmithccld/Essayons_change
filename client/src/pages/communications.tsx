@@ -42,6 +42,829 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { type CommunicationStrategy, type CommunicationTemplate, type Communication, type Stakeholder, insertCommunicationStrategySchema } from "@shared/schema";
 import { z } from "zod";
 
+// Group Emails Execution Module Component
+function GroupEmailsExecutionModule() {
+  const { currentProject } = useCurrentProject();
+  const [activeView, setActiveView] = useState<'repository' | 'create' | 'manage'>('repository');
+  const [selectedTemplate, setSelectedTemplate] = useState<CommunicationTemplate | null>(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [emailContent, setEmailContent] = useState({ title: '', content: '', callToAction: '' });
+  const [currentEmail, setCurrentEmail] = useState<Communication | null>(null);
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showDistributeModal, setShowDistributeModal] = useState(false);
+  const [distributionEmail, setDistributionEmail] = useState<Communication | null>(null);
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
+  const [recipientInput, setRecipientInput] = useState('');
+  const [selectedRaidLogs, setSelectedRaidLogs] = useState<string[]>([]);
+  const [tone, setTone] = useState('professional');
+  const [urgency, setUrgency] = useState('normal');
+  const { toast } = useToast();
+
+  // Fetch communication templates for group emails
+  const { data: templates = [], isLoading: templatesLoading } = useQuery({
+    queryKey: ['/api/communication-templates/category/email']
+  });
+
+  // Fetch created group emails
+  const { data: communications = [], isLoading: communicationsLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'communications'],
+    enabled: !!currentProject?.id
+  });
+
+  const groupEmails = communications.filter((comm: Communication) => comm.type === 'group_email');
+
+  // Fetch stakeholders for recipient selection
+  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
+    enabled: !!currentProject?.id
+  });
+
+  // Fetch RAID logs for context integration
+  const { data: raidLogs = [], isLoading: raidLogsLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'raid-logs'],
+    enabled: !!currentProject?.id
+  });
+
+  // Create group email mutation
+  const createEmailMutation = useMutation({
+    mutationFn: (data: any) => apiRequest(`/api/projects/${currentProject?.id}/communications`, {
+      method: 'POST',
+      body: {
+        ...data,
+        type: 'group_email',
+        status: 'draft'
+      }
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      toast({ title: "Group email created successfully" });
+      setShowCreateModal(false);
+      setEmailContent({ title: '', content: '', callToAction: '' });
+      setSelectedRaidLogs([]);
+      setSelectedRecipients([]);
+    },
+    onError: () => {
+      toast({ title: "Failed to create group email", variant: "destructive" });
+    }
+  });
+
+  // GPT content generation for group emails
+  const generateContentMutation = useMutation({
+    mutationFn: (data: any) => apiRequest('/api/gpt/generate-group-email-content', {
+      method: 'POST',
+      body: data
+    }),
+    onSuccess: (content) => {
+      setEmailContent(content);
+      setIsGeneratingContent(false);
+      toast({ title: "Email content generated successfully" });
+    },
+    onError: () => {
+      setIsGeneratingContent(false);
+      toast({ title: "Failed to generate email content", variant: "destructive" });
+    }
+  });
+
+  // Distribution mutation
+  const distributeEmailMutation = useMutation({
+    mutationFn: ({ emailId, recipients, dryRun }: { 
+      emailId: string; 
+      recipients: string[]; 
+      dryRun?: boolean 
+    }) => 
+      apiRequest(`/api/communications/${emailId}/distribute`, {
+        method: 'POST',
+        body: { 
+          distributionMethod: 'email',
+          recipients,
+          dryRun: dryRun || false
+        }
+      }),
+    onSuccess: (data, { dryRun }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      
+      if (dryRun) {
+        toast({ 
+          title: "Dry Run Complete", 
+          description: `Would send email to ${data.distributionResult?.sent || 0} recipients. No emails were actually sent.`,
+          variant: "default"
+        });
+      } else {
+        const successCount = data.distributionResult?.sent || 0;
+        const failCount = data.distributionResult?.failed || 0;
+        toast({ 
+          title: "Email Distribution Complete", 
+          description: `Successfully sent to ${successCount} recipients${failCount > 0 ? `, ${failCount} failed` : ''}.`,
+        });
+      }
+      
+      setShowDistributeModal(false);
+      setDistributionEmail(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to distribute email", variant: "destructive" });
+    }
+  });
+
+  // Increment template usage
+  const incrementUsageMutation = useMutation({
+    mutationFn: (templateId: string) => apiRequest(`/api/communication-templates/${templateId}/usage`, {
+      method: 'POST'
+    }),
+  });
+
+  const handleTemplateSelect = (template: CommunicationTemplate) => {
+    setSelectedTemplate(template);
+    incrementUsageMutation.mutate(template.id);
+    setEmailContent({
+      title: template.name,
+      content: template.content,
+      callToAction: 'Please review this information and let us know if you have any questions'
+    });
+    setShowTemplateModal(false);
+    setShowCreateModal(true);
+  };
+
+  const handleGenerateContent = () => {
+    if (!currentProject) return;
+    
+    setIsGeneratingContent(true);
+    
+    // Get selected RAID log context
+    const raidLogContext = selectedRaidLogs.length > 0 
+      ? raidLogs.filter((log: any) => selectedRaidLogs.includes(log.id))
+      : [];
+    
+    generateContentMutation.mutate({
+      projectName: currentProject.name,
+      changeDescription: currentProject.description,
+      targetAudience: ['All Staff'],
+      keyMessages: ['Important change initiative update', 'Benefits for the organization'],
+      raidLogContext,
+      tone,
+      urgency
+    });
+  };
+
+  const handleSaveEmail = () => {
+    if (!emailContent.title || !emailContent.content) {
+      toast({ title: "Please fill in subject and content", variant: "destructive" });
+      return;
+    }
+
+    createEmailMutation.mutate({
+      title: emailContent.title,
+      content: emailContent.content,
+      targetAudience: ['All Staff'],
+      templateId: selectedTemplate?.id || null,
+      raidLogReferences: selectedRaidLogs,
+      isGptGenerated: isGeneratingContent,
+      distributionMethod: 'email',
+      visibilitySettings: 'public'
+    });
+  };
+
+  const handleAddRecipient = () => {
+    if (recipientInput.trim() && !selectedRecipients.includes(recipientInput.trim())) {
+      setSelectedRecipients([...selectedRecipients, recipientInput.trim()]);
+      setRecipientInput('');
+    }
+  };
+
+  const handleRemoveRecipient = (email: string) => {
+    setSelectedRecipients(selectedRecipients.filter(r => r !== email));
+  };
+
+  const handleDistribute = (email: Communication, dryRun: boolean = false) => {
+    if (selectedRecipients.length === 0) {
+      toast({ title: "Please select at least one recipient", variant: "destructive" });
+      return;
+    }
+
+    distributeEmailMutation.mutate({
+      emailId: email.id,
+      recipients: selectedRecipients,
+      dryRun
+    });
+  };
+
+  const filteredTemplates = templates.filter((template: CommunicationTemplate) => 
+    template.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+    (selectedCategory === 'all' || template.category === selectedCategory)
+  );
+
+  const filteredEmails = groupEmails.filter((email: Communication) =>
+    email.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Mail className="w-5 h-5 text-[#832c2c]" />
+            <span>Group Emails</span>
+          </div>
+          <Badge variant="outline" className="text-[#832c2c] border-[#832c2c]">
+            {groupEmails.length} Created
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Tabs value={activeView} onValueChange={setActiveView as any} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="repository" data-testid="tab-email-repository">
+              <Mail className="w-4 h-4 mr-2" />
+              Email Repository
+            </TabsTrigger>
+            <TabsTrigger value="create" data-testid="tab-create-email">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Email
+            </TabsTrigger>
+            <TabsTrigger value="manage" data-testid="tab-manage-emails">
+              <Users className="w-4 h-4 mr-2" />
+              Manage
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Email Repository View */}
+          <TabsContent value="repository" className="space-y-6" data-testid="repository-content">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Input 
+                  placeholder="Search group emails..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-64"
+                  data-testid="input-search-emails"
+                />
+              </div>
+              <Button 
+                variant="outline"
+                onClick={() => setActiveView('create')}
+                data-testid="button-create-email"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create New Email
+              </Button>
+            </div>
+
+            <div className="grid gap-4">
+              {communicationsLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <Card key={i} className="p-4">
+                    <Skeleton className="h-6 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <div className="flex justify-between">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-6 w-20" />
+                    </div>
+                  </Card>
+                ))
+              ) : filteredEmails.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <Mail className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="font-medium mb-2">No group emails created yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Start by creating your first group email communication
+                  </p>
+                  <Button onClick={() => setActiveView('create')} data-testid="button-create-first-email">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Your First Group Email
+                  </Button>
+                </Card>
+              ) : (
+                filteredEmails.map((email: Communication) => (
+                  <Card key={email.id} className="p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <h3 className="font-medium" data-testid={`text-email-title-${email.id}`}>
+                            {email.title}
+                          </h3>
+                          <Badge 
+                            variant={email.status === 'sent' ? 'default' : email.status === 'draft' ? 'secondary' : 'outline'}
+                            data-testid={`badge-email-status-${email.id}`}
+                          >
+                            {email.status}
+                          </Badge>
+                          {email.isGptGenerated && (
+                            <Badge variant="outline" className="text-[#832c2c] border-[#832c2c]">
+                              <Bot className="w-3 h-3 mr-1" />
+                              AI Generated
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                          {email.content.substring(0, 120)}...
+                        </p>
+                        <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                          <span>Created {new Date(email.createdAt).toLocaleDateString()}</span>
+                          {email.sendDate && (
+                            <span>Sent {new Date(email.sendDate).toLocaleDateString()}</span>
+                          )}
+                          {email.targetAudience.length > 0 && (
+                            <span>To: {email.targetAudience.join(', ')}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 ml-4">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setCurrentEmail(email);
+                            setShowPreviewModal(true);
+                          }}
+                          data-testid={`button-preview-${email.id}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setDistributionEmail(email);
+                            setShowDistributeModal(true);
+                          }}
+                          disabled={email.status === 'sent'}
+                          data-testid={`button-distribute-${email.id}`}
+                        >
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Create Email View */}
+          <TabsContent value="create" className="space-y-6" data-testid="create-email-content">
+            <Card className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Create New Group Email</h3>
+                  <div className="flex items-center space-x-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowTemplateModal(true)}
+                      data-testid="button-browse-templates"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Browse Templates
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleGenerateContent}
+                      disabled={isGeneratingContent || !currentProject}
+                      data-testid="button-generate-email-content"
+                    >
+                      {isGeneratingContent ? (
+                        <>
+                          <Clock className="w-4 h-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Bot className="w-4 h-4 mr-2" />
+                          Generate with AI
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="grid gap-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="tone">Email Tone</Label>
+                      <Select value={tone} onValueChange={setTone}>
+                        <SelectTrigger data-testid="select-email-tone">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="professional">Professional</SelectItem>
+                          <SelectItem value="friendly">Friendly</SelectItem>
+                          <SelectItem value="formal">Formal</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="urgency">Urgency Level</Label>
+                      <Select value={urgency} onValueChange={setUrgency}>
+                        <SelectTrigger data-testid="select-email-urgency">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="critical">Critical</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="subject">Email Subject</Label>
+                    <Input
+                      id="subject"
+                      value={emailContent.title}
+                      onChange={(e) => setEmailContent({ ...emailContent, title: e.target.value })}
+                      placeholder="Enter email subject..."
+                      data-testid="input-email-subject"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="content">Email Content</Label>
+                    <Textarea
+                      id="content"
+                      value={emailContent.content}
+                      onChange={(e) => setEmailContent({ ...emailContent, content: e.target.value })}
+                      placeholder="Enter email content..."
+                      rows={8}
+                      data-testid="textarea-email-content"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="cta">Call to Action</Label>
+                    <Input
+                      id="cta"
+                      value={emailContent.callToAction}
+                      onChange={(e) => setEmailContent({ ...emailContent, callToAction: e.target.value })}
+                      placeholder="Enter call to action..."
+                      data-testid="input-email-cta"
+                    />
+                  </div>
+
+                  {/* RAID Log Integration */}
+                  <div>
+                    <Label>Include RAID Log Information</Label>
+                    <div className="mt-2 space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">
+                      {raidLogsLoading ? (
+                        <div className="text-sm text-muted-foreground">Loading RAID logs...</div>
+                      ) : raidLogs.length === 0 ? (
+                        <div className="text-sm text-muted-foreground">No RAID logs available</div>
+                      ) : (
+                        raidLogs.map((log: any) => (
+                          <div key={log.id} className="flex items-start space-x-2">
+                            <Checkbox
+                              id={`raid-${log.id}`}
+                              checked={selectedRaidLogs.includes(log.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedRaidLogs([...selectedRaidLogs, log.id]);
+                                } else {
+                                  setSelectedRaidLogs(selectedRaidLogs.filter(id => id !== log.id));
+                                }
+                              }}
+                              data-testid={`checkbox-raid-${log.id}`}
+                            />
+                            <div className="flex-1">
+                              <label htmlFor={`raid-${log.id}`} className="text-sm font-medium cursor-pointer">
+                                <Badge variant="outline" className="mr-2">
+                                  {log.type.toUpperCase()}
+                                </Badge>
+                                {log.title}
+                              </label>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {log.description.substring(0, 100)}...
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setEmailContent({ title: '', content: '', callToAction: '' });
+                      setSelectedRaidLogs([]);
+                    }}
+                    data-testid="button-clear-email"
+                  >
+                    Clear
+                  </Button>
+                  <Button 
+                    onClick={handleSaveEmail}
+                    disabled={!emailContent.title || !emailContent.content || createEmailMutation.isPending}
+                    data-testid="button-save-email"
+                  >
+                    {createEmailMutation.isPending ? (
+                      <>
+                        <Clock className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Email
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </TabsContent>
+
+          {/* Manage Emails View */}
+          <TabsContent value="manage" className="space-y-6" data-testid="manage-emails-content">
+            <Card className="p-6">
+              <h3 className="text-lg font-medium mb-4">Email Management</h3>
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <Card className="p-4 text-center">
+                    <div className="text-2xl font-bold text-[#832c2c]">
+                      {groupEmails.filter(e => e.status === 'sent').length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Emails Sent</div>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <div className="text-2xl font-bold text-[#832c2c]">
+                      {groupEmails.filter(e => e.status === 'draft').length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Drafts</div>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <div className="text-2xl font-bold text-[#832c2c]">
+                      {groupEmails.filter(e => e.isGptGenerated).length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">AI Generated</div>
+                  </Card>
+                </div>
+              </div>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Template Selection Modal */}
+        <Dialog open={showTemplateModal} onOpenChange={setShowTemplateModal}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Select Email Template</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <Input 
+                  placeholder="Search templates..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="flex-1"
+                  data-testid="input-search-templates"
+                />
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="w-48" data-testid="select-template-category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="email">Email Templates</SelectItem>
+                    <SelectItem value="newsletter">Newsletters</SelectItem>
+                    <SelectItem value="announcement">Announcements</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-4">
+                {templatesLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <Card key={i} className="p-4">
+                      <Skeleton className="h-6 w-3/4 mb-2" />
+                      <Skeleton className="h-4 w-full mb-2" />
+                      <div className="flex justify-between">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-6 w-20" />
+                      </div>
+                    </Card>
+                  ))
+                ) : (
+                  filteredTemplates.map((template: CommunicationTemplate) => (
+                    <Card 
+                      key={template.id} 
+                      className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleTemplateSelect(template)}
+                      data-testid={`template-card-${template.id}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <h3 className="font-medium">{template.name}</h3>
+                            <Badge variant="outline">
+                              {template.category}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {template.description}
+                          </p>
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {template.content.substring(0, 150)}...
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium">
+                            Used {template.usageCount || 0} times
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Email Distribution Modal */}
+        <Dialog open={showDistributeModal} onOpenChange={setShowDistributeModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Distribute Group Email</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium mb-2">Email: {distributionEmail?.title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {distributionEmail?.content.substring(0, 200)}...
+                </p>
+              </div>
+
+              <div>
+                <Label>Recipients</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      value={recipientInput}
+                      onChange={(e) => setRecipientInput(e.target.value)}
+                      placeholder="Enter email address..."
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddRecipient()}
+                      data-testid="input-recipient-email"
+                    />
+                    <Button 
+                      variant="outline" 
+                      onClick={handleAddRecipient}
+                      data-testid="button-add-recipient"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  
+                  {/* Quick Add from Stakeholders */}
+                  <div>
+                    <Label className="text-sm">Quick add from stakeholders:</Label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {stakeholders
+                        .filter((s: Stakeholder) => s.email && !selectedRecipients.includes(s.email))
+                        .map((stakeholder: Stakeholder) => (
+                        <Button
+                          key={stakeholder.id}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (stakeholder.email) {
+                              setSelectedRecipients([...selectedRecipients, stakeholder.email]);
+                            }
+                          }}
+                          data-testid={`button-add-stakeholder-${stakeholder.id}`}
+                        >
+                          <User className="w-3 h-3 mr-1" />
+                          {stakeholder.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Selected Recipients */}
+                  {selectedRecipients.length > 0 && (
+                    <div>
+                      <Label className="text-sm">Selected recipients:</Label>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {selectedRecipients.map((email) => (
+                          <Badge 
+                            key={email} 
+                            variant="secondary" 
+                            className="cursor-pointer"
+                            onClick={() => handleRemoveRecipient(email)}
+                            data-testid={`badge-recipient-${email}`}
+                          >
+                            {email}
+                            <Trash2 className="w-3 h-3 ml-1" />
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  variant="outline"
+                  onClick={() => distributionEmail && handleDistribute(distributionEmail, true)}
+                  disabled={selectedRecipients.length === 0 || distributeEmailMutation.isPending}
+                  data-testid="button-dry-run"
+                >
+                  Test Send (Dry Run)
+                </Button>
+                <Button 
+                  onClick={() => distributionEmail && handleDistribute(distributionEmail, false)}
+                  disabled={selectedRecipients.length === 0 || distributeEmailMutation.isPending}
+                  data-testid="button-send-email"
+                  className="bg-[#832c2c] hover:bg-[#6d2424]"
+                >
+                  {distributeEmailMutation.isPending ? (
+                    <>
+                      <Clock className="w-4 h-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      Send Email
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Email Preview Modal */}
+        <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Email Preview</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {currentEmail && (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Subject:</Label>
+                    <div className="font-medium" data-testid="preview-email-subject">
+                      {currentEmail.title}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Content:</Label>
+                    <div 
+                      className="prose prose-sm max-w-none mt-2"
+                      data-testid="preview-email-content"
+                    >
+                      {currentEmail.content.split('\n').map((paragraph, index) => (
+                        <p key={index}>{paragraph}</p>
+                      ))}
+                    </div>
+                  </div>
+                  {currentEmail.raidLogReferences && currentEmail.raidLogReferences.length > 0 && (
+                    <div>
+                      <Label className="text-sm text-muted-foreground">Related RAID Information:</Label>
+                      <div className="space-y-2 mt-2">
+                        {currentEmail.raidLogReferences.map((raidId: string) => {
+                          const raidLog = raidLogs.find((log: any) => log.id === raidId);
+                          if (!raidLog) return null;
+                          return (
+                            <div key={raidId} className="p-3 bg-muted rounded-lg">
+                              <div className="flex items-center space-x-2">
+                                <Badge variant="outline">
+                                  {raidLog.type.toUpperCase()}
+                                </Badge>
+                                <span className="font-medium">{raidLog.title}</span>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {raidLog.description}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Status: {currentEmail.status}</span>
+                    <span>Created: {new Date(currentEmail.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
 // Flyers Execution Module Component
 function FlyersExecutionModule() {
   const { currentProject } = useCurrentProject();
@@ -1554,9 +2377,12 @@ export default function Communications() {
               <ChannelPreferences />
             </TabsContent>
 
-            {/* Execution Tab Content (Flyers Implementation) */}
+            {/* Execution Tab Content (Flyers and Group Emails Implementation) */}
             <TabsContent value="execution" className="space-y-6" data-testid="execution-content">
-              <FlyersExecutionModule />
+              <div className="space-y-6">
+                <GroupEmailsExecutionModule />
+                <FlyersExecutionModule />
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>

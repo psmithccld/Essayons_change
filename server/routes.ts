@@ -41,7 +41,7 @@ import {
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions
 } from "@shared/schema";
 import * as openaiService from "./openai";
-import { sendTaskAssignmentNotification } from "./services/emailService";
+import { sendTaskAssignmentNotification, sendBulkGroupEmail } from "./services/emailService";
 import { z } from "zod";
 
 // Input validation schemas
@@ -54,6 +54,35 @@ const distributionRequestSchema = z.object({
 
 const exportRequestSchema = z.object({
   format: z.enum(['powerpoint', 'pdf', 'canva'])
+});
+
+// GPT Content Generation schema
+const generateGroupEmailContentSchema = z.object({
+  projectName: z.string().min(1, "Project name is required"),
+  changeDescription: z.string().optional(),
+  targetAudience: z.array(z.string()).min(1, "At least one target audience is required"),
+  keyMessages: z.array(z.string()).optional(),
+  raidLogContext: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    type: z.string(),
+    description: z.string()
+  })).optional(),
+  tone: z.enum(['professional', 'friendly', 'urgent', 'formal']).default('professional'),
+  urgency: z.enum(['low', 'normal', 'high', 'critical']).default('normal')
+});
+
+// GPT Content Refinement schema
+const refineGroupEmailContentSchema = z.object({
+  currentContent: z.object({
+    title: z.string(),
+    content: z.string(),
+    callToAction: z.string().optional()
+  }),
+  refinementRequest: z.string().min(1, "Refinement request is required"),
+  context: z.object({}).optional(),
+  tone: z.enum(['professional', 'friendly', 'urgent', 'formal']).default('professional'),
+  urgency: z.enum(['low', 'normal', 'high', 'critical']).default('normal')
 });
 
 // Rate limiting store (in production, use Redis)
@@ -1023,6 +1052,79 @@ Return the refined content in JSON format:
     }
   });
 
+  // GPT Content Generation for Group Emails
+  app.post("/api/gpt/generate-group-email-content", requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // SECURITY: Input validation with Zod
+      const validatedInput = generateGroupEmailContentSchema.parse(req.body);
+      const { projectName, changeDescription, targetAudience, keyMessages, raidLogContext, tone, urgency } = validatedInput;
+
+      const raidContextString = raidLogContext && raidLogContext.length > 0 
+        ? `\n\nRelated Project Information:\n${raidLogContext.map((item: any) => `${item.type.toUpperCase()}: ${item.title} - ${item.description}`).join('\n')}`
+        : '';
+
+      const content = await openaiService.generateChangeContent('email', {
+        projectName,
+        changeDescription: (changeDescription || '') + raidContextString,
+        targetAudience: Array.isArray(targetAudience) ? targetAudience : [targetAudience],
+        keyMessages: Array.isArray(keyMessages) ? keyMessages : (keyMessages ? [keyMessages] : [])
+      });
+
+      res.json(content);
+    } catch (error) {
+      console.error("Error generating group email content:", error);
+      res.status(500).json({ error: "Failed to generate group email content" });
+    }
+  });
+
+  // GPT Content Refinement for Group Emails
+  app.post("/api/gpt/refine-group-email-content", requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // SECURITY: Input validation with Zod
+      const validatedInput = refineGroupEmailContentSchema.parse(req.body);
+      const { currentContent, refinementRequest, context, tone, urgency } = validatedInput;
+
+      const prompt = `Refine this group email content based on the request:
+
+Current content:
+Subject: ${currentContent.title || 'No subject'}
+Content: ${currentContent.content || 'No content'}
+Call to Action: ${currentContent.callToAction || 'No CTA'}
+
+Refinement request: ${refinementRequest}
+Tone: ${tone || 'Professional'}
+Urgency: ${urgency || 'Normal'}
+
+Context: ${JSON.stringify(context || {})}
+
+Create professional email content that:
+- Uses appropriate tone (${tone || 'Professional'})
+- Reflects urgency level (${urgency || 'Normal'})
+- Maintains clear communication
+- Includes actionable next steps
+
+Return the refined content in JSON format:
+{
+  "title": "refined email subject",
+  "content": "refined email body",
+  "callToAction": "refined call to action"
+}`;
+
+      const { openai } = await import("./openai");
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      });
+
+      const refinedContent = JSON.parse(response.choices[0].message.content || "{}");
+      res.json(refinedContent);
+    } catch (error) {
+      console.error("Error refining group email content:", error);
+      res.status(500).json({ error: "Failed to refine group email content" });
+    }
+  });
+
   // Flyer Distribution - SECURITY: Requires bulk email permission and proper auth
   app.post("/api/communications/:id/distribute", requireAuthAndPermission('canSendBulkEmails'), async (req: AuthenticatedRequest, res) => {
     try {
@@ -1037,13 +1139,19 @@ Return the refined content in JSON format:
         });
       }
       
-      // SECURITY: Environment safety check
-      const safetyCheck = checkEnvironmentSafety('bulk_email');
-      if (!safetyCheck.safe) {
-        return res.status(403).json({ 
-          error: safetyCheck.message,
-          hint: "Set ALLOW_PRODUCTION_EMAIL=true if you intend to send emails in production"
-        });
+      // DRY RUN mode - short-circuit before environment safety checks
+      if (dryRun) {
+        // Skip all safety checks for dry runs - they should always succeed
+        console.log(`[DRY RUN] User ${req.userId} initiating DRY RUN distribution - bypassing environment checks`);
+      } else {
+        // SECURITY: Environment safety check (only for live distributions)
+        const safetyCheck = checkEnvironmentSafety('bulk_email');
+        if (!safetyCheck.safe) {
+          return res.status(403).json({ 
+            error: safetyCheck.message,
+            hint: "Set ALLOW_PRODUCTION_EMAIL=true if you intend to send emails in production"
+          });
+        }
       }
 
       const communication = await storage.getCommunication(req.params.id);
@@ -1082,7 +1190,7 @@ Return the refined content in JSON format:
           timestamp: new Date().toISOString()
         });
         
-        // DRY RUN mode - simulate without sending
+        // Handle DRY RUN mode - simulate without sending
         if (dryRun) {
           distributionResult = {
             sent: emailList.length,
@@ -1091,16 +1199,46 @@ Return the refined content in JSON format:
           };
           console.log(`[DRY RUN] Would distribute to ${emailList.length} recipients:`, emailList);
         } else {
-          // Import and use email service
-          const { sendBulkFlyerDistribution } = await import("./services/emailService");
-          
-          distributionResult = await sendBulkFlyerDistribution(
-            emailList,
-            communication.title,
-            communication.content,
-            project.name,
-            distributionMethod
-          );
+          // LIVE distribution - choose appropriate email service based on communication type
+          if (communication.type === 'group_email') {
+            // Get RAID log context if referenced
+            let raidLogInfo: { title: string; type: string; description: string }[] = [];
+            if (communication.raidLogReferences && communication.raidLogReferences.length > 0) {
+              try {
+                const raidLogs = await Promise.all(
+                  communication.raidLogReferences.map(id => storage.getRaidLog(id))
+                );
+                raidLogInfo = raidLogs
+                  .filter(log => log !== undefined)
+                  .map(log => ({
+                    title: log!.title,
+                    type: log!.type,
+                    description: log!.description
+                  }));
+              } catch (error) {
+                console.warn('Error fetching RAID logs for email context:', error);
+              }
+            }
+            
+            distributionResult = await sendBulkGroupEmail(
+              emailList,
+              communication.title,
+              communication.content,
+              project.name,
+              raidLogInfo.length > 0 ? raidLogInfo : undefined
+            );
+          } else {
+            // Import and use flyer distribution service for backward compatibility
+            const { sendBulkFlyerDistribution } = await import("./services/emailService");
+            
+            distributionResult = await sendBulkFlyerDistribution(
+              emailList,
+              communication.title,
+              communication.content,
+              project.name,
+              distributionMethod
+            );
+          }
         }
       }
 
