@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Canvas as FabricCanvas, IText, Rect, Circle as FabricCircle, Ellipse, Polygon, Path, Group } from "fabric";
+import { Canvas as FabricCanvas, IText, Rect, Circle as FabricCircle, Ellipse, Polygon, Path, Group, PencilBrush } from "fabric";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,7 +17,8 @@ import { z } from "zod";
 import { 
   Plus, Save, Download, Upload, Pen, Square, Circle, Diamond, FileText, 
   Database, Layers, Move, Clock, Triangle, ArrowRight, MoreVertical, 
-  Trash2, Edit, Undo, Redo, ZoomIn, ZoomOut, RotateCcw, MousePointer2
+  Trash2, Edit, Undo, Redo, ZoomIn, ZoomOut, RotateCcw, MousePointer2,
+  Type, Eraser, Palette
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -50,10 +52,15 @@ interface Connection {
 }
 
 interface CanvasTools {
-  mode: 'select' | 'connect' | 'text';
+  mode: 'select' | 'connect' | 'text' | 'draw' | 'shape';
   selectedElement: any | null;
   connecting: boolean;
   connectionStart: any | null;
+  drawingTool: 'pen' | 'eraser';
+  shapeType: 'rectangle' | 'circle';
+  strokeColor: string;
+  strokeWidth: number;
+  fillColor: string;
 }
 
 // Process mapping symbol definitions with industry standard shapes
@@ -86,6 +93,11 @@ export default function DevelopmentMaps() {
     selectedElement: null,
     connecting: false,
     connectionStart: null,
+    drawingTool: 'pen',
+    shapeType: 'rectangle',
+    strokeColor: '#000000',
+    strokeWidth: 2,
+    fillColor: '#ffffff',
   });
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -159,6 +171,22 @@ export default function DevelopmentMaps() {
   useEffect(() => {
     selectedSymbolTypeRef.current = selectedSymbolType;
   }, [selectedSymbolType]);
+
+  // Update brush properties when drawing tools change (fix reactivity)
+  useEffect(() => {
+    if (!canvas || !canvas.isDrawingMode) return;
+    
+    // Update brush properties when colors or stroke width change while in drawing mode
+    if (tools.drawingTool === 'eraser') {
+      canvas.freeDrawingBrush = new PencilBrush(canvas);
+      canvas.freeDrawingBrush.color = '#ffffff'; // Background color for eraser effect
+      canvas.freeDrawingBrush.width = tools.strokeWidth * 2;
+    } else {
+      canvas.freeDrawingBrush = new PencilBrush(canvas);
+      canvas.freeDrawingBrush.color = tools.strokeColor;
+      canvas.freeDrawingBrush.width = tools.strokeWidth;
+    }
+  }, [canvas, tools.drawingTool, tools.strokeColor, tools.strokeWidth]);
 
   // Handle canvas interactions - symbol placement and connections
   useEffect(() => {
@@ -652,6 +680,98 @@ export default function DevelopmentMaps() {
     }
   };
 
+  // Drawing tool functions
+  const setDrawingMode = (enabled: boolean) => {
+    if (!canvas) {
+      return;
+    }
+    
+    canvas.isDrawingMode = enabled;
+    
+    if (enabled) {
+      // Initialize the brush first before setting properties
+      if (tools.drawingTool === 'eraser') {
+        canvas.freeDrawingBrush = new PencilBrush(canvas);
+        canvas.freeDrawingBrush.color = '#ffffff'; // Background color for eraser effect
+        canvas.freeDrawingBrush.width = tools.strokeWidth * 2;
+      } else {
+        canvas.freeDrawingBrush = new PencilBrush(canvas);
+        canvas.freeDrawingBrush.color = tools.strokeColor;
+        canvas.freeDrawingBrush.width = tools.strokeWidth;
+      }
+      
+      // Add path created event listener
+      canvas.on('path:created', function(event) {
+        // Path was created successfully
+      });
+    } else {
+      // Remove event listeners when drawing is disabled
+      canvas.off('path:created');
+    }
+  };
+
+  const addTextBox = () => {
+    if (!canvas) return;
+    
+    const textbox = new IText('Click to edit text', {
+      left: canvas.width! / 2 - 100,
+      top: canvas.height! / 2 - 20,
+      fontFamily: 'Arial',
+      fontSize: 16,
+      fill: tools.strokeColor,
+      width: 200,
+      splitByGrapheme: true,
+    });
+    
+    canvas.add(textbox);
+    canvas.setActiveObject(textbox);
+    
+    // Wait for the textbox to be properly rendered before entering editing mode
+    canvas.requestRenderAll();
+    setTimeout(() => {
+      try {
+        textbox.enterEditing();
+      } catch (error) {
+        console.warn('Could not enter editing mode immediately:', error);
+        // Fallback: user can double-click to edit
+      }
+    }, 50);
+  };
+
+  const addShape = (type: 'rectangle' | 'circle') => {
+    if (!canvas) return;
+    
+    const centerX = canvas.width! / 2;
+    const centerY = canvas.height! / 2;
+    
+    let shape: any;
+    
+    if (type === 'rectangle') {
+      shape = new Rect({
+        left: centerX - 50,
+        top: centerY - 25,
+        width: 100,
+        height: 50,
+        fill: tools.fillColor,
+        stroke: tools.strokeColor,
+        strokeWidth: tools.strokeWidth,
+      });
+    } else {
+      shape = new FabricCircle({
+        left: centerX - 25,
+        top: centerY - 25,
+        radius: 25,
+        fill: tools.fillColor,
+        stroke: tools.strokeColor,
+        strokeWidth: tools.strokeWidth,
+      });
+    }
+    
+    canvas.add(shape);
+    canvas.setActiveObject(shape);
+    canvas.requestRenderAll();
+  };
+
   // Mutations for CRUD operations
   const createProcessMapMutation = useMutation({
     mutationFn: async (data: ProcessMapFormData) => {
@@ -1136,6 +1256,101 @@ export default function DevelopmentMaps() {
                     <ArrowRight className="w-4 h-4 mr-1" />
                     Connect
                   </Button>
+                  
+                  {/* Drawing Tools */}
+                  <Button
+                    variant={tools.mode === 'draw' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      const newMode = tools.mode === 'draw' ? 'select' : 'draw';
+                      setTools(prev => ({ ...prev, mode: newMode }));
+                      setSelectedSymbolType(null);
+                      setDrawingMode(newMode === 'draw');
+                      if (canvas) {
+                        canvas.defaultCursor = newMode === 'draw' ? 'crosshair' : 'default';
+                      }
+                    }}
+                    data-testid="button-tool-draw"
+                  >
+                    <Pen className="w-4 h-4 mr-1" />
+                    Draw
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addTextBox}
+                    data-testid="button-tool-text"
+                  >
+                    <Type className="w-4 h-4 mr-1" />
+                    Text
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addShape('rectangle')}
+                    data-testid="button-tool-rectangle"
+                  >
+                    <Square className="w-4 h-4 mr-1" />
+                    Rectangle
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addShape('circle')}
+                    data-testid="button-tool-circle"
+                  >
+                    <Circle className="w-4 h-4 mr-1" />
+                    Circle
+                  </Button>
+                  
+                  {/* Color Controls */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" data-testid="button-tool-color">
+                        <Palette className="w-4 h-4 mr-2" />
+                        <div 
+                          className="w-4 h-4 rounded border"
+                          style={{ backgroundColor: tools.strokeColor }}
+                        />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64">
+                      <div className="space-y-3">
+                        <div>
+                          <Label>Stroke Color</Label>
+                          <Input
+                            type="color"
+                            value={tools.strokeColor}
+                            onChange={(e) => setTools({ ...tools, strokeColor: e.target.value })}
+                            data-testid="input-stroke-color"
+                          />
+                        </div>
+                        <div>
+                          <Label>Fill Color</Label>
+                          <Input
+                            type="color"
+                            value={tools.fillColor}
+                            onChange={(e) => setTools({ ...tools, fillColor: e.target.value })}
+                            data-testid="input-fill-color"
+                          />
+                        </div>
+                        <div>
+                          <Label>Stroke Width</Label>
+                          <Input
+                            type="range"
+                            min="1"
+                            max="20"
+                            value={tools.strokeWidth}
+                            onChange={(e) => setTools({ ...tools, strokeWidth: parseInt(e.target.value) })}
+                            data-testid="input-stroke-width"
+                          />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 
                 <div className="grid grid-cols-1 gap-2">
