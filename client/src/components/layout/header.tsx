@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Bell, Plus, User, Shield, Briefcase, ChevronDown } from "lucide-react";
+import { Bell, Plus, User, Shield, Briefcase, ChevronDown, Settings, Palette } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -28,8 +30,21 @@ const projectFormSchema = insertProjectSchema.extend({
 
 type ProjectFormData = z.infer<typeof projectFormSchema>;
 
+const userSettingsSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email").optional(),
+  role: z.string().optional(),
+  theme: z.enum(["light", "dark", "system"]).default("system"),
+  notifications: z.boolean().default(true),
+  emailNotifications: z.boolean().default(true),
+  autoSave: z.boolean().default(true),
+});
+
+type UserSettingsData = z.infer<typeof userSettingsSchema>;
+
 export default function Header() {
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { currentProject, setCurrentProject, projects, isLoading } = useCurrentProject();
@@ -82,6 +97,29 @@ export default function Header() {
 
   const onSubmit = (data: ProjectFormData) => {
     createProjectMutation.mutate(data);
+  };
+
+  // User Settings Form
+  const settingsForm = useForm<UserSettingsData>({
+    resolver: zodResolver(userSettingsSchema),
+    defaultValues: {
+      name: user?.name || "",
+      email: user?.username || "",
+      role: "User",
+      theme: "system",
+      notifications: true,
+      emailNotifications: true,
+      autoSave: true,
+    },
+  });
+
+  const onSettingsSubmit = (data: UserSettingsData) => {
+    console.log("Settings updated:", data);
+    toast({
+      title: "Settings Updated",
+      description: "Your preferences have been saved successfully!",
+    });
+    setIsSettingsOpen(false);
   };
 
   return (
@@ -183,6 +221,11 @@ export default function Header() {
                   </Link>
                 </DropdownMenuItem>
               )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setIsSettingsOpen(true)} data-testid="nav-user-settings">
+                <Settings className="w-4 h-4 mr-2" />
+                User Settings
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -311,6 +354,191 @@ export default function Header() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* User Settings Sheet */}
+      <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <SheetContent side="right" className="w-full max-w-[400px] sm:max-w-[540px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              User Settings
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-6">
+            <Form {...settingsForm}>
+              <form onSubmit={settingsForm.handleSubmit(onSettingsSubmit)} className="space-y-6">
+                {/* Profile Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
+                    <User className="w-4 h-4" />
+                    Profile
+                  </div>
+                  <FormField
+                    control={settingsForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input data-testid="input-settings-name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={settingsForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" data-testid="input-settings-email" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={settingsForm.control}
+                    name="role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Role</FormLabel>
+                        <FormControl>
+                          <Input data-testid="input-settings-role" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Appearance Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
+                    <Palette className="w-4 h-4" />
+                    Appearance
+                  </div>
+                  <FormField
+                    control={settingsForm.control}
+                    name="theme"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Theme</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-settings-theme">
+                              <SelectValue placeholder="Select theme" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="light">Light</SelectItem>
+                            <SelectItem value="dark">Dark</SelectItem>
+                            <SelectItem value="system">System</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Notifications Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
+                    <Bell className="w-4 h-4" />
+                    Notifications
+                  </div>
+                  <FormField
+                    control={settingsForm.control}
+                    name="notifications"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">
+                            Push Notifications
+                          </FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            Get notified about important updates
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-settings-notifications"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={settingsForm.control}
+                    name="emailNotifications"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">
+                            Email Notifications
+                          </FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            Receive updates via email
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-settings-email-notifications"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={settingsForm.control}
+                    name="autoSave"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">
+                            Auto Save
+                          </FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            Automatically save your work
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-settings-auto-save"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button type="submit" data-testid="button-save-settings">
+                    Save Changes
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsSettingsOpen(false)}
+                    data-testid="button-cancel-settings"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </div>
+        </SheetContent>
+      </Sheet>
     </header>
   );
 }

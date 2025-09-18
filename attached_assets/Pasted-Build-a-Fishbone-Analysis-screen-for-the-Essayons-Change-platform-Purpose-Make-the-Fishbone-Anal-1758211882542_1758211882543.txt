@@ -1,0 +1,116 @@
+Build a “Fishbone Analysis” screen for the Essayons Change platform.
+
+Purpose
+Make the Fishbone Analysis the focal point for guiding a change initiative through five phases. It should help users see where they are, understand what to do next (organizational + individual actions), and create the right work items (tasks, milestones, RAID entries, communications).
+
+Overall vibe
+Clear, calm, encouraging. Minimal UI chrome. The content is the star. Use concise labels, short tips, and obvious calls to action.
+
+Top bar
+
+Show the initiative name and the current phase.
+
+Provide two primary actions:
+
+Advance to next phase (with an optional confirmation step).
+
+Plan next phase (lets users prepare work items for upcoming phase without advancing).
+
+Fishbone layout
+
+Horizontal spine from left to right with five labeled phase nodes:
+
+Identify Need to Change
+
+Identify Stakeholders
+
+Develop the Change
+
+Implement the Change
+
+Reinforce the Change
+
+The current phase is visually highlighted. Completed phases look “checked.” Upcoming phases look neutral.
+
+Hover tips (tooltips) — show BOTH organizational actions and individual adoption cues
+When the user hovers any phase, show a small card with two short lists:
+
+Identify Need to Change
+
+Organizational: clarify business problem; define success metrics; align leadership narrative.
+
+Individual: explain the “why”; reduce uncertainty; invite early questions.
+
+Identify Stakeholders
+
+Organizational: map influence/interest; assign sponsors/champions; choose comms channels.
+
+Individual: clarify roles and impact; open feedback loops; surface resistance early.
+
+Develop the Change
+
+Organizational: design process/tech changes; build training & support; define readiness gates.
+
+Individual: show “what changes for me”; provide how-to guides; offer practice spaces.
+
+Implement the Change
+
+Organizational: publish schedule; monitor adoption; remove blockers fast.
+
+Individual: encourage first wins; give just-in-time help; share exemplars.
+
+Reinforce the Change
+
+Organizational: measure outcomes vs. targets; update SOPs; recognize contributors.
+
+Individual: celebrate progress; reflect on lessons; embed new habits.
+
+From any phase, the user can create these items (without leaving the screen):
+
+Task (owner, due date, phase tag)
+
+Milestone (name, date, success criteria)
+
+RAID entry (risk/assumption/issue/dependency, severity, owner)
+
+Communication (audience, channel, message draft, planned send date)
+
+Behavior
+
+Creating an item should feel lightweight (small modal or side panel).
+
+Default the new item’s phase to the phase the user is viewing.
+
+If the user chooses Plan next phase, default new items to the next phase (but do not advance the initiative).
+
+After Advance to next phase, prompt: “Do you want to create or review items for the new phase now?”
+
+Microcopy
+
+Empty state: “Start here—hover a phase to see tips. Create a task or note for what needs to happen next.”
+
+Success: “Saved. You can find this under [Tasks/RAID/Comms] and on this phase.”
+
+Advance confirm: “Advance to [Next Phase]? You can still return to earlier data.”
+
+Progress cues
+
+Each phase node shows small badges: number of open tasks, open RAID, scheduled comms.
+
+A subtle “readiness/sentiment” indicator can appear under the current phase if available.
+
+Accessibility & simplicity
+
+Short labels. Clear focus states. Keyboard-friendly navigation.
+
+Keep text readable and avoid dense paragraphs in tooltips.
+
+Done when
+
+I can hover any phase and instantly see concise org + individual tips.
+
+I can create a task, milestone, RAID, or communication from the current phase or for the next phase without leaving the screen.
+
+I can advance the initiative to the next phase or plan that phase’s work in advance.
+
+Current, completed, and upcoming phases are visually distinct and easy to understand at a glance.
