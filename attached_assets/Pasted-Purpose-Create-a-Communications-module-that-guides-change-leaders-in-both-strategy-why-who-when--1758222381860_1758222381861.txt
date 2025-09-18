@@ -1,0 +1,86 @@
+Purpose
+Create a Communications module that guides change leaders in both strategy (why, who, when, and how) and execution (creating and sending actual communications). The module should embed the GPT Coach to provide tailored suggestions at every step.
+
+Part 1: Strategy
+
+At the strategy level, the tool should:
+
+Provide phase-based guidance: show recommended communication themes for the current phase (e.g., urgency and vision in “Identify Need,” training resources in “Develop the Change,” reinforcement stories in “Reinforce the Change”).
+
+Stakeholder mapping: let the user identify key stakeholders relevant to this phase.
+
+Resistance identification: allow the user to capture resistance concerns; the GPT Coach suggests counter-messages or tactics.
+
+Channel preferences: prompt the user to consider how the team prefers to receive info — Flyers, Group Emails, P2P Emails, or Meetings.
+
+Part 2: Execution
+
+At the execution level, the user works with actual tools:
+
+Flyers
+
+Pull from a repository of company-approved templates.
+
+GPT Coach helps draft content: vision statements, key messages, or quick updates.
+
+User can save flyers into the repository.
+
+After a flyer is developed, prompt: “Should this be distributed by Group Email, P2P Email, or stored for records?”
+
+Export options: PowerPoint or Canva.
+
+Group Emails
+
+Guided by GPT Coach for purposes such as vision setting, issue response, sharing short-term wins, motivational interviews, or team debriefs.
+
+Allow selection of internal and external recipients.
+
+Allow RAID log items to be embedded directly.
+
+Emails are sent “on behalf of [Initiative/Manager].”
+
+P2P Emails
+
+Guided by GPT Coach to suggest purpose and draft content (e.g., stakeholder feedback, RAID tracking, individual updates).
+
+Options:
+
+Visible to all in the initiative (transparency).
+
+Private (only sender + recipient see message).
+
+Can embed RAID log details.
+
+Sent “on behalf of [Initiative/Manager].”
+
+Meetings
+
+Create a meeting invite that captures the 5Ws (Who, What, When, Where, Why).
+
+GPT Coach helps build the agenda with focus points based on the initiative phase.
+
+Output: meeting invite file + agenda summary.
+
+After creation, the system sends an email “on behalf of [Initiative/Manager].”
+
+Repository Features
+
+Flyers: searchable repository with templates + past communications.
+
+Emails: archive of Group and P2P messages tied to initiative.
+
+Meetings: log of meeting invites and agendas.
+
+All tied to initiatives and phases for traceability.
+
+User Flow Summary
+
+User enters Communications module.
+
+Strategy tab: guided prompts (phase tips, stakeholders, resistance, channel preferences).
+
+Execution tab: user chooses channel (Flyer, Group Email, P2P, Meeting).
+
+GPT Coach helps generate drafts, agenda, or counter-messages.
+
+User finalizes → send, export, or store in repository.

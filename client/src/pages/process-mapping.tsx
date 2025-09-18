@@ -111,6 +111,14 @@ export default function DevelopmentMaps() {
     enabled: !!currentProject?.id,
   });
 
+  // Auto-load the first process map when available
+  useEffect(() => {
+    if (!isLoading && processMaps.length > 0 && !currentProcessMap && canvas) {
+      const firstProcessMap = processMaps[0];
+      loadProcessMap(firstProcessMap);
+    }
+  }, [isLoading, processMaps, currentProcessMap, canvas]);
+
   // Initialize Fabric.js canvas
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -673,10 +681,66 @@ export default function DevelopmentMaps() {
   };
 
   const deleteSelected = () => {
-    if (canvas && tools.selectedElement) {
-      canvas.remove(tools.selectedElement);
-      canvas.renderAll();
-      setTools(prev => ({ ...prev, selectedElement: null }));
+    if (!canvas || !tools.selectedElement) return;
+
+    const elementToDelete = tools.selectedElement;
+    const elementId = (elementToDelete as any).processId;
+    const connectionId = (elementToDelete as any).connectionId;
+    const isConnection = (elementToDelete as any).isConnection === true;
+
+    // Remove from canvas
+    canvas.remove(elementToDelete);
+    canvas.renderAll();
+    setTools(prev => ({ ...prev, selectedElement: null }));
+
+    // Calculate updated state based on what was deleted
+    let updatedElements = elements;
+    let updatedConnections = connections;
+
+    if (isConnection && connectionId) {
+      // Deleting a connection
+      updatedConnections = connections.filter(conn => conn.id !== connectionId);
+    } else if (elementId) {
+      // Deleting a symbol/element
+      updatedElements = elements.filter(el => el.id !== elementId);
+      // Also remove any connections involving this element
+      updatedConnections = connections.filter(conn => 
+        conn.fromId !== elementId && conn.toId !== elementId
+      );
+    }
+
+    // Update state
+    if (elementId || (isConnection && connectionId)) {
+      setElements(updatedElements);
+      setConnections(updatedConnections);
+    }
+
+    // Auto-save with the updated state
+    if (currentProcessMap?.id && canvas) {
+      const canvasData = JSON.stringify(canvas.toJSON());
+      const updateData = {
+        canvasData: canvasData,
+        elements: updatedElements,
+        connections: updatedConnections,
+      };
+
+      // Save immediately with the correct state
+      apiRequest('PUT', `/api/process-maps/${currentProcessMap.id}`, updateData)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'process-maps'] });
+          toast({
+            title: "Success",
+            description: "Process map saved successfully!",
+          });
+        })
+        .catch((error) => {
+          console.error("Error saving process map after delete:", error);
+          toast({
+            title: "Error",
+            description: "Failed to save changes. Please try again.",
+            variant: "destructive",
+          });
+        });
     }
   };
 
