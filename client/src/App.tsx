@@ -14,7 +14,6 @@ import Communications from "@/pages/communications";
 import Stakeholders from "@/pages/stakeholders";
 import Surveys from "@/pages/surveys";
 import GptCoach from "@/pages/gpt-coach";
-import MindMaps from "@/pages/mind-maps";
 import ProcessMapping from "@/pages/process-mapping";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -43,7 +42,6 @@ function Router() {
             <Route path="/users" component={UserManagement} />
             <Route path="/initiatives" component={InitiativeManagement} />
             <Route path="/security" component={SecurityManagement} />
-            <Route path="/mind-maps" component={MindMaps} />
             <Route path="/process-mapping" component={ProcessMapping} />
             <Route path="/change-process-flow" component={ChangeProcessFlow} />
             <Route component={NotFound} />

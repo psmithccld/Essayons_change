@@ -52,11 +52,6 @@ export const permissionsSchema = z.object({
   canEditSurveys: z.boolean().default(false),
   canDeleteSurveys: z.boolean().default(false),
   
-  // Mind Maps Management - granular CRUD operations
-  canSeeMindMaps: z.boolean().default(false),
-  canModifyMindMaps: z.boolean().default(false),
-  canEditMindMaps: z.boolean().default(false),
-  canDeleteMindMaps: z.boolean().default(false),
   
   // Process Maps Management - granular CRUD operations
   canSeeProcessMaps: z.boolean().default(false),
@@ -348,18 +343,6 @@ export const checklistTemplates = pgTable("checklist_templates", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const mindMaps = pgTable("mind_maps", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
-  name: text("name").notNull(),
-  description: text("description"),
-  canvasData: jsonb("canvas_data").notNull(), // Fabric.js canvas state
-  textBoxes: jsonb("text_boxes").default([]), // Array of text box metadata for context menus
-  isActive: boolean("is_active").notNull().default(true),
-  createdById: uuid("created_by_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
 
 export const processMaps = pgTable("process_maps", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -435,7 +418,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   surveyResponses: many(surveyResponses),
   gptInteractions: many(gptInteractions),
   createdChecklistTemplates: many(checklistTemplates),
-  createdMindMaps: many(mindMaps),
   createdProcessMaps: many(processMaps),
   initiativeAssignments: many(userInitiativeAssignments, { relationName: "userAssignments" }),
   assignedInitiatives: many(userInitiativeAssignments, { relationName: "assignedBy" }),
@@ -453,7 +435,6 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   surveys: many(surveys),
   gptInteractions: many(gptInteractions),
   milestones: many(milestones),
-  mindMaps: many(mindMaps),
   processMaps: many(processMaps),
   userAssignments: many(userInitiativeAssignments),
 }));
@@ -569,16 +550,6 @@ export const checklistTemplatesRelations = relations(checklistTemplates, ({ one 
   }),
 }));
 
-export const mindMapsRelations = relations(mindMaps, ({ one }) => ({
-  project: one(projects, {
-    fields: [mindMaps.projectId],
-    references: [projects.id],
-  }),
-  createdBy: one(users, {
-    fields: [mindMaps.createdById],
-    references: [users.id],
-  }),
-}));
 
 export const processMapsRelations = relations(processMaps, ({ one }) => ({
   project: one(projects, {
@@ -748,11 +719,6 @@ export const insertChecklistTemplateSchema = createInsertSchema(checklistTemplat
   updatedAt: true,
 });
 
-export const insertMindMapSchema = createInsertSchema(mindMaps).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
 
 export const insertProcessMapSchema = createInsertSchema(processMaps).omit({
   id: true,
@@ -1148,8 +1114,6 @@ export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
 export type ChecklistTemplate = typeof checklistTemplates.$inferSelect;
 export type InsertChecklistTemplate = z.infer<typeof insertChecklistTemplateSchema>;
 
-export type MindMap = typeof mindMaps.$inferSelect;
-export type InsertMindMap = z.infer<typeof insertMindMapSchema>;
 
 export type ProcessMap = typeof processMaps.$inferSelect;
 export type InsertProcessMap = z.infer<typeof insertProcessMapSchema>;

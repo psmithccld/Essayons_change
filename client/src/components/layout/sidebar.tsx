@@ -13,7 +13,6 @@ import {
   Bot,
   Fish,
   GitBranch,
-  Brain,
   ListChecks,
   GripVertical,
   Briefcase
@@ -47,8 +46,7 @@ const allNavigationItems: NavigationItem[] = [
   { id: "surveys", icon: ClipboardCheck, label: "Readiness Surveys", path: "/surveys" },
   { id: "gpt-coach", icon: Bot, label: "GPT Coach", path: "/gpt-coach" },
   { id: "fishbone", icon: Fish, label: "Change Process Flow", path: "/change-process-flow" },
-  { id: "process-mapping", icon: GitBranch, label: "Development Maps", path: "/process-mapping", permissions: ["canSeeAllProjects", "canModifyProjects"], requireAll: false },
-  { id: "mind-maps", icon: Brain, label: "Mind Maps", path: "/mind-maps", permissions: ["canSeeAllProjects", "canModifyProjects"], requireAll: false }
+  { id: "process-mapping", icon: GitBranch, label: "Development Maps", path: "/process-mapping", permissions: ["canSeeAllProjects", "canModifyProjects"], requireAll: false }
 ];
 
 const SIDEBAR_ORDER_KEY = "sidebarOrder";

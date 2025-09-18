@@ -1,13 +1,13 @@
 import bcrypt from 'bcrypt';
 import { 
-  users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, mindMaps, processMaps, roles, userInitiativeAssignments,
+  users, projects, tasks, stakeholders, raidLogs, communications, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type Survey, type InsertSurvey,
   type SurveyResponse, type InsertSurveyResponse, type GptInteraction, type InsertGptInteraction,
   type Milestone, type InsertMilestone, type ChecklistTemplate, type InsertChecklistTemplate,
-  type MindMap, type InsertMindMap, type ProcessMap, type InsertProcessMap,
+  type ProcessMap, type InsertProcessMap,
   type Role, type InsertRole, type UserInitiativeAssignment, type InsertUserInitiativeAssignment,
   type Permissions, type UserGroup, type InsertUserGroup, type UserGroupMembership, 
   type InsertUserGroupMembership, type UserPermission, type InsertUserPermission
@@ -101,12 +101,6 @@ export interface IStorage {
   updateChecklistTemplate(id: string, template: Partial<InsertChecklistTemplate>): Promise<ChecklistTemplate | undefined>;
   deleteChecklistTemplate(id: string): Promise<boolean>;
 
-  // Mind Maps
-  getMindMapsByProject(projectId: string): Promise<MindMap[]>;
-  getMindMap(id: string): Promise<MindMap | undefined>;
-  createMindMap(mindMap: InsertMindMap): Promise<MindMap>;
-  updateMindMap(id: string, mindMap: Partial<InsertMindMap>): Promise<MindMap | undefined>;
-  deleteMindMap(id: string): Promise<boolean>;
 
   // Process Maps
   getProcessMapsByProject(projectId: string): Promise<ProcessMap[]>;
@@ -911,34 +905,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Mind Maps
-  async getMindMapsByProject(projectId: string): Promise<MindMap[]> {
-    return await db.select().from(mindMaps)
-      .where(and(eq(mindMaps.projectId, projectId), eq(mindMaps.isActive, true)))
-      .orderBy(desc(mindMaps.createdAt));
-  }
-
-  async getMindMap(id: string): Promise<MindMap | undefined> {
-    const [mindMap] = await db.select().from(mindMaps).where(eq(mindMaps.id, id));
-    return mindMap || undefined;
-  }
-
-  async createMindMap(insertMindMap: InsertMindMap): Promise<MindMap> {
-    const [mindMap] = await db.insert(mindMaps).values(insertMindMap).returning();
-    return mindMap;
-  }
-
-  async updateMindMap(id: string, updateData: Partial<InsertMindMap>): Promise<MindMap | undefined> {
-    const [mindMap] = await db.update(mindMaps)
-      .set({ ...updateData, updatedAt: new Date() })
-      .where(eq(mindMaps.id, id))
-      .returning();
-    return mindMap || undefined;
-  }
-
-  async deleteMindMap(id: string): Promise<boolean> {
-    const result = await db.delete(mindMaps).where(eq(mindMaps.id, id));
-    return result.rowCount ? result.rowCount > 0 : false;
-  }
 
   // Process Maps
   async getProcessMapsByProject(projectId: string): Promise<ProcessMap[]> {

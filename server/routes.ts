@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { 
   insertProjectSchema, insertTaskSchema, insertStakeholderSchema, insertRaidLogSchema,
   insertCommunicationSchema, insertSurveySchema, baseSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
-  insertMilestoneSchema, insertChecklistTemplateSchema, insertMindMapSchema, insertProcessMapSchema,
+  insertMilestoneSchema, insertChecklistTemplateSchema, insertProcessMapSchema,
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema,
   insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
   insertUserGroupMembershipSchema, insertUserPermissionSchema,
@@ -1051,70 +1051,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Mind Maps
-  app.get("/api/projects/:projectId/mind-maps", async (req, res) => {
-    try {
-      const mindMaps = await storage.getMindMapsByProject(req.params.projectId);
-      res.json(mindMaps);
-    } catch (error) {
-      console.error("Error fetching mind maps:", error);
-      res.status(500).json({ error: "Failed to fetch mind maps" });
-    }
-  });
-
-  app.get("/api/mind-maps/:id", async (req, res) => {
-    try {
-      const mindMap = await storage.getMindMap(req.params.id);
-      if (!mindMap) {
-        return res.status(404).json({ error: "Mind map not found" });
-      }
-      res.json(mindMap);
-    } catch (error) {
-      console.error("Error fetching mind map:", error);
-      res.status(500).json({ error: "Failed to fetch mind map" });
-    }
-  });
-
-  app.post("/api/projects/:projectId/mind-maps", async (req, res) => {
-    try {
-      const validatedData = insertMindMapSchema.parse({
-        ...req.body,
-        projectId: req.params.projectId,
-        createdById: "550e8400-e29b-41d4-a716-446655440000", // For demo, using default user ID
-      });
-      const mindMap = await storage.createMindMap(validatedData);
-      res.status(201).json(mindMap);
-    } catch (error) {
-      console.error("Error creating mind map:", error);
-      res.status(400).json({ error: "Failed to create mind map" });
-    }
-  });
-
-  app.put("/api/mind-maps/:id", async (req, res) => {
-    try {
-      const mindMap = await storage.updateMindMap(req.params.id, req.body);
-      if (!mindMap) {
-        return res.status(404).json({ error: "Mind map not found" });
-      }
-      res.json(mindMap);
-    } catch (error) {
-      console.error("Error updating mind map:", error);
-      res.status(400).json({ error: "Failed to update mind map" });
-    }
-  });
-
-  app.delete("/api/mind-maps/:id", async (req, res) => {
-    try {
-      const success = await storage.deleteMindMap(req.params.id);
-      if (!success) {
-        return res.status(404).json({ error: "Mind map not found" });
-      }
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting mind map:", error);
-      res.status(500).json({ error: "Failed to delete mind map" });
-    }
-  });
 
   // Process Maps
   app.get("/api/projects/:projectId/process-maps", async (req, res) => {
