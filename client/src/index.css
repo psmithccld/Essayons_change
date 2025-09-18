@@ -4,38 +4,39 @@
 @tailwind utilities;
 
 :root {
-  --background: hsl(210, 20%, 98%);
-  --foreground: hsl(210, 15%, 15%);
+  /* Essayons Change Brand Colors */
+  --background: hsl(210, 20%, 98%); /* Soft White */
+  --foreground: hsl(0, 0%, 18%); /* Charcoal Gray */
   --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(210, 15%, 15%);
+  --card-foreground: hsl(0, 0%, 18%); /* Charcoal Gray */
   --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(210, 15%, 15%);
-  --primary: hsl(210, 65%, 50%);
+  --popover-foreground: hsl(0, 0%, 18%); /* Charcoal Gray */
+  --primary: hsl(353, 61%, 30%); /* Deep Essayons Red */
   --primary-foreground: hsl(0, 0%, 98%);
-  --secondary: hsl(160, 50%, 45%);
+  --secondary: hsl(206, 29%, 32%); /* Slate Blue */
   --secondary-foreground: hsl(0, 0%, 98%);
-  --muted: hsl(210, 20%, 96%);
-  --muted-foreground: hsl(210, 10%, 45%);
-  --accent: hsl(25, 80%, 55%);
+  --muted: hsl(220, 13%, 91%); /* Light Gray */
+  --muted-foreground: hsl(220, 9%, 46%); /* Steel Gray */
+  --accent: hsl(182, 38%, 48%); /* Soft Teal */
   --accent-foreground: hsl(0, 0%, 98%);
-  --destructive: hsl(0, 75%, 55%);
+  --destructive: hsl(0, 73%, 51%); /* Error Red */
   --destructive-foreground: hsl(0, 0%, 98%);
-  --border: hsl(210, 20%, 90%);
-  --input: hsl(210, 20%, 90%);
-  --ring: hsl(210, 65%, 50%);
-  --chart-1: hsl(210, 65%, 50%);
-  --chart-2: hsl(160, 50%, 45%);
-  --chart-3: hsl(25, 80%, 55%);
-  --chart-4: hsl(280, 55%, 60%);
-  --chart-5: hsl(340, 65%, 55%);
-  --sidebar: hsl(0, 0%, 100%);
-  --sidebar-foreground: hsl(210, 15%, 15%);
-  --sidebar-primary: hsl(210, 65%, 50%);
+  --border: hsl(220, 13%, 91%); /* Light Gray */
+  --input: hsl(220, 13%, 91%); /* Light Gray */
+  --ring: hsl(353, 61%, 30%); /* Deep Essayons Red */
+  --chart-1: hsl(353, 61%, 30%); /* Deep Essayons Red */
+  --chart-2: hsl(182, 38%, 48%); /* Soft Teal */
+  --chart-3: hsl(206, 29%, 32%); /* Slate Blue */
+  --chart-4: hsl(135, 48%, 44%); /* Success Green */
+  --chart-5: hsl(43, 90%, 50%); /* Warning Amber */
+  --sidebar: hsl(0, 0%, 18%); /* Charcoal Gray */
+  --sidebar-foreground: hsl(0, 0%, 98%);
+  --sidebar-primary: hsl(353, 61%, 30%); /* Deep Essayons Red */
   --sidebar-primary-foreground: hsl(0, 0%, 98%);
-  --sidebar-accent: hsl(210, 20%, 96%);
-  --sidebar-accent-foreground: hsl(210, 65%, 50%);
-  --sidebar-border: hsl(210, 20%, 90%);
-  --sidebar-ring: hsl(210, 65%, 50%);
+  --sidebar-accent: hsl(217, 19%, 27%); /* Dark Gray */
+  --sidebar-accent-foreground: hsl(0, 0%, 98%);
+  --sidebar-border: hsl(220, 9%, 66%); /* Mid Gray */
+  --sidebar-ring: hsl(353, 61%, 30%); /* Deep Essayons Red */
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
@@ -53,38 +54,39 @@
 }
 
 .dark {
-  --background: hsl(0, 0%, 0%);
-  --foreground: hsl(200, 6.6667%, 91.1765%);
-  --card: hsl(228, 9.8039%, 10%);
-  --card-foreground: hsl(0, 0%, 85.0980%);
-  --popover: hsl(0, 0%, 0%);
-  --popover-foreground: hsl(200, 6.6667%, 91.1765%);
-  --primary: hsl(210, 65%, 50%);
+  /* Essayons Change Dark Mode Colors */
+  --background: hsl(0, 0%, 8%); /* Very Dark Background */
+  --foreground: hsl(0, 0%, 95%); /* Light Text */
+  --card: hsl(217, 19%, 12%); /* Dark Card Background */
+  --card-foreground: hsl(0, 0%, 90%); /* Light Card Text */
+  --popover: hsl(217, 19%, 12%); /* Dark Popover */
+  --popover-foreground: hsl(0, 0%, 95%); /* Light Popover Text */
+  --primary: hsl(353, 61%, 40%); /* Lighter Essayons Red for dark mode */
   --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(160, 50%, 45%);
+  --secondary: hsl(206, 29%, 42%); /* Lighter Slate Blue */
   --secondary-foreground: hsl(0, 0%, 100%);
-  --muted: hsl(0, 0%, 9.4118%);
-  --muted-foreground: hsl(210, 3.3898%, 46.2745%);
-  --accent: hsl(25, 80%, 55%);
+  --muted: hsl(217, 19%, 15%); /* Dark Muted */
+  --muted-foreground: hsl(220, 9%, 60%); /* Light Steel Gray */
+  --accent: hsl(182, 38%, 55%); /* Lighter Soft Teal */
   --accent-foreground: hsl(0, 0%, 100%);
-  --destructive: hsl(0, 75%, 55%);
+  --destructive: hsl(0, 73%, 55%); /* Lighter Error Red */
   --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(210, 5.2632%, 14.9020%);
-  --input: hsl(207.6923, 27.6596%, 18.4314%);
-  --ring: hsl(210, 65%, 50%);
-  --chart-1: hsl(210, 65%, 50%);
-  --chart-2: hsl(160, 50%, 45%);
-  --chart-3: hsl(25, 80%, 55%);
-  --chart-4: hsl(280, 55%, 60%);
-  --chart-5: hsl(340, 65%, 55%);
-  --sidebar: hsl(228, 9.8039%, 10%);
-  --sidebar-foreground: hsl(0, 0%, 85.0980%);
-  --sidebar-primary: hsl(210, 65%, 50%);
+  --border: hsl(217, 19%, 20%); /* Dark Border */
+  --input: hsl(217, 19%, 20%); /* Dark Input */
+  --ring: hsl(353, 61%, 40%); /* Lighter Essayons Red */
+  --chart-1: hsl(353, 61%, 40%); /* Lighter Essayons Red */
+  --chart-2: hsl(182, 38%, 55%); /* Lighter Soft Teal */
+  --chart-3: hsl(206, 29%, 42%); /* Lighter Slate Blue */
+  --chart-4: hsl(135, 48%, 50%); /* Lighter Success Green */
+  --chart-5: hsl(43, 90%, 55%); /* Lighter Warning Amber */
+  --sidebar: hsl(0, 0%, 10%); /* Dark Sidebar */
+  --sidebar-foreground: hsl(0, 0%, 95%); /* Light Sidebar Text */
+  --sidebar-primary: hsl(353, 61%, 40%); /* Lighter Essayons Red */
   --sidebar-primary-foreground: hsl(0, 0%, 100%);
-  --sidebar-accent: hsl(205.7143, 70%, 7.8431%);
-  --sidebar-accent-foreground: hsl(210, 65%, 50%);
-  --sidebar-border: hsl(205.7143, 15.7895%, 26.0784%);
-  --sidebar-ring: hsl(210, 65%, 50%);
+  --sidebar-accent: hsl(217, 19%, 18%); /* Dark Sidebar Accent */
+  --sidebar-accent-foreground: hsl(0, 0%, 95%);
+  --sidebar-border: hsl(217, 19%, 25%); /* Dark Sidebar Border */
+  --sidebar-ring: hsl(353, 61%, 40%); /* Lighter Essayons Red */
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
@@ -184,9 +186,55 @@
 }
 
 .status-pending {
-  @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300;
+  @apply bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300;
 }
 
 .status-blocked {
   @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300;
+}
+
+/* Essayons Change Brand Specific Classes */
+.text-brand-primary {
+  color: hsl(353, 61%, 30%); /* Deep Essayons Red */
+}
+
+.bg-brand-primary {
+  background-color: hsl(353, 61%, 30%); /* Deep Essayons Red */
+}
+
+.border-brand-primary {
+  border-color: hsl(353, 61%, 30%); /* Deep Essayons Red */
+}
+
+.hover\:bg-brand-accent:hover {
+  background-color: hsl(182, 38%, 48%); /* Soft Teal */
+}
+
+.hover\:bg-brand-secondary:hover {
+  background-color: hsl(206, 29%, 32%); /* Slate Blue */
+}
+
+/* Status Colors with Essayons Change Palette */
+.text-success {
+  color: hsl(135, 48%, 44%); /* Success Green */
+}
+
+.bg-success {
+  background-color: hsl(135, 48%, 44%); /* Success Green */
+}
+
+.text-warning {
+  color: hsl(43, 90%, 50%); /* Warning Amber */
+}
+
+.bg-warning {
+  background-color: hsl(43, 90%, 50%); /* Warning Amber */
+}
+
+.text-error {
+  color: hsl(0, 73%, 51%); /* Error Red */
+}
+
+.bg-error {
+  background-color: hsl(0, 73%, 51%); /* Error Red */
 }
