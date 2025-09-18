@@ -229,15 +229,14 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
-      <div className="p-4 border-b border-sidebar-border flex-shrink-0">
-        <div className="flex items-center space-x-2">
+    <div className="flex flex-col h-full bg-card text-foreground border-r border-border">
+      <div className="p-4 border-b border-border flex-shrink-0 bg-card">
+        <div className="flex items-center justify-center">
           <img 
             src="/images/essayons-logo-cropped.png" 
-            alt="Essayons Change" 
+            alt="Logo" 
             className="h-8 w-auto"
           />
-          <h1 className="text-lg font-semibold text-sidebar-foreground">Essayons Change</h1>
         </div>
       </div>
 
