@@ -278,7 +278,7 @@ export default function Sidebar() {
         <div className="flex items-center justify-center">
           <div className="w-16 h-16 flex items-center justify-center bg-white rounded-lg p-2">
             <img 
-              src="/images/essayons-logo.png" 
+              src="/images/essayons-logo-cropped.png" 
               alt="Essayons Change Logo" 
               className="w-full h-full object-contain"
               data-testid="img-logo"
