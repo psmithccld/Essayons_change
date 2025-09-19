@@ -164,7 +164,7 @@ type RaidFormData = z.infer<typeof raidFormSchema>;
 type CommunicationFormData = z.infer<typeof communicationFormSchema>;
 
 interface PhaseNodeProps {
-  phase: typeof CHANGE_PHASES[0];
+  phase: typeof CHANGE_PHASES[number];
   isCurrentPhase: boolean;
   isCompleted: boolean;
   taskCount: number;
@@ -901,29 +901,6 @@ export default function ChangeProcessFlow() {
               </p>
             </div>
             
-            <div className="flex space-x-2">
-              {nextPhase && (
-                <Button 
-                  variant="outline"
-                  onClick={handlePlanNextPhase}
-                  data-testid="button-plan-next-phase"
-                >
-                  <Target className="w-4 h-4 mr-2" />
-                  Plan Next Phase
-                </Button>
-              )}
-              
-              {nextPhase && (
-                <Button 
-                  onClick={handleAdvancePhase}
-                  disabled={updateProjectMutation.isPending}
-                  data-testid="button-advance-phase"
-                >
-                  <ArrowRight className="w-4 h-4 mr-2" />
-                  {updateProjectMutation.isPending ? "Advancing..." : `Advance to ${nextPhase.shortName}`}
-                </Button>
-              )}
-            </div>
           </div>
         </CardHeader>
       </Card>
