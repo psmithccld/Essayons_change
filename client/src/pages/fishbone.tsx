@@ -327,9 +327,8 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
   const createTaskMutation = useMutation({
     mutationFn: async (data: TaskFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", "/api/tasks", {
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, {
         ...data,
-        projectId: currentProject.id,
         phase,
         status: "pending",
       });
@@ -344,9 +343,8 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
   const createMilestoneMutation = useMutation({
     mutationFn: async (data: MilestoneFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", "/api/milestones", {
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/milestones`, {
         ...data,
-        projectId: currentProject.id,
         phase,
         status: "pending",
       });
@@ -361,9 +359,8 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
   const createRaidMutation = useMutation({
     mutationFn: async (data: RaidFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", "/api/raid-logs", {
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/raid-logs`, {
         ...data,
-        projectId: currentProject.id,
         phase,
         status: "open",
       });
@@ -378,9 +375,8 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
   const createCommunicationMutation = useMutation({
     mutationFn: async (data: CommunicationFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", "/api/communications", {
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/communications`, {
         ...data,
-        projectId: currentProject.id,
         phase,
         status: "scheduled",
       });
@@ -715,7 +711,39 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
               <FormItem>
                 <FormLabel>Title</FormLabel>
                 <FormControl>
-                  <Input {...field} data-testid="input-comm-title" placeholder="Communication title..." />
+                  <Input 
+                    {...field} 
+                    data-testid="input-comm-title" 
+                    placeholder="Communication title..."
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      field.onChange(e);
+                      // Force form validation update
+                      communicationForm.setValue('title', value, { 
+                        shouldValidate: true, 
+                        shouldDirty: true 
+                      });
+                      if (value.trim()) {
+                        communicationForm.clearErrors('title');
+                      }
+                    }}
+                    onInput={(e) => {
+                      // Additional handler for input events (helps with automated testing)
+                      const value = (e.target as HTMLInputElement).value;
+                      communicationForm.setValue('title', value, { 
+                        shouldValidate: true, 
+                        shouldDirty: true 
+                      });
+                    }}
+                    onBlur={(e) => {
+                      field.onBlur();
+                      // Ensure validation runs on blur
+                      const value = e.target.value;
+                      if (value.trim()) {
+                        communicationForm.clearErrors('title');
+                      }
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
