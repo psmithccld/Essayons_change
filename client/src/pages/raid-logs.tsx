@@ -200,7 +200,7 @@ export default function RaidLogs() {
       },
     };
     
-    form.reset(typeSpecificDefaults[newType]);
+    form.reset(typeSpecificDefaults[newType] as any);
   };
 
   const createRaidLogMutation = useMutation({
@@ -282,8 +282,8 @@ export default function RaidLogs() {
     setEditingLog(log);
     setFormType(log.type as "risk" | "action" | "issue" | "deficiency");
     
-    // Reset form with log data
-    form.reset({
+    // Reset form with log data - type-safe for union
+    const formData = {
       type: log.type,
       title: log.title,
       description: log.description || "",
@@ -309,18 +309,34 @@ export default function RaidLogs() {
       resolutionStatus: log.resolutionStatus || "pending",
       // Common fields
       notes: log.notes || "",
-    });
+    };
+    form.reset(formData as any);
     
     setIsNewLogOpen(true);
   };
 
   const onSubmit = (data: RaidLogFormData) => {
-    // The union schema validates the data correctly based on the type discriminant
+    // Convert string dates to Date objects for backend
+    const processedData = { ...data };
+    
+    // Handle date conversions
+    if ('dueDate' in processedData && processedData.dueDate) {
+      (processedData as any).dueDate = new Date(processedData.dueDate);
+    }
+    if ('targetResolutionDate' in processedData && processedData.targetResolutionDate) {
+      (processedData as any).targetResolutionDate = new Date(processedData.targetResolutionDate);
+    }
+    
+    // Clean empty assigneeId values
+    if ('assigneeId' in processedData && processedData.assigneeId === '') {
+      delete (processedData as any).assigneeId;
+    }
+    
     if (editingLog) {
-      updateRaidLogMutation.mutate({ logId: editingLog.id, data });
+      updateRaidLogMutation.mutate({ logId: editingLog.id, data: processedData as any });
       setEditingLog(null);
     } else {
-      createRaidLogMutation.mutate(data);
+      createRaidLogMutation.mutate(processedData);
     }
   };
   
