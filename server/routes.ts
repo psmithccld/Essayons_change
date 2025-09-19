@@ -287,19 +287,65 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
   
   switch (type) {
     case 'risk':
-      templateValidated = insertRiskSchema.parse(processedData);
-      description = templateValidated.notes || templateValidated.title || 'Risk description';
+      // Provide defaults for required risk-specific fields from simple form
+      const riskData = {
+        ...processedData,
+        likelihood: processedData.likelihood || 3, // Default to medium likelihood
+        riskLevel: processedData.riskLevel || 3, // Default to medium risk level 
+        potentialOutcome: processedData.potentialOutcome || processedData.description || "Risk identified",
+        whoWillManage: processedData.whoWillManage || "To be determined",
+        notes: processedData.description || processedData.notes,
+        // Keep required database fields
+        title: processedData.title || "Risk Item",
+        description: processedData.description || processedData.potentialOutcome || processedData.title || "Risk identified",
+        severity: processedData.severity || "medium",
+        impact: processedData.impact || "medium",
+      };
+      
+      // Clean assigneeId if it's empty or invalid
+      if (!riskData.assigneeId || riskData.assigneeId === "" || riskData.assigneeId === "none") {
+        delete riskData.assigneeId;
+      }
+      
+      // For risks, use the database fields directly instead of type-specific validation
+      templateValidated = riskData;
+      description = templateValidated.description;
       break;
     case 'action':
-      templateValidated = insertActionSchema.parse(processedData);
-      description = templateValidated.event || templateValidated.title || 'Action description';
+      // Provide defaults for required action-specific fields from simple form
+      const actionData = {
+        ...processedData,
+        event: processedData.event || processedData.description || processedData.title || "Action required",
+        dueOut: processedData.dueOut || "To be determined",
+        notes: processedData.description || processedData.notes,
+        // Keep required database fields
+        title: processedData.title || "Action Item",
+        description: processedData.description || processedData.event || processedData.title || "Action required",
+        severity: processedData.severity || "medium",
+        impact: processedData.impact || "medium",
+      };
+      
+      // Clean assigneeId if it's empty or invalid
+      if (!actionData.assigneeId || actionData.assigneeId === "" || actionData.assigneeId === "none") {
+        delete actionData.assigneeId;
+      }
+      
+      // For actions, use the database fields directly instead of type-specific validation
+      templateValidated = actionData;
+      description = templateValidated.description;
       break;
     case 'issue':
       templateValidated = insertIssueSchema.parse(processedData);
       description = templateValidated.description || templateValidated.title || 'Issue description';
       break;
     case 'deficiency':
-      templateValidated = insertDeficiencySchema.parse(processedData);
+      // Provide defaults for required deficiency-specific fields from simple form
+      const deficiencyData = {
+        ...processedData,
+        category: processedData.category || "General", // Default category
+        resolutionStatus: processedData.resolutionStatus || "pending" // Default status
+      };
+      templateValidated = insertDeficiencySchema.parse(deficiencyData);
       description = templateValidated.description || templateValidated.title || 'Deficiency description';
       break;
     default:
@@ -312,9 +358,13 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
   const finalData = {
     ...templateValidated,
     description,
-    severity: (templateValidated as any).severity || 'medium',
-    impact: (templateValidated as any).impact || 'medium',
   };
+  
+  // Only add severity and impact for types that support them
+  if (type === 'issue' || type === 'deficiency') {
+    finalData.severity = (templateValidated as any).severity || 'medium';
+    finalData.impact = (templateValidated as any).impact || 'medium';
+  }
   
   // Convert date strings to Date objects for database timestamp fields
   if (finalData.dueDate && typeof finalData.dueDate === 'string') {

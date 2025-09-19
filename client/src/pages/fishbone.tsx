@@ -331,7 +331,7 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
       // Clean up the data - remove empty assigneeId and convert empty strings to undefined
       const cleanData = {
         ...data,
-        assigneeId: data.assigneeId && data.assigneeId.trim() && data.assigneeId !== 'unassigned' ? data.assigneeId : undefined,
+        assigneeId: data.assigneeId && data.assigneeId.trim() && data.assigneeId !== 'unassigned' && data.assigneeId !== 'none' ? data.assigneeId : undefined,
         dueDate: data.dueDate && data.dueDate.trim() ? data.dueDate : undefined,
         phase,
         status: "pending",
@@ -369,7 +369,7 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
       // Clean up the data - remove empty assigneeId
       const cleanData = {
         ...data,
-        assigneeId: data.assigneeId && data.assigneeId.trim() && data.assigneeId !== 'unassigned' ? data.assigneeId : undefined,
+        assigneeId: data.assigneeId && data.assigneeId.trim() && data.assigneeId !== 'unassigned' && data.assigneeId !== 'none' ? data.assigneeId : undefined,
         phase,
         status: "open",
       };
@@ -445,7 +445,7 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">No assignee</SelectItem>
+                      <SelectItem value="none">No assignee</SelectItem>
                       {users.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.name}
@@ -699,7 +699,7 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">No owner</SelectItem>
+                      <SelectItem value="none">No owner</SelectItem>
                       {users.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.name}
