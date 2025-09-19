@@ -221,6 +221,8 @@ export default function Sidebar() {
             ? "bg-accent text-accent-foreground" 
             : "text-muted-foreground"
         )}>
+          {/* Invisible spacer to align with draggable items */}
+          <div className="flex items-center justify-center mr-3 w-4 h-4" />
           <IconComponent className="mr-3 h-4 w-4 flex-shrink-0" />
           <span className="truncate" data-testid={`nav-${item.id}`}>{item.label}</span>
         </div>
