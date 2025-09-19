@@ -331,7 +331,7 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
       // Clean up the data - remove empty assigneeId and convert empty strings to undefined
       const cleanData = {
         ...data,
-        assigneeId: data.assigneeId && data.assigneeId.trim() ? data.assigneeId : undefined,
+        assigneeId: data.assigneeId && data.assigneeId.trim() && data.assigneeId !== 'unassigned' ? data.assigneeId : undefined,
         dueDate: data.dueDate && data.dueDate.trim() ? data.dueDate : undefined,
         phase,
         status: "pending",
@@ -369,7 +369,7 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
       // Clean up the data - remove empty assigneeId
       const cleanData = {
         ...data,
-        assigneeId: data.assigneeId && data.assigneeId.trim() ? data.assigneeId : undefined,
+        assigneeId: data.assigneeId && data.assigneeId.trim() && data.assigneeId !== 'unassigned' ? data.assigneeId : undefined,
         phase,
         status: "open",
       };
@@ -445,7 +445,7 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="unassigned">No assignee</SelectItem>
+                      <SelectItem value="">No assignee</SelectItem>
                       {users.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.name}
@@ -520,7 +520,26 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
               <FormItem>
                 <FormLabel>Milestone Name</FormLabel>
                 <FormControl>
-                  <Input {...field} data-testid="input-milestone-name" placeholder="Enter milestone name..." />
+                  <Input 
+                    {...field} 
+                    data-testid="input-milestone-name" 
+                    placeholder="Enter milestone name..."
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      field.onChange(e);
+                      milestoneForm.setValue('name', value, { 
+                        shouldValidate: true, 
+                        shouldDirty: true 
+                      });
+                    }}
+                    onInput={(e) => {
+                      const value = (e.target as HTMLInputElement).value;
+                      milestoneForm.setValue('name', value, { 
+                        shouldValidate: true, 
+                        shouldDirty: true 
+                      });
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -602,7 +621,26 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
               <FormItem>
                 <FormLabel>Title</FormLabel>
                 <FormControl>
-                  <Input {...field} data-testid="input-raid-title" placeholder="Brief summary..." />
+                  <Input 
+                    {...field} 
+                    data-testid="input-raid-title" 
+                    placeholder="Brief summary..."
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      field.onChange(e);
+                      raidForm.setValue('title', value, { 
+                        shouldValidate: true, 
+                        shouldDirty: true 
+                      });
+                    }}
+                    onInput={(e) => {
+                      const value = (e.target as HTMLInputElement).value;
+                      raidForm.setValue('title', value, { 
+                        shouldValidate: true, 
+                        shouldDirty: true 
+                      });
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -661,7 +699,7 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="unassigned">No owner</SelectItem>
+                      <SelectItem value="">No owner</SelectItem>
                       {users.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.name}
@@ -768,7 +806,26 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
               <FormItem>
                 <FormLabel>Message Content</FormLabel>
                 <FormControl>
-                  <Textarea {...field} data-testid="input-comm-content" placeholder="Draft your message..." />
+                  <Textarea 
+                    {...field} 
+                    data-testid="input-comm-content" 
+                    placeholder="Draft your message..."
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      field.onChange(e);
+                      communicationForm.setValue('content', value, { 
+                        shouldValidate: true, 
+                        shouldDirty: true 
+                      });
+                    }}
+                    onInput={(e) => {
+                      const value = (e.target as HTMLTextAreaElement).value;
+                      communicationForm.setValue('content', value, { 
+                        shouldValidate: true, 
+                        shouldDirty: true 
+                      });
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
