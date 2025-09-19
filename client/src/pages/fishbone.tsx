@@ -327,11 +327,17 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
   const createTaskMutation = useMutation({
     mutationFn: async (data: TaskFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, {
+      
+      // Clean up the data - remove empty assigneeId and convert empty strings to undefined
+      const cleanData = {
         ...data,
+        assigneeId: data.assigneeId && data.assigneeId.trim() ? data.assigneeId : undefined,
+        dueDate: data.dueDate && data.dueDate.trim() ? data.dueDate : undefined,
         phase,
         status: "pending",
-      });
+      };
+      
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, cleanData);
       return response.json();
     },
     onSuccess: () => {
@@ -359,11 +365,16 @@ function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormPro
   const createRaidMutation = useMutation({
     mutationFn: async (data: RaidFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/raid-logs`, {
+      
+      // Clean up the data - remove empty assigneeId
+      const cleanData = {
         ...data,
+        assigneeId: data.assigneeId && data.assigneeId.trim() ? data.assigneeId : undefined,
         phase,
         status: "open",
-      });
+      };
+      
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/raid-logs`, cleanData);
       return response.json();
     },
     onSuccess: () => {
