@@ -83,6 +83,8 @@ export default function DevelopmentMaps() {
   const [currentProcessMap, setCurrentProcessMap] = useState<ProcessMap | null>(null);
   const [isNewProcessMapOpen, setIsNewProcessMapOpen] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [processMapToDelete, setProcessMapToDelete] = useState<ProcessMap | null>(null);
   const [elements, setElements] = useState<ProcessElement[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [selectedSymbolType, setSelectedSymbolType] = useState<string | null>(null);
@@ -907,6 +909,48 @@ export default function DevelopmentMaps() {
     },
   });
 
+  const deleteProcessMapMutation = useMutation({
+    mutationFn: async (processMapId: string) => {
+      return apiRequest('DELETE', `/api/process-maps/${processMapId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'process-maps'] });
+      
+      // Clear current process map if it was deleted
+      if (currentProcessMap?.id === processMapToDelete?.id) {
+        setCurrentProcessMap(null);
+        clearCanvas();
+      }
+      
+      setIsDeleteDialogOpen(false);
+      setProcessMapToDelete(null);
+      
+      toast({
+        title: "Success",
+        description: "Process map deleted successfully!",
+      });
+    },
+    onError: (error) => {
+      console.error("Error deleting process map:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete process map. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteClick = (processMap: ProcessMap) => {
+    setProcessMapToDelete(processMap);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (processMapToDelete?.id) {
+      deleteProcessMapMutation.mutate(processMapToDelete.id);
+    }
+  };
+
   // Load process map
   const loadProcessMap = async (processMap: ProcessMap) => {
     if (!canvas) {
@@ -1114,14 +1158,39 @@ export default function DevelopmentMaps() {
                           </p>
                         )}
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => loadProcessMap(processMap)}
-                        data-testid={`button-load-${processMap.id}`}
-                      >
-                        Load
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => loadProcessMap(processMap)}
+                          data-testid={`button-load-${processMap.id}`}
+                        >
+                          Load
+                        </Button>
+                        <PermissionGate customCheck={canDeleteContent}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                data-testid={`button-menu-${processMap.id}`}
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem 
+                                onClick={() => handleDeleteClick(processMap)}
+                                className="text-destructive focus:text-destructive"
+                                data-testid={`button-delete-${processMap.id}`}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </PermissionGate>
+                      </div>
                     </div>
                   ))
                 )}
@@ -1489,6 +1558,37 @@ export default function DevelopmentMaps() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Process Map</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete "{processMapToDelete?.name}"? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsDeleteDialogOpen(false)}
+                data-testid="button-cancel-delete"
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={confirmDelete}
+                disabled={deleteProcessMapMutation.isPending}
+                data-testid="button-confirm-delete"
+              >
+                {deleteProcessMapMutation.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
