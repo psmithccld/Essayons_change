@@ -23,7 +23,12 @@ import { PermissionGate } from "@/components/auth/PermissionGate";
 import { usePermissions } from "@/hooks/use-permissions";
 
 // Form validation schemas
-const createUserSchema = insertUserSchema.extend({
+const createUserSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Must be a valid email address"),
+  roleId: z.string().uuid("Please select a role"),
+  isActive: z.boolean().default(true),
   password: z.string().min(8, "Password must be at least 8 characters long"),
   confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
