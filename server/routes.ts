@@ -592,6 +592,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // SECURITY: Auth status endpoint
+  app.get("/api/auth/status", async (req: SessionRequest, res) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.isActive) {
+        // Clear invalid session
+        req.session.destroy(() => {});
+        return res.status(401).json({ error: "Invalid session" });
+      }
+
+      const role = await storage.getRole(user.roleId);
+      if (!role) {
+        return res.status(500).json({ error: "User role not found" });
+      }
+
+      res.json({
+        user,
+        role,
+        permissions: role.permissions,
+        sessionEstablished: true
+      });
+    } catch (error) {
+      console.error("Error checking auth status:", error);
+      res.status(500).json({ error: "Failed to check authentication status" });
+    }
+  });
+
   // SECURITY: Logout endpoint that destroys sessions
   app.post("/api/auth/logout", async (req: SessionRequest, res) => {
     try {

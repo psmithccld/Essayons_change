@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Plus, User, Shield, Briefcase, ChevronDown, Settings, Palette, Check, Trash2, UserPlus, AlertTriangle, BarChart3, RefreshCw, Loader2 } from "lucide-react";
+import { Bell, Plus, User, Shield, Briefcase, ChevronDown, Settings, Palette, Check, Trash2, UserPlus, AlertTriangle, BarChart3, RefreshCw, Loader2, LogOut } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -20,6 +20,7 @@ import { insertProjectSchema, type InsertProject, type Notification } from "@sha
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "wouter";
 import { z } from "zod";
 import { formatDistanceToNow } from "date-fns";
@@ -54,6 +55,7 @@ export default function Header() {
   const queryClient = useQueryClient();
   const { currentProject, setCurrentProject, projects, isLoading } = useCurrentProject();
   const { user, hasAnyPermission } = usePermissions();
+  const { logout } = useAuth();
 
   // Generate user initials from name
   const getUserInitials = (name: string) => {
@@ -490,6 +492,15 @@ export default function Header() {
               <DropdownMenuItem onClick={() => setIsSettingsOpen(true)} data-testid="nav-user-settings">
                 <Settings className="w-4 h-4 mr-2" />
                 User Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={logout} 
+                className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                data-testid="button-logout"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

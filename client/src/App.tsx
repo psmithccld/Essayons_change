@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CurrentProjectProvider } from "@/contexts/CurrentProjectContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Tasks from "@/pages/tasks";
@@ -22,8 +23,24 @@ import InitiativeManagement from "@/pages/initiative-management";
 import SecurityManagement from "@/pages/security-management";
 import ChangeProcessFlow from "@/pages/fishbone";
 import Reports from "@/pages/reports";
+import { LoginPage } from "@/pages/auth/login";
+import { EmailVerifyPage } from "@/pages/auth/verify-email";
+import { Loader2 } from "lucide-react";
 
-function Router() {
+function LoadingSpinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="text-center">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+        <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+function AuthenticatedApp() {
+  const { login } = useAuth();
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
@@ -46,6 +63,7 @@ function Router() {
             <Route path="/process-mapping" component={ProcessMapping} />
             <Route path="/change-process-flow" component={ChangeProcessFlow} />
             <Route path="/reports" component={Reports} />
+            <Route path="/verify-email" component={() => <EmailVerifyPage onAuthSuccess={login} />} />
             <Route component={NotFound} />
           </Switch>
         </main>
@@ -54,15 +72,36 @@ function Router() {
   );
 }
 
+function Router() {
+  const { isAuthenticated, isLoading, login } = useAuth();
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Switch>
+        <Route path="/verify-email" component={() => <EmailVerifyPage onAuthSuccess={login} />} />
+        <Route component={() => <LoginPage onAuthSuccess={login} />} />
+      </Switch>
+    );
+  }
+
+  return <AuthenticatedApp />;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <CurrentProjectProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </CurrentProjectProvider>
+      <AuthProvider>
+        <CurrentProjectProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </CurrentProjectProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
