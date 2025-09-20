@@ -389,6 +389,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SECURITY: User registration endpoint
+  app.post("/api/auth/register", async (req: SessionRequest, res) => {
+    try {
+      const { registrationRequestSchema } = await import("../shared/schema.js");
+      
+      // Validate request body
+      const validationResult = registrationRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid registration data", 
+          details: validationResult.error.errors 
+        });
+      }
+
+      const registrationRequest = validationResult.data;
+
+      // Get default role (assuming "User" role exists)
+      const roles = await storage.getRoles();
+      const defaultRole = roles.find(r => r.name === "User" || r.name === "Standard User");
+      if (!defaultRole) {
+        return res.status(500).json({ error: "Default user role not found" });
+      }
+
+      // Create pending user
+      const result = await storage.createPendingUser(registrationRequest, defaultRole.id);
+      if (!result.success) {
+        return res.status(400).json({ error: result.message });
+      }
+
+      // Generate and send verification email
+      const token = await storage.createEmailVerificationToken(registrationRequest.email);
+      
+      // Send verification email
+      const { sendEmail, createVerificationEmailHtml, createVerificationEmailText } = await import("./email.js");
+      const verificationLink = `${req.protocol}://${req.get('host')}/verify-email?token=${token}`;
+      
+      const emailSent = await sendEmail({
+        to: registrationRequest.email,
+        from: 'noreply@projectmanagement.com', // Configure this
+        subject: 'Verify Your Email - Project Management System',
+        text: createVerificationEmailText(verificationLink, registrationRequest.name),
+        html: createVerificationEmailHtml(verificationLink, registrationRequest.name),
+      });
+
+      if (!emailSent) {
+        // Log warning but don't fail registration
+        console.warn(`Failed to send verification email to ${registrationRequest.email}`);
+      }
+
+      res.json({
+        message: "Registration successful! Please check your email to verify your account and set your password.",
+        emailSent,
+        email: registrationRequest.email
+      });
+    } catch (error) {
+      console.error("Error during registration:", error);
+      res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
+  // Email verification endpoint
+  app.post("/api/auth/verify-email", async (req: SessionRequest, res) => {
+    try {
+      const { emailVerificationResponseSchema } = await import("../shared/schema.js");
+      
+      // Validate request body
+      const validationResult = emailVerificationResponseSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid verification data", 
+          details: validationResult.error.errors 
+        });
+      }
+
+      const verificationResponse = validationResult.data;
+
+      // Complete email verification
+      const result = await storage.completeEmailVerification(verificationResponse);
+      if (!result.success) {
+        return res.status(400).json({ error: result.message });
+      }
+
+      const user = result.user!;
+
+      // Get user role information
+      const role = await storage.getRole(user.roleId);
+      if (!role) {
+        return res.status(500).json({ error: "User role not found" });
+      }
+
+      // SECURITY: Regenerate session ID and log user in
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error("Session regeneration error:", err);
+          return res.status(500).json({ error: "Session creation failed" });
+        }
+        
+        // Store user information in session
+        req.session.userId = user.id;
+        req.session.user = {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          roleId: user.roleId,
+          isActive: user.isActive
+        };
+        
+        // Save session
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            return res.status(500).json({ error: "Session creation failed" });
+          }
+          
+          // Return user data and permissions
+          res.json({
+            message: result.message,
+            user: user,
+            role,
+            permissions: role.permissions,
+            sessionEstablished: true
+          });
+        });
+      });
+    } catch (error) {
+      console.error("Error during email verification:", error);
+      res.status(500).json({ error: "Email verification failed" });
+    }
+  });
+
   // SECURITY: Authentication endpoints with session management
   app.post("/api/auth/login", async (req: SessionRequest, res) => {
     try {
@@ -405,6 +535,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!user.isActive) {
         return res.status(401).json({ error: "Account is inactive" });
+      }
+
+      // Check if email is verified
+      if (!user.isEmailVerified) {
+        return res.status(401).json({ 
+          error: "Email not verified. Please check your email and verify your account before logging in." 
+        });
       }
       
       // Get user role information
@@ -436,6 +573,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error("Session save error:", err);
             return res.status(500).json({ error: "Session creation failed" });
           }
+          
+          // Update last login time
+          storage.updateUser(user.id, { lastLoginAt: new Date() });
           
           // Return user data and permissions (passwordHash already removed by storage layer)
           res.json({

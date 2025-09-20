@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { 
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
-  userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications,
+  userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type CommunicationVersion, type InsertCommunicationVersion, type Survey, type InsertSurvey,
@@ -12,7 +12,8 @@ import {
   type Role, type InsertRole, type UserInitiativeAssignment, type InsertUserInitiativeAssignment,
   type Permissions, type UserGroup, type InsertUserGroup, type UserGroupMembership, 
   type InsertUserGroupMembership, type UserPermission, type InsertUserPermission,
-  type Notification, type InsertNotification
+  type Notification, type InsertNotification, type EmailVerificationToken, type InsertEmailVerificationToken,
+  type PasswordResetToken, type InsertPasswordResetToken, type RegistrationRequest, type EmailVerificationResponse
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray } from "drizzle-orm";
@@ -31,10 +32,18 @@ export interface IStorage {
   getUsers(): Promise<User[]>;
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, user: Partial<Omit<InsertUser, 'password'> & { passwordHash?: string }>): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
   verifyPassword(username: string, password: string): Promise<User | null>;
+
+  // Authentication & Email Verification
+  createPendingUser(request: RegistrationRequest, roleId: string): Promise<{ success: boolean; message: string }>;
+  createEmailVerificationToken(email: string): Promise<string>;
+  verifyEmailToken(token: string): Promise<{ isValid: boolean; email?: string; isExpired?: boolean }>;
+  completeEmailVerification(response: EmailVerificationResponse): Promise<{ success: boolean; user?: User; message: string }>;
+  cleanupExpiredTokens(): Promise<void>;
 
   // Projects
   getProjects(userId: string): Promise<Project[]>;
@@ -895,10 +904,18 @@ export class DatabaseStorage implements IStorage {
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    if (!user) return undefined;
+    // SECURITY: Remove passwordHash from response
+    const { passwordHash, ...userWithoutHash } = user;
+    return userWithoutHash as User;
+  }
+
   async verifyPassword(username: string, password: string): Promise<User | null> {
     // SECURITY: Use internal method that includes passwordHash for authentication
     const userWithPassword = await this.getUserByUsernameWithPassword(username);
-    if (!userWithPassword || !userWithPassword.isActive) {
+    if (!userWithPassword || !userWithPassword.isActive || !userWithPassword.passwordHash) {
       return null;
     }
     
@@ -908,6 +925,144 @@ export class DatabaseStorage implements IStorage {
     // SECURITY: Remove passwordHash from response
     const { passwordHash, ...userWithoutHash } = userWithPassword;
     return userWithoutHash as User;
+  }
+
+  // Authentication & Email Verification Methods
+  async createPendingUser(request: RegistrationRequest, roleId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // Check if email already exists
+      const existingEmail = await this.getUserByEmail(request.email);
+      if (existingEmail) {
+        return { success: false, message: "Email already registered" };
+      }
+
+      // Check if username already exists
+      const existingUsername = await this.getUserByUsername(request.username);
+      if (existingUsername) {
+        return { success: false, message: "Username already taken" };
+      }
+
+      // Create pending user (without password)
+      const pendingUserData = {
+        username: request.username,
+        name: request.name,
+        email: request.email,
+        roleId: roleId,
+        isActive: true,
+        isEmailVerified: false,
+        // passwordHash will be null until email verification
+      };
+
+      await db.insert(users).values(pendingUserData);
+      return { success: true, message: "Pending user created successfully" };
+    } catch (error) {
+      console.error("Error creating pending user:", error);
+      return { success: false, message: "Failed to create user account" };
+    }
+  }
+
+  async createEmailVerificationToken(email: string): Promise<string> {
+    // Generate secure random token
+    const token = require('crypto').randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Clean up any existing tokens for this email
+    await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.email, email));
+
+    // Insert new token
+    await db.insert(emailVerificationTokens).values({
+      email,
+      token,
+      expiresAt,
+      isUsed: false,
+    });
+
+    return token;
+  }
+
+  async verifyEmailToken(token: string): Promise<{ isValid: boolean; email?: string; isExpired?: boolean }> {
+    const [tokenRecord] = await db.select()
+      .from(emailVerificationTokens)
+      .where(eq(emailVerificationTokens.token, token));
+
+    if (!tokenRecord) {
+      return { isValid: false };
+    }
+
+    if (tokenRecord.isUsed) {
+      return { isValid: false, email: tokenRecord.email };
+    }
+
+    const now = new Date();
+    if (tokenRecord.expiresAt < now) {
+      return { isValid: false, email: tokenRecord.email, isExpired: true };
+    }
+
+    return { isValid: true, email: tokenRecord.email };
+  }
+
+  async completeEmailVerification(response: EmailVerificationResponse): Promise<{ success: boolean; user?: User; message: string }> {
+    try {
+      // Verify token first
+      const tokenVerification = await this.verifyEmailToken(response.token);
+      if (!tokenVerification.isValid) {
+        if (tokenVerification.isExpired) {
+          return { success: false, message: "Verification link has expired. Please request a new one." };
+        }
+        return { success: false, message: "Invalid verification token." };
+      }
+
+      const email = tokenVerification.email!;
+
+      // Get the pending user
+      const pendingUser = await this.getUserByEmail(email);
+      if (!pendingUser) {
+        return { success: false, message: "User account not found." };
+      }
+
+      if (pendingUser.isEmailVerified) {
+        return { success: false, message: "Email already verified. Please log in." };
+      }
+
+      // Hash the password
+      const hashedPassword = await bcrypt.hash(response.password, SALT_ROUNDS);
+
+      // Update user with password and mark as verified
+      const [updatedUser] = await db.update(users)
+        .set({
+          passwordHash: hashedPassword,
+          isEmailVerified: true,
+          lastLoginAt: new Date(),
+        })
+        .where(eq(users.email, email))
+        .returning();
+
+      // Mark token as used
+      await db.update(emailVerificationTokens)
+        .set({ isUsed: true })
+        .where(eq(emailVerificationTokens.token, response.token));
+
+      // Remove passwordHash from response
+      const { passwordHash, ...userWithoutHash } = updatedUser;
+      return { 
+        success: true, 
+        user: userWithoutHash as User, 
+        message: "Email verified and account activated successfully!" 
+      };
+    } catch (error) {
+      console.error("Error completing email verification:", error);
+      return { success: false, message: "Failed to complete email verification." };
+    }
+  }
+
+  async cleanupExpiredTokens(): Promise<void> {
+    try {
+      const now = new Date();
+      await db.delete(emailVerificationTokens).where(sql`expires_at < ${now}`);
+      await db.delete(passwordResetTokens).where(sql`expires_at < ${now}`);
+    } catch (error) {
+      console.error("Error cleaning up expired tokens:", error);
+    }
   }
 
   // Projects
