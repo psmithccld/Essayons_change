@@ -130,13 +130,40 @@ export const roles = pgTable("roles", {
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
-  passwordHash: text("password_hash").notNull(), // Changed from plain text to hashed password
+  passwordHash: text("password_hash"), // Made optional for pending users
   name: text("name").notNull(),
+  email: text("email").notNull().unique(), // Added email for verification
   roleId: uuid("role_id").references(() => roles.id, { onDelete: "restrict" }).notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  isEmailVerified: boolean("is_email_verified").notNull().default(false), // Email verification status
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Email verification tokens for secure user registration
+export const emailVerificationTokens = pgTable("email_verification_tokens", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  token: text("token").notNull().unique(), // Secure random token
+  expiresAt: timestamp("expires_at").notNull(), // Token expiration
+  isUsed: boolean("is_used").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  emailIdx: index("email_verification_tokens_email_idx").on(table.email),
+  tokenIdx: index("email_verification_tokens_token_idx").on(table.token),
+}));
+
+// Password reset tokens for future use
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  isUsed: boolean("is_used").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  tokenIdx: index("password_reset_tokens_token_idx").on(table.token),
+}));
 
 // User Groups for advanced security management
 export const userGroups = pgTable("user_groups", {
@@ -797,9 +824,58 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   passwordHash: true, // Exclude hashed password from direct insertion
+  lastLoginAt: true,
+  isEmailVerified: true, // Handled during verification process
 }).extend({
-  password: z.string().min(8, "Password must be at least 8 characters long"), // Plain password for hashing
+  password: z.string().min(8, "Password must be at least 8 characters long").optional(), // Optional for email verification flow
+  confirmPassword: z.string().optional(), // Password confirmation
   roleId: z.string().uuid("Role ID must be a valid UUID"), // Ensure roleId is required and valid
+  email: z.string().email("Must be a valid email address"), // Email validation
+}).refine((data) => {
+  // If password is provided, confirmPassword must match
+  if (data.password && data.password !== data.confirmPassword) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Passwords must match",
+  path: ["confirmPassword"],
+});
+
+// Email verification token schemas
+export const insertEmailVerificationTokenSchema = createInsertSchema(emailVerificationTokens).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  email: z.string().email("Must be a valid email address"),
+  token: z.string().min(32, "Token must be at least 32 characters"),
+  expiresAt: z.date(),
+});
+
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  userId: z.string().uuid("User ID must be a valid UUID"),
+  token: z.string().min(32, "Token must be at least 32 characters"),
+  expiresAt: z.date(),
+});
+
+// Registration request schema (for initial signup)
+export const registrationRequestSchema = z.object({
+  email: z.string().email("Must be a valid email address"),
+  name: z.string().min(1, "Name is required"),
+  username: z.string().min(3, "Username must be at least 3 characters").regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
+});
+
+// Email verification response schema (for setting password after email verification)
+export const emailVerificationResponseSchema = z.object({
+  token: z.string().min(32, "Invalid token"),
+  password: z.string().min(8, "Password must be at least 8 characters long"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords must match",
+  path: ["confirmPassword"],
 });
 
 export const insertUserInitiativeAssignmentSchema = createInsertSchema(userInitiativeAssignments).omit({
@@ -1420,3 +1496,14 @@ export const exportRequestSchema = z.object({
 
 export type DistributionRequest = z.infer<typeof distributionRequestSchema>;
 export type ExportRequest = z.infer<typeof exportRequestSchema>;
+
+// Email verification and password reset types
+export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
+export type InsertEmailVerificationToken = z.infer<typeof insertEmailVerificationTokenSchema>;
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
+
+// Authentication request types
+export type RegistrationRequest = z.infer<typeof registrationRequestSchema>;
+export type EmailVerificationResponse = z.infer<typeof emailVerificationResponseSchema>;
