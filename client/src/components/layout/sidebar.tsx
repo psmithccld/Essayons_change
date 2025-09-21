@@ -15,7 +15,9 @@ import {
   GitBranch,
   ListChecks,
   GripVertical,
-  Briefcase
+  Briefcase,
+  Shield,
+  Building
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
@@ -42,8 +44,11 @@ const allNavigationItems: NavigationItem[] = [
   { id: "raid-logs", icon: AlertTriangle, label: "RAID Logs", path: "/raid-logs" },
   { id: "reports", icon: ChartBar, label: "Reports", path: "/reports", permissions: ["canSeeReports"] },
   { id: "communications", icon: Megaphone, label: "Communications", path: "/communications" },
-  { id: "stakeholders", icon: Users, label: "Stakeholders", path: "/stakeholders" },
+  { id: "stakeholders", icon: Building, label: "Stakeholders", path: "/stakeholders" },
   { id: "surveys", icon: ClipboardCheck, label: "Readiness Surveys", path: "/surveys" },
+  { id: "users", icon: Users, label: "User Management", path: "/users", permissions: ["canModifyUsers"] },
+  { id: "security", icon: Shield, label: "Security Management", path: "/security", permissions: ["canModifyUsers"] },
+  { id: "initiatives", icon: Briefcase, label: "Initiative Management", path: "/initiatives" },
   { id: "gpt-coach", icon: Bot, label: "GPT Coach", path: "/gpt-coach" },
   { id: "fishbone", icon: Fish, label: "Change Process Flow", path: "/change-process-flow" },
   { id: "process-mapping", icon: GitBranch, label: "Development Maps", path: "/process-mapping", permissions: ["canSeeAllProjects", "canModifyProjects"], requireAll: false }
