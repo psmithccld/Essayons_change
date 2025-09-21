@@ -802,6 +802,48 @@ function RAIDReportsTab() {
     enabled: activeReport === 'items'
   });
 
+  const { data: highSeverityRisksData, isLoading: highSeverityRisksLoading } = useQuery({
+    queryKey: ['reports', 'raid', 'high-severity-risks', filters],
+    queryFn: async () => {
+      const response = await fetch('/api/reports/raid/high-severity-risks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(filters)
+      });
+      if (!response.ok) throw new Error('Failed to fetch high severity risks report');
+      return response.json() as Promise<RAIDItem[]>;
+    },
+    enabled: activeReport === 'high-severity-risks'
+  });
+
+  const { data: openIssuesData, isLoading: openIssuesLoading } = useQuery({
+    queryKey: ['reports', 'raid', 'open-issues', filters],
+    queryFn: async () => {
+      const response = await fetch('/api/reports/raid/open-issues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(filters)
+      });
+      if (!response.ok) throw new Error('Failed to fetch open issues report');
+      return response.json() as Promise<RAIDItem[]>;
+    },
+    enabled: activeReport === 'open-issues'
+  });
+
+  const { data: dependenciesAtRiskData, isLoading: dependenciesAtRiskLoading } = useQuery({
+    queryKey: ['reports', 'raid', 'dependencies-at-risk', filters],
+    queryFn: async () => {
+      const response = await fetch('/api/reports/raid/dependencies-at-risk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(filters)
+      });
+      if (!response.ok) throw new Error('Failed to fetch dependencies at risk report');
+      return response.json() as Promise<RAIDItem[]>;
+    },
+    enabled: activeReport === 'dependencies-at-risk'
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
@@ -923,6 +965,247 @@ function RAIDReportsTab() {
                       <TableCell>{item.ownerName}</TableCell>
                       <TableCell>
                         <Badge variant={item.daysOpen > 30 ? 'destructive' : 'secondary'}>
+                          {item.daysOpen} days
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeReport === 'high-severity-risks' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" style={{ color: ESSAYONS_COLORS.error }} />
+              High Severity Risks Report
+            </CardTitle>
+            <CardDescription>
+              Critical and high-severity risks requiring immediate attention
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {highSeverityRisksLoading ? (
+              <div className="space-y-2">
+                {[...Array(10)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : (
+              <Table data-testid="table-high-severity-risks">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Project</TableHead>
+                    <TableHead>Severity</TableHead>
+                    <TableHead>Impact</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Days Open</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {highSeverityRisksData?.map((item) => (
+                    <TableRow key={item.raidId} data-testid={`row-high-risk-${item.raidId}`}>
+                      <TableCell>
+                        <div className="font-medium">{item.title}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{item.projectName}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge style={{ backgroundColor: ESSAYONS_COLORS.error }}>
+                          {item.severity}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge style={{ backgroundColor: ESSAYONS_COLORS.warning }}>
+                          {item.impact}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          style={{ 
+                            backgroundColor: item.status === 'closed' ? ESSAYONS_COLORS.success : 
+                                           item.status === 'open' ? ESSAYONS_COLORS.error :
+                                           ESSAYONS_COLORS.neutral 
+                          }}
+                        >
+                          {item.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{item.ownerName}</TableCell>
+                      <TableCell>
+                        <Badge variant={item.daysOpen > 30 ? 'destructive' : 'secondary'}>
+                          {item.daysOpen} days
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeReport === 'open-issues' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" style={{ color: ESSAYONS_COLORS.warning }} />
+              Open Issues Report
+            </CardTitle>
+            <CardDescription>
+              Active issues requiring resolution and tracking
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {openIssuesLoading ? (
+              <div className="space-y-2">
+                {[...Array(10)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : (
+              <Table data-testid="table-open-issues">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Project</TableHead>
+                    <TableHead>Severity</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Assignee</TableHead>
+                    <TableHead>Days Open</TableHead>
+                    <TableHead>Due Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {openIssuesData?.map((item) => (
+                    <TableRow key={item.raidId} data-testid={`row-open-issue-${item.raidId}`}>
+                      <TableCell>
+                        <div className="font-medium">{item.title}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{item.projectName}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          style={{ 
+                            backgroundColor: item.severity === 'critical' ? ESSAYONS_COLORS.error : 
+                                           item.severity === 'high' ? '#FF6B35' :
+                                           item.severity === 'medium' ? ESSAYONS_COLORS.warning :
+                                           ESSAYONS_COLORS.success 
+                          }}
+                        >
+                          {item.severity}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge style={{ backgroundColor: ESSAYONS_COLORS.warning }}>
+                          {item.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {item.assigneeName || 'Unassigned'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={item.daysOpen > 14 ? 'destructive' : 'secondary'}>
+                          {item.daysOpen} days
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {item.dueDate ? (
+                          <div className={item.overdue ? 'text-red-600' : ''}>
+                            {format(new Date(item.dueDate), 'PP')}
+                            {item.overdue && <span className="ml-1 text-xs">(Overdue)</span>}
+                          </div>
+                        ) : 'No due date'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeReport === 'dependencies-at-risk' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" style={{ color: ESSAYONS_COLORS.primary }} />
+              Dependencies at Risk Report
+            </CardTitle>
+            <CardDescription>
+              Dependencies that could impact project timelines and deliverables
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {dependenciesAtRiskLoading ? (
+              <div className="space-y-2">
+                {[...Array(10)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : (
+              <Table data-testid="table-dependencies-at-risk">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Project</TableHead>
+                    <TableHead>Severity</TableHead>
+                    <TableHead>Impact</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Days Open</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dependenciesAtRiskData?.map((item) => (
+                    <TableRow key={item.raidId} data-testid={`row-dependency-${item.raidId}`}>
+                      <TableCell>
+                        <div className="font-medium">{item.title}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{item.projectName}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          style={{ 
+                            backgroundColor: item.severity === 'critical' ? ESSAYONS_COLORS.error : 
+                                           item.severity === 'high' ? '#FF6B35' :
+                                           item.severity === 'medium' ? ESSAYONS_COLORS.warning :
+                                           ESSAYONS_COLORS.success 
+                          }}
+                        >
+                          {item.severity}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge style={{ backgroundColor: ESSAYONS_COLORS.warning }}>
+                          {item.impact}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          style={{ 
+                            backgroundColor: item.status === 'closed' ? ESSAYONS_COLORS.success : 
+                                           item.status === 'open' ? ESSAYONS_COLORS.error :
+                                           ESSAYONS_COLORS.neutral 
+                          }}
+                        >
+                          {item.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{item.ownerName}</TableCell>
+                      <TableCell>
+                        <Badge variant={item.daysOpen > 21 ? 'destructive' : 'secondary'}>
                           {item.daysOpen} days
                         </Badge>
                       </TableCell>
