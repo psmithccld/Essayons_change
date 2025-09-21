@@ -1181,13 +1181,6 @@ function MeetingsExecutionModule() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button 
-                onClick={() => setShowCreateModal(true)}
-                className="bg-red-600 hover:bg-red-700 text-white"
-                data-testid="create-meeting-button"
-              >
-                Schedule Meeting
-              </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
