@@ -2093,11 +2093,11 @@ export class DatabaseStorage implements IStorage {
         canDeleteSecuritySettings: false,
         
         // Email System Permissions
-        canSendEmails: false,
-        canSendBulkEmails: false,
+        canSendEmails: true,
+        canSendBulkEmails: true,
         canSendSystemEmails: false,
-        canSeeEmailLogs: false,
-        canModifyEmailTemplates: false,
+        canSeeEmailLogs: true,
+        canModifyEmailTemplates: true,
         canEditEmailSettings: false,
         
         // System Administration
