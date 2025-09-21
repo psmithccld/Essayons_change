@@ -287,6 +287,9 @@ export default function RaidLogs() {
       type: log.type,
       title: log.title,
       description: log.description || "",
+      // Required fields for updates
+      projectId: log.projectId,
+      ownerId: log.ownerId,
       // Risk-specific fields
       likelihood: log.likelihood || 3,
       riskLevel: log.riskLevel || 3,
