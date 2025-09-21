@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import GanttChart from "@/components/charts/gantt-chart";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
-import type { Task, Milestone } from "@shared/schema";
+import type { Task, Milestone, Communication } from "@shared/schema";
 
 const milestoneFormSchema = z.object({
   name: z.string().min(1, "Milestone name is required"),
@@ -44,6 +44,16 @@ export default function Gantt() {
     queryKey: ['/api/projects', currentProject?.id, 'milestones'],
     enabled: !!currentProject?.id,
   });
+
+  const { data: communications = [], isLoading: communicationsLoading } = useQuery<Communication[]>({
+    queryKey: ['/api/projects', currentProject?.id, 'communications'],
+    enabled: !!currentProject?.id,
+  });
+
+  // Filter communications to get only meetings
+  const meetings = communications.filter(comm => 
+    comm.type === 'meeting' || comm.type === 'meeting_prompt'
+  );
 
   const form = useForm<MilestoneFormData>({
     resolver: zodResolver(milestoneFormSchema),
@@ -356,20 +366,20 @@ export default function Gantt() {
             <CardTitle>Project Timeline</CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {isLoading || communicationsLoading || milestonesLoading ? (
               <div className="flex items-center justify-center h-64" data-testid="gantt-loading">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-            ) : tasks.length === 0 ? (
-              <div className="text-center py-12" data-testid="no-tasks-gantt">
+            ) : tasks.length === 0 && milestones.length === 0 && meetings.length === 0 ? (
+              <div className="text-center py-12" data-testid="no-timeline-data-gantt">
                 <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">No Tasks to Display</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-2">No Timeline Data</h3>
                 <p className="text-sm text-muted-foreground">
-                  Add tasks to this project to see the Gantt chart visualization.
+                  Add tasks, milestones, or schedule meetings to see the Gantt chart visualization.
                 </p>
               </div>
             ) : (
-              <GanttChart tasks={tasks} milestones={milestones} />
+              <GanttChart tasks={tasks} milestones={milestones} meetings={meetings} />
             )}
           </CardContent>
         </Card>

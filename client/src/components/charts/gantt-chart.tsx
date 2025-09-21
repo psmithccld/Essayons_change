@@ -2,12 +2,13 @@ import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Calendar, Diamond } from "lucide-react";
-import type { Task, Milestone } from "@shared/schema";
+import { Calendar, Diamond, Clock } from "lucide-react";
+import type { Task, Milestone, Communication } from "@shared/schema";
 
 interface GanttChartProps {
   tasks: Task[];
   milestones?: Milestone[];
+  meetings?: Communication[];
 }
 
 interface GanttTask {
@@ -24,6 +25,15 @@ interface GanttMilestone {
   id: string;
   name: string;
   targetDate: Date;
+  status: string;
+}
+
+interface GanttMeeting {
+  id: string;
+  title: string;
+  startDate: Date;
+  endDate: Date;
+  type: string;
   status: string;
 }
 
@@ -53,7 +63,18 @@ function getMilestoneColor(status: string) {
   }
 }
 
-export default function GanttChart({ tasks, milestones = [] }: GanttChartProps) {
+function getMeetingColor(type: string) {
+  switch (type) {
+    case 'status': return 'bg-purple-500';
+    case 'planning': return 'bg-indigo-500'; 
+    case 'review': return 'bg-cyan-500';
+    case 'decision': return 'bg-orange-500';
+    case 'brainstorming': return 'bg-pink-500';
+    default: return 'bg-violet-500';
+  }
+}
+
+export default function GanttChart({ tasks, milestones = [], meetings = [] }: GanttChartProps) {
   const ganttData = useMemo(() => {
     // Filter tasks that have dates
     const validTasks = tasks.filter(task => task.startDate && task.dueDate);
@@ -61,8 +82,15 @@ export default function GanttChart({ tasks, milestones = [] }: GanttChartProps) 
     // Filter milestones that have dates
     const validMilestones = milestones.filter(milestone => milestone.targetDate);
     
-    if (validTasks.length === 0 && validMilestones.length === 0) {
-      return { ganttTasks: [], ganttMilestones: [], timelineStart: new Date(), timelineEnd: new Date(), totalDays: 0 };
+    // Filter meetings that have scheduled dates and are meeting type
+    const validMeetings = meetings.filter(meeting => 
+      meeting.meetingWhen && 
+      (meeting.type === 'meeting' || meeting.type === 'meeting_prompt') &&
+      meeting.meetingDuration
+    );
+    
+    if (validTasks.length === 0 && validMilestones.length === 0 && validMeetings.length === 0) {
+      return { ganttTasks: [], ganttMilestones: [], ganttMeetings: [], timelineStart: new Date(), timelineEnd: new Date(), totalDays: 0 };
     }
 
     // Convert to Gantt format
@@ -83,13 +111,27 @@ export default function GanttChart({ tasks, milestones = [] }: GanttChartProps) 
       status: milestone.status,
     }));
 
-    // Calculate timeline bounds from both tasks and milestones
+    const ganttMeetings: GanttMeeting[] = validMeetings.map(meeting => {
+      const startDate = new Date(meeting.meetingWhen!);
+      const endDate = new Date(startDate.getTime() + (meeting.meetingDuration! * 60 * 1000)); // Duration in minutes to milliseconds
+      return {
+        id: meeting.id,
+        title: meeting.title,
+        startDate,
+        endDate,
+        type: meeting.meetingType || 'meeting',
+        status: meeting.status,
+      };
+    });
+
+    // Calculate timeline bounds from tasks, milestones, and meetings
     const taskDates = ganttTasks.flatMap(task => [task.startDate, task.endDate]);
     const milestoneDates = ganttMilestones.map(milestone => milestone.targetDate);
-    const allDates = [...taskDates, ...milestoneDates];
+    const meetingDates = ganttMeetings.flatMap(meeting => [meeting.startDate, meeting.endDate]);
+    const allDates = [...taskDates, ...milestoneDates, ...meetingDates];
     
     if (allDates.length === 0) {
-      return { ganttTasks: [], ganttMilestones: [], timelineStart: new Date(), timelineEnd: new Date(), totalDays: 0 };
+      return { ganttTasks: [], ganttMilestones: [], ganttMeetings: [], timelineStart: new Date(), timelineEnd: new Date(), totalDays: 0 };
     }
     
     const timelineStart = new Date(Math.min(...allDates.map(d => d.getTime())));
@@ -101,10 +143,10 @@ export default function GanttChart({ tasks, milestones = [] }: GanttChartProps) 
     
     const totalDays = Math.ceil((timelineEnd.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24));
 
-    return { ganttTasks, ganttMilestones, timelineStart, timelineEnd, totalDays };
-  }, [tasks, milestones]);
+    return { ganttTasks, ganttMilestones, ganttMeetings, timelineStart, timelineEnd, totalDays };
+  }, [tasks, milestones, meetings]);
 
-  const { ganttTasks, ganttMilestones, timelineStart, timelineEnd, totalDays } = ganttData;
+  const { ganttTasks, ganttMilestones, ganttMeetings, timelineStart, timelineEnd, totalDays } = ganttData;
 
   const getTaskPosition = (task: GanttTask) => {
     const taskStart = Math.max(0, Math.floor((task.startDate.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)));
@@ -127,6 +169,20 @@ export default function GanttChart({ tasks, milestones = [] }: GanttChartProps) 
     };
   };
 
+  const getMeetingPosition = (meeting: GanttMeeting) => {
+    const meetingStart = Math.max(0, Math.floor((meeting.startDate.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)));
+    const meetingDuration = Math.ceil((meeting.endDate.getTime() - meeting.startDate.getTime()) / (1000 * 60 * 60 * 24));
+    // For short meetings (less than a day), ensure minimum width for visibility
+    const displayDuration = Math.max(meetingDuration, 0.1);
+    const leftPercentage = (meetingStart / totalDays) * 100;
+    const widthPercentage = (displayDuration / totalDays) * 100;
+    
+    return {
+      left: `${leftPercentage}%`,
+      width: `${Math.max(widthPercentage, 1)}%`, // Minimum 1% width for visibility
+    };
+  };
+
   const generateTimelineHeaders = () => {
     const headers = [];
     const current = new Date(timelineStart);
@@ -139,13 +195,13 @@ export default function GanttChart({ tasks, milestones = [] }: GanttChartProps) 
     return headers;
   };
 
-  if (ganttTasks.length === 0 && ganttMilestones.length === 0) {
+  if (ganttTasks.length === 0 && ganttMilestones.length === 0 && ganttMeetings.length === 0) {
     return (
       <div className="text-center py-12" data-testid="gantt-empty">
         <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-foreground mb-2">No Timeline Data</h3>
         <p className="text-sm text-muted-foreground">
-          Tasks need start and due dates, and milestones need target dates to appear in the Gantt chart.
+          Tasks need start and due dates, milestones need target dates, and meetings need scheduled times to appear in the Gantt chart.
         </p>
       </div>
     );
@@ -230,6 +286,50 @@ export default function GanttChart({ tasks, milestones = [] }: GanttChartProps) 
             );
           })}
         </div>
+
+        {/* Meetings */}
+        {ganttMeetings.length > 0 && (
+          <div className="mt-6">
+            <h4 className="text-sm font-medium text-foreground mb-3">Meetings</h4>
+            <div className="space-y-2">
+              {ganttMeetings.map((meeting) => {
+                const position = getMeetingPosition(meeting);
+                
+                return (
+                  <div key={meeting.id} className="relative" data-testid={`gantt-meeting-${meeting.id}`}>
+                    {/* Meeting name */}
+                    <div className="flex items-center space-x-2 mb-1">
+                      <Clock className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground truncate flex-1">
+                        {meeting.title}
+                      </span>
+                      <Badge className="text-xs" variant="secondary">
+                        {meeting.type}
+                      </Badge>
+                    </div>
+                    
+                    {/* Meeting bar track */}
+                    <div className="relative h-4 bg-muted/40 rounded-lg">
+                      {/* Meeting bar */}
+                      <div
+                        className={`absolute top-0 h-4 rounded-lg ${getMeetingColor(meeting.type)} opacity-70 border border-current`}
+                        style={position}
+                        data-testid={`gantt-meeting-bar-${meeting.id}`}
+                      ></div>
+                      
+                      {/* Meeting info tooltip area */}
+                      <div
+                        className="absolute inset-0 cursor-pointer"
+                        title={`${meeting.title} - ${meeting.startDate.toLocaleString()} (${Math.round((meeting.endDate.getTime() - meeting.startDate.getTime()) / (1000 * 60))} min)`}
+                        style={position}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Milestones */}
         {ganttMilestones.length > 0 && (
@@ -324,6 +424,38 @@ export default function GanttChart({ tasks, milestones = [] }: GanttChartProps) 
                 <div className="flex items-center space-x-2">
                   <Diamond className="w-4 h-4 text-blue-500" />
                   <span className="text-sm">Pending</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {ganttMeetings.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <h5 className="text-sm font-medium text-foreground mb-2">Meeting Types</h5>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-purple-500 rounded"></div>
+                  <span className="text-sm">Status</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-indigo-500 rounded"></div>
+                  <span className="text-sm">Planning</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-cyan-500 rounded"></div>
+                  <span className="text-sm">Review</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-orange-500 rounded"></div>
+                  <span className="text-sm">Decision</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-pink-500 rounded"></div>
+                  <span className="text-sm">Brainstorming</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-violet-500 rounded"></div>
+                  <span className="text-sm">Other</span>
                 </div>
               </div>
             </div>

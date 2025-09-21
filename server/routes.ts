@@ -2565,7 +2565,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/projects/:projectId/communications", async (req: AuthenticatedRequest, res) => {
+  app.post("/api/projects/:projectId/communications", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       // Determine required permission based on communication type
       let requiredPermission: keyof Permissions = 'canModifyCommunications';
@@ -2573,23 +2573,24 @@ Return the refined content in JSON format:
         requiredPermission = 'canScheduleMeetings';
       }
 
-      // SECURITY: Check authentication and specific permission
-      if (!req.userId) {
-        return res.status(401).json({ error: "Authentication required" });
-      }
-
       // Check user permissions
-      const user = await storage.getUser(req.userId);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
-
-      const userPermissions = await storage.resolveUserPermissions(req.userId);
+      const userPermissions = await storage.resolveUserPermissions(req.userId!);
       if (!userPermissions[requiredPermission]) {
         return res.status(403).json({ 
           error: "Access denied", 
           message: `Permission '${requiredPermission}' is required to create this type of communication`
         });
+      }
+
+      // Check project access (unless user is admin with all-project permissions)
+      if (!userPermissions.canModifyAllProjects) {
+        const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+        if (!authorizedProjectIds.includes(req.params.projectId)) {
+          return res.status(403).json({
+            error: "Access denied",
+            message: "You are not authorized to create communications for this project"
+          });
+        }
       }
 
       const validatedData = insertCommunicationSchema.parse({
