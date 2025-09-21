@@ -2388,7 +2388,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/projects/:projectId/raid-logs", async (req, res) => {
+  app.post("/api/projects/:projectId/raid-logs", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       // Add backward compatibility mapping
       let processedBody = { ...req.body };
@@ -2406,18 +2406,29 @@ Return the refined content in JSON format:
       const baseData = {
         ...processedBody,
         projectId: req.params.projectId,
-        ownerId: "550e8400-e29b-41d4-a716-446655440000"
+        ownerId: req.userId!
       };
       
       const validatedData = buildRaidInsertFromTemplate(processedBody.type, baseData);
       
       const raidLog = await storage.createRaidLog(validatedData);
       
-      // Create notification for assigned user if RAID log has an assignee
-      if (raidLog.assigneeId) {
-        try {
-          const project = await storage.getProject(req.params.projectId);
-          if (project) {
+      // Create notifications for RAID log creation
+      try {
+        const project = await storage.getProject(req.params.projectId);
+        if (project) {
+          // Always create notification for the creator
+          await storage.createNotification({
+            userId: req.userId!,
+            title: "RAID Log Created",
+            message: `New ${raidLog.type} created: "${raidLog.title}" in initiative "${project.name}"`,
+            type: "raid_identified",
+            relatedId: raidLog.id,
+            relatedType: "raid_log"
+          });
+
+          // Additionally create notification for assigned user if RAID log has an assignee (and it's different from creator)
+          if (raidLog.assigneeId && raidLog.assigneeId !== req.userId) {
             await storage.createNotification({
               userId: raidLog.assigneeId,
               title: "RAID Log Assignment",
@@ -2427,10 +2438,10 @@ Return the refined content in JSON format:
               relatedType: "raid_log"
             });
           }
-        } catch (notificationError) {
-          console.error("Error creating RAID log assignment notification:", notificationError);
-          // Don't fail the RAID log creation if notification creation fails
         }
+      } catch (notificationError) {
+        console.error("Error creating RAID log notifications:", notificationError);
+        // Don't fail the RAID log creation if notification creation fails
       }
       
       // Apply backward compatibility mapping to response
