@@ -1381,6 +1381,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Repository API Endpoints
   
+  // Basic Communications CRUD
+  app.get("/api/communications", requireAuthAndPermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const communications = await storage.getCommunications();
+      res.json(communications);
+    } catch (error) {
+      console.error("Error fetching communications:", error);
+      res.status(500).json({ error: "Failed to fetch communications" });
+    }
+  });
+
+  app.get("/api/communications/personal-emails", requireAuthAndPermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const personalEmails = await storage.getPersonalEmails();
+      res.json(personalEmails);
+    } catch (error) {
+      console.error("Error fetching personal emails:", error);
+      res.status(500).json({ error: "Failed to fetch personal emails" });
+    }
+  });
+
+  app.post("/api/communications", requireAuthAndPermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const processedData = {
+        ...req.body,
+        createdById: req.userId || DEMO_USER_ID,
+      };
+      
+      const validatedData = insertCommunicationSchema.parse(processedData);
+      const communication = await storage.createCommunication(validatedData);
+      res.status(201).json(communication);
+    } catch (error) {
+      console.error("Error creating communication:", error);
+      if (error instanceof Error && error.name === 'ZodError') {
+        res.status(400).json({ error: "Validation failed", details: (error as any).errors });
+      } else {
+        res.status(400).json({ error: "Failed to create communication" });
+      }
+    }
+  });
+  
   // Advanced search for communications
   app.post('/api/communications/search', requireAuth, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
     try {

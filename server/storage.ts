@@ -79,6 +79,8 @@ export interface IStorage {
   deleteRaidLog(id: string): Promise<boolean>;
 
   // Communications
+  getCommunications(): Promise<Communication[]>;
+  getPersonalEmails(): Promise<Communication[]>;
   getCommunicationsByProject(projectId: string): Promise<Communication[]>;
   getCommunication(id: string): Promise<Communication | undefined>;
   createCommunication(communication: InsertCommunication): Promise<Communication>;
@@ -1287,6 +1289,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Communications
+  async getCommunications(): Promise<Communication[]> {
+    return await db.select().from(communications).orderBy(desc(communications.createdAt));
+  }
+
+  async getPersonalEmails(): Promise<Communication[]> {
+    return await db.select().from(communications)
+      .where(eq(communications.type, 'p2p'))
+      .orderBy(desc(communications.createdAt));
+  }
+
   async getCommunicationsByProject(projectId: string): Promise<Communication[]> {
     return await db.select().from(communications).where(eq(communications.projectId, projectId)).orderBy(desc(communications.createdAt));
   }

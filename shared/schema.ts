@@ -351,7 +351,6 @@ export const communications = pgTable("communications", {
   archivedById: uuid("archived_by_id").references(() => users.id, { onDelete: "set null" }), // Who archived it
   isArchived: boolean("is_archived").notNull().default(false), // Archive status
   version: integer("version").notNull().default(1), // Version number for version history
-  parentId: uuid("parent_id"), // Reference to parent version (self-reference removed to fix circular dependency)
   // Meeting-specific data (5Ws)
   meetingWho: text("meeting_who"), // Who should attend
   meetingWhat: text("meeting_what"), // What will be discussed
@@ -717,11 +716,6 @@ export const communicationsRelations = relations(communications, ({ one, many })
   gptInteraction: one(gptInteractions, {
     fields: [communications.gptInteractionId],
     references: [gptInteractions.id],
-  }),
-  parentVersion: one(communications, {
-    fields: [communications.parentId],
-    references: [communications.id],
-    relationName: "versionHistory",
   }),
   childVersions: many(communications, { relationName: "versionHistory" }),
   recipients: many(communicationRecipients), // Communication recipients

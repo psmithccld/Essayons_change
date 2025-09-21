@@ -39,7 +39,8 @@ import {
   SortAsc,
   SortDesc,
   X,
-  Plus
+  Plus,
+  AlertTriangle
 } from "lucide-react";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
