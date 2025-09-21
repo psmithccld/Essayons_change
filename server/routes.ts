@@ -2208,7 +2208,7 @@ Return the refined content in JSON format:
   });
 
   // Stakeholders
-  app.get("/api/projects/:projectId/stakeholders", async (req, res) => {
+  app.get("/api/projects/:projectId/stakeholders", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const stakeholders = await storage.getStakeholdersByProject(req.params.projectId);
       res.json(stakeholders);
@@ -2218,7 +2218,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/projects/:projectId/stakeholders", async (req, res) => {
+  app.post("/api/projects/:projectId/stakeholders", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertStakeholderSchema.parse({
         ...req.body,
@@ -2259,7 +2259,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.put("/api/stakeholders/:id", async (req, res) => {
+  app.put("/api/stakeholders/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const stakeholder = await storage.updateStakeholder(req.params.id, req.body);
       if (!stakeholder) {
@@ -2272,7 +2272,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.delete("/api/stakeholders/:id", async (req, res) => {
+  app.delete("/api/stakeholders/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const success = await storage.deleteStakeholder(req.params.id);
       if (!success) {
