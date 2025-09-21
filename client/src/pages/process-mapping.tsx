@@ -1508,6 +1508,51 @@ export default function DevelopmentMaps() {
                     </Button>
                   </div>
                 </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="text-xs font-medium mb-2">Change Management</h4>
+                  <p className="text-xs text-muted-foreground mb-2">Creates linked items and symbols</p>
+                  <div className="grid grid-cols-1 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSymbolSelect('task')}
+                      className={`h-auto p-3 ${selectedSymbolType === 'task' ? 'ring-2 ring-blue-500' : ''}`}
+                      data-testid="button-symbol-task"
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <CheckSquare className="w-5 h-5 text-blue-500" />
+                        <span className="text-xs">Task</span>
+                      </div>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSymbolSelect('milestone')}
+                      className={`h-auto p-3 ${selectedSymbolType === 'milestone' ? 'ring-2 ring-green-500' : ''}`}
+                      data-testid="button-symbol-milestone"
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <Calendar className="w-5 h-5 text-green-500" />
+                        <span className="text-xs">Milestone</span>
+                      </div>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSymbolSelect('action')}
+                      className={`h-auto p-3 ${selectedSymbolType === 'action' ? 'ring-2 ring-orange-500' : ''}`}
+                      data-testid="button-symbol-action"
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <AlertTriangle className="w-5 h-5 text-orange-500" />
+                        <span className="text-xs">Action</span>
+                      </div>
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
