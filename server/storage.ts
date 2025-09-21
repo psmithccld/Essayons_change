@@ -193,6 +193,12 @@ export interface IStorage {
   assignUserToInitiative(assignment: InsertUserInitiativeAssignment): Promise<UserInitiativeAssignment>;
   updateUserInitiativeAssignment(id: string, assignment: Partial<InsertUserInitiativeAssignment>): Promise<UserInitiativeAssignment | undefined>;
   removeUserFromInitiative(userId: string, projectId: string): Promise<boolean>;
+  getUserInitiativesWithRoles(userId: string): Promise<Array<{
+    project: Project;
+    role: string;
+    canEdit: boolean;
+    assignedAt: Date;
+  }>>;
 
   // Enhanced User Methods
   getUsersWithRoles(): Promise<(Omit<User, 'passwordHash'> & { role: Role })[]>;
@@ -1897,6 +1903,33 @@ export class DatabaseStorage implements IStorage {
         eq(userInitiativeAssignments.projectId, projectId)
       ));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async getUserInitiativesWithRoles(userId: string): Promise<Array<{
+    project: Project;
+    role: string;
+    canEdit: boolean;
+    assignedAt: Date;
+  }>> {
+    // Get user's permissions to determine edit access
+    const userPermissions = await this.resolveUserPermissions(userId);
+    
+    // Get assignments with project details
+    const assignments = await db.select({
+      assignment: userInitiativeAssignments,
+      project: projects
+    })
+    .from(userInitiativeAssignments)
+    .innerJoin(projects, eq(userInitiativeAssignments.projectId, projects.id))
+    .where(eq(userInitiativeAssignments.userId, userId))
+    .orderBy(desc(userInitiativeAssignments.assignedAt));
+
+    return assignments.map(({ assignment, project }) => ({
+      project,
+      role: assignment.role,
+      canEdit: userPermissions.canEditAllProjects || project.ownerId === userId,
+      assignedAt: assignment.assignedAt
+    }));
   }
 
   // Enhanced User Methods

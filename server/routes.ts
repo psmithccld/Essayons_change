@@ -3236,6 +3236,18 @@ Return the refined content in JSON format:
     }
   });
 
+  // Get current user's initiatives with roles and permissions
+  app.get("/api/my/initiatives", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const initiatives = await storage.getUserInitiativesWithRoles(userId);
+      res.json(initiatives);
+    } catch (error) {
+      console.error("Error fetching user initiatives with roles:", error);
+      res.status(500).json({ error: "Failed to fetch user initiatives with roles" });
+    }
+  });
+
   app.get("/api/projects/:projectId/assignments", async (req, res) => {
     try {
       const assignments = await storage.getInitiativeAssignments(req.params.projectId);
