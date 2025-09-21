@@ -1,4 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
+import type { Session } from "express-session";
 import { createServer, type Server } from "http";
 
 // SECURITY: Session type declaration
@@ -16,19 +17,7 @@ declare module 'express-session' {
 }
 
 interface SessionRequest extends Request {
-  session: {
-    userId?: string;
-    user?: {
-      id: string;
-      username: string;
-      name: string;
-      roleId: string;
-      isActive: boolean;
-    };
-    regenerate(callback: (err?: any) => void): void;
-    destroy(callback: (err?: any) => void): void;
-    save(callback?: (err?: any) => void): void;
-  };
+  session: Session & SessionData;
 }
 import { storage } from "./storage";
 import { 
@@ -37,7 +26,7 @@ import {
   insertMilestoneSchema, insertChecklistTemplateSchema, insertProcessMapSchema,
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema,
   insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
-  insertUserGroupMembershipSchema, insertUserPermissionSchema, insertNotificationSchema,
+  insertUserGroupSchema, insertUserGroupMembershipSchema, insertUserPermissionSchema, insertNotificationSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification
 } from "@shared/schema";
 import * as openaiService from "./openai";
