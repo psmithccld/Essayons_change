@@ -2801,10 +2801,76 @@ Return the refined content in JSON format:
     }
   });
 
+  // Zod schemas for GPT Coach input validation
+  const gptCommunicationPlanSchema = z.object({
+    projectId: z.string().uuid(),
+    projectName: z.string().min(1).max(100),
+    description: z.string().max(1000),
+    stakeholders: z.array(z.object({
+      name: z.string().min(1).max(50),
+      role: z.string().min(1).max(50),
+      supportLevel: z.string(),
+      influenceLevel: z.string()
+    })).max(20)
+  });
+
+  const gptReadinessAnalysisSchema = z.object({
+    projectId: z.string().uuid(),
+    surveyResponses: z.array(z.object({
+      questionId: z.string(),
+      question: z.string().max(200),
+      answer: z.union([z.string().max(500), z.number()])
+    })).max(50),
+    stakeholderData: z.array(z.object({
+      supportLevel: z.string(),
+      engagementLevel: z.string(),
+      role: z.string().max(50)
+    })).max(20)
+  });
+
+  const gptRiskMitigationSchema = z.object({
+    projectId: z.string().uuid(),
+    risks: z.array(z.object({
+      title: z.string().min(1).max(100),
+      description: z.string().max(500),
+      severity: z.string(),
+      impact: z.string(),
+      probability: z.string().optional()
+    })).max(20)
+  });
+
+  const gptStakeholderTipsSchema = z.object({
+    projectId: z.string().uuid(),
+    stakeholders: z.array(z.object({
+      name: z.string().min(1).max(50),
+      role: z.string().min(1).max(50),
+      supportLevel: z.string(),
+      influenceLevel: z.string(),
+      engagementLevel: z.string().optional()
+    })).max(20)
+  });
+
   // GPT Coach endpoints
-  app.post("/api/gpt/communication-plan", async (req, res) => {
+  app.post("/api/gpt/communication-plan", requireAuthAndPermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
-      const { projectId, projectName, description, stakeholders } = req.body;
+      // Input validation
+      const parseResult = gptCommunicationPlanSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid input data", details: parseResult.error.issues });
+      }
+      const validatedInput = parseResult.data;
+      const { projectId, projectName, description, stakeholders } = validatedInput;
+      
+      // Rate limiting for AI endpoints
+      if (!checkRateLimit(req.userId!, 5, 300000)) { // 5 requests per 5 minutes
+        return res.status(429).json({ error: "AI coaching rate limit exceeded. Please wait before requesting more AI assistance." });
+      }
+      
+      // Project authorization check
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      if (!authorizedProjectIds.includes(projectId)) {
+        return res.status(403).json({ error: 'Access denied to requested project' });
+      }
       
       const plan = await openaiService.generateCommunicationPlan({
         name: projectName,
@@ -2815,7 +2881,7 @@ Return the refined content in JSON format:
       // Save interaction
       await storage.createGptInteraction({
         projectId,
-        userId: "550e8400-e29b-41d4-a716-446655440000",
+        userId: req.user!.id,
         type: "communication_plan",
         prompt: `Generate communication plan for ${projectName}`,
         response: JSON.stringify(plan),
@@ -2829,9 +2895,26 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/gpt/readiness-analysis", async (req, res) => {
+  app.post("/api/gpt/readiness-analysis", requireAuthAndPermission('canSeeSurveys'), async (req: AuthenticatedRequest, res) => {
     try {
-      const { projectId, surveyResponses, stakeholderData } = req.body;
+      // Input validation
+      const parseResult = gptReadinessAnalysisSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid input data", details: parseResult.error.issues });
+      }
+      const validatedInput = parseResult.data;
+      const { projectId, surveyResponses, stakeholderData } = validatedInput;
+      
+      // Rate limiting for AI endpoints
+      if (!checkRateLimit(req.userId!, 5, 300000)) { // 5 requests per 5 minutes
+        return res.status(429).json({ error: "AI coaching rate limit exceeded. Please wait before requesting more AI assistance." });
+      }
+      
+      // Project authorization check
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      if (!authorizedProjectIds.includes(projectId)) {
+        return res.status(403).json({ error: 'Access denied to requested project' });
+      }
       
       const analysis = await openaiService.analyzeChangeReadiness({
         responses: surveyResponses,
@@ -2841,7 +2924,7 @@ Return the refined content in JSON format:
       // Save interaction
       await storage.createGptInteraction({
         projectId,
-        userId: "550e8400-e29b-41d4-a716-446655440000",
+        userId: req.user!.id,
         type: "readiness_analysis",
         prompt: "Analyze change readiness",
         response: JSON.stringify(analysis),
@@ -2855,16 +2938,33 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/gpt/risk-mitigation", async (req, res) => {
+  app.post("/api/gpt/risk-mitigation", requireAuthAndPermission('canSeeRaidLogs'), async (req: AuthenticatedRequest, res) => {
     try {
-      const { projectId, risks } = req.body;
+      // Input validation
+      const parseResult = gptRiskMitigationSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid input data", details: parseResult.error.issues });
+      }
+      const validatedInput = parseResult.data;
+      const { projectId, risks } = validatedInput;
+      
+      // Rate limiting for AI endpoints
+      if (!checkRateLimit(req.userId!, 5, 300000)) { // 5 requests per 5 minutes
+        return res.status(429).json({ error: "AI coaching rate limit exceeded. Please wait before requesting more AI assistance." });
+      }
+      
+      // Project authorization check
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      if (!authorizedProjectIds.includes(projectId)) {
+        return res.status(403).json({ error: 'Access denied to requested project' });
+      }
       
       const strategies = await openaiService.generateRiskMitigationStrategies(risks);
 
       // Save interaction
       await storage.createGptInteraction({
         projectId,
-        userId: "550e8400-e29b-41d4-a716-446655440000",
+        userId: req.user!.id,
         type: "risk_mitigation",
         prompt: "Generate risk mitigation strategies",
         response: JSON.stringify(strategies),
@@ -2878,16 +2978,33 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/gpt/stakeholder-tips", async (req, res) => {
+  app.post("/api/gpt/stakeholder-tips", requireAuthAndPermission('canSeeStakeholders'), async (req: AuthenticatedRequest, res) => {
     try {
-      const { projectId, stakeholders } = req.body;
+      // Input validation
+      const parseResult = gptStakeholderTipsSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid input data", details: parseResult.error.issues });
+      }
+      const validatedInput = parseResult.data;
+      const { projectId, stakeholders } = validatedInput;
+      
+      // Rate limiting for AI endpoints
+      if (!checkRateLimit(req.userId!, 5, 300000)) { // 5 requests per 5 minutes
+        return res.status(429).json({ error: "AI coaching rate limit exceeded. Please wait before requesting more AI assistance." });
+      }
+      
+      // Project authorization check
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      if (!authorizedProjectIds.includes(projectId)) {
+        return res.status(403).json({ error: 'Access denied to requested project' });
+      }
       
       const tips = await openaiService.getStakeholderEngagementTips(stakeholders);
 
       // Save interaction
       await storage.createGptInteraction({
         projectId,
-        userId: "550e8400-e29b-41d4-a716-446655440000",
+        userId: req.user!.id,
         type: "stakeholder_tips",
         prompt: "Get stakeholder engagement tips",
         response: JSON.stringify(tips),
