@@ -94,11 +94,11 @@ const PERMISSION_LABELS: Record<keyof Permissions, string> = {
   canEditSurveys: "Edit Surveys",
   canDeleteSurveys: "Delete Surveys",
   
-  // Mind Maps Management
-  canSeeMindMaps: "View Mind Maps",
-  canModifyMindMaps: "Create Mind Maps",
-  canEditMindMaps: "Edit Mind Maps",
-  canDeleteMindMaps: "Delete Mind Maps",
+  // Mind Maps Management (commented out until schema includes these permissions)
+  // canSeeMindMaps: "View Mind Maps",
+  // canModifyMindMaps: "Create Mind Maps", 
+  // canEditMindMaps: "Edit Mind Maps",
+  // canDeleteMindMaps: "Delete Mind Maps",
   
   // Process Maps Management
   canSeeProcessMaps: "View Process Maps",
@@ -1334,17 +1334,17 @@ function SecurityManagementContent() {
   const { toast } = useToast();
 
   // Fetch roles
-  const { data: roles = [], isLoading: rolesLoading } = useQuery({
+  const { data: roles = [], isLoading: rolesLoading } = useQuery<Role[]>({
     queryKey: ["/api/roles"]
   });
 
   // Fetch users
-  const { data: users = [], isLoading: usersLoading } = useQuery({
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/users"]
   });
 
   // Fetch current user permissions
-  const { data: userPermissionsData } = useQuery({
+  const { data: userPermissionsData } = useQuery<{permissions: Permissions}>({
     queryKey: ["/api/users/me/permissions"]
   });
 
@@ -1384,21 +1384,21 @@ function SecurityManagementContent() {
   };
 
   // Calculate user counts per role
-  const userCountByRole = users.reduce((acc: Record<string, number>, user: User) => {
+  const userCountByRole = (users as User[]).reduce((acc: Record<string, number>, user: User) => {
     acc[user.roleId] = (acc[user.roleId] || 0) + 1;
     return acc;
   }, {});
 
   // Filter roles based on search
-  const filteredRoles = roles.filter((role: Role) =>
+  const filteredRoles = (roles as Role[]).filter((role: Role) =>
     role.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (role.description?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Calculate metrics
   const totalPermissions = Object.keys(permissionsSchema.shape).length;
-  const activeUsers = users.filter((user: User) => user.isActive).length;
-  const totalRoles = roles.length;
+  const activeUsers = (users as User[]).filter((user: User) => user.isActive).length;
+  const totalRoles = (roles as Role[]).length;
 
   if (!userPermissions?.canSeeRoles) {
     return (
