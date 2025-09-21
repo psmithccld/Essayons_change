@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+// Using GPT-4o-mini as requested by the user
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || ""
 });
@@ -46,7 +46,7 @@ Return the response as JSON in this format:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
@@ -94,7 +94,7 @@ Return as JSON:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
@@ -145,7 +145,7 @@ Return as JSON:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
@@ -188,7 +188,7 @@ Return as JSON:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
@@ -227,7 +227,7 @@ Return as JSON:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
@@ -278,7 +278,7 @@ Return as JSON:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
@@ -373,7 +373,7 @@ Return as JSON:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
@@ -460,7 +460,7 @@ Return as JSON:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
@@ -523,7 +523,7 @@ Return as JSON:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
@@ -599,7 +599,7 @@ Return the refined content as JSON:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
@@ -661,7 +661,7 @@ Return as JSON:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
@@ -695,7 +695,7 @@ Return the refined content in JSON format:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
@@ -777,7 +777,7 @@ Return the content in JSON format:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
