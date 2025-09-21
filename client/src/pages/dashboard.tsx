@@ -6,8 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Rocket, Users, TrendingUp, AlertTriangle, 
   Bot, Lightbulb, ChartLine, ExternalLink,
-  CheckCircle, Clock, AlertCircle, Link as LinkIcon
+  CheckCircle, Clock, AlertCircle, Link as LinkIcon,
+  Edit2, Save, X
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState } from "react";
 import changeProcessFlowImage from "/images/change-process-flow.png";
 
 interface DashboardStats {
@@ -18,6 +22,32 @@ interface DashboardStats {
   openIssues: number;
   stakeholderEngagement: number;
   changeReadiness: number;
+}
+
+interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  startDate: string | null;
+  endDate: string | null;
+  progress: number | null;
+  priority: string;
+  category: string | null;
+  objectives: string | null;
+  scope: string | null;
+  successCriteria: string | null;
+  currentPhase: string | null;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface UserInitiativeWithRole {
+  project: Project;
+  role: string;
+  canEdit: boolean;
+  assignedAt: string;
 }
 
 interface Activity {
@@ -59,32 +89,6 @@ const mockActivities: Activity[] = [
   }
 ];
 
-const mockProjects = [
-  {
-    id: '1',
-    name: 'Digital Transformation',
-    description: 'Modernizing customer service processes and tools',
-    progress: 68,
-    status: 'Active',
-    dueDate: 'Mar 15, 2024'
-  },
-  {
-    id: '2',
-    name: 'Office Relocation', 
-    description: 'Moving headquarters to new downtown location',
-    progress: 25,
-    status: 'Planning',
-    dueDate: 'Jun 30, 2024'
-  },
-  {
-    id: '3',
-    name: 'ERP Implementation',
-    description: 'Implementing new enterprise resource planning system',
-    progress: 42,
-    status: 'Development',
-    dueDate: 'Sep 15, 2024'
-  }
-];
 
 function getActivityIcon(type: Activity['type']) {
   switch (type) {
@@ -106,10 +110,33 @@ function getProjectStatusColor(status: string) {
 }
 
 export default function Dashboard() {
+  const [editingProject, setEditingProject] = useState<string | null>(null);
+  const [editData, setEditData] = useState<{ status: string; name: string }>({ status: '', name: '' });
+
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats'],
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  const { data: userInitiatives, isLoading: isLoadingInitiatives } = useQuery<UserInitiativeWithRole[]>({
+    queryKey: ['/api/my/initiatives'],
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const handleEditClick = (project: Project) => {
+    setEditingProject(project.id);
+    setEditData({ status: project.status, name: project.name });
+  };
+
+  const handleSaveEdit = async (projectId: string) => {
+    // TODO: Implement save functionality
+    setEditingProject(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProject(null);
+    setEditData({ status: '', name: '' });
+  };
 
   if (isLoading) {
     return (
@@ -268,33 +295,129 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Active Initiatives</CardTitle>
+              <CardTitle>My Assigned Initiatives</CardTitle>
               <Button variant="ghost" size="sm" data-testid="button-manage-all">
                 Manage All
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {mockProjects.map((project) => (
-                <Card key={project.id} className="border border-border" data-testid={`project-${project.id}`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-medium text-foreground">{project.name}</h3>
-                      <Badge className={getProjectStatusColor(project.status)}>
-                        {project.status}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-3">{project.description}</p>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-xs text-muted-foreground">Progress: {project.progress}%</div>
-                      <div className="text-xs text-muted-foreground">Due: {project.dueDate}</div>
-                    </div>
-                    <Progress value={project.progress} className="h-2" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            {isLoadingInitiatives ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <Card key={i} className="border border-border animate-pulse">
+                    <CardContent className="p-4">
+                      <div className="h-4 bg-muted rounded mb-2"></div>
+                      <div className="h-3 bg-muted rounded mb-3 w-3/4"></div>
+                      <div className="h-2 bg-muted rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {userInitiatives?.length ? (
+                  userInitiatives.map((initiative) => (
+                    <Card key={initiative.project.id} className="border border-border" data-testid={`project-${initiative.project.id}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          {editingProject === initiative.project.id ? (
+                            <Input
+                              value={editData.name}
+                              onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                              className="h-6 font-medium"
+                              data-testid={`input-project-name-${initiative.project.id}`}
+                            />
+                          ) : (
+                            <h3 className="font-medium text-foreground">{initiative.project.name}</h3>
+                          )}
+                          <div className="flex items-center space-x-2">
+                            {editingProject === initiative.project.id ? (
+                              <Select 
+                                value={editData.status} 
+                                onValueChange={(value) => setEditData({ ...editData, status: value })}
+                              >
+                                <SelectTrigger className="w-32 h-6" data-testid={`select-status-${initiative.project.id}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="planning">Planning</SelectItem>
+                                  <SelectItem value="active">Active</SelectItem>
+                                  <SelectItem value="on_hold">On Hold</SelectItem>
+                                  <SelectItem value="completed">Completed</SelectItem>
+                                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Badge className={getProjectStatusColor(initiative.project.status)}>
+                                {initiative.project.status}
+                              </Badge>
+                            )}
+                            {initiative.canEdit && (
+                              <div className="flex items-center space-x-1">
+                                {editingProject === initiative.project.id ? (
+                                  <>
+                                    <Button 
+                                      size="sm" 
+                                      variant="ghost" 
+                                      onClick={() => handleSaveEdit(initiative.project.id)}
+                                      data-testid={`button-save-${initiative.project.id}`}
+                                    >
+                                      <Save className="w-3 h-3" />
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      variant="ghost" 
+                                      onClick={handleCancelEdit}
+                                      data-testid={`button-cancel-${initiative.project.id}`}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    onClick={() => handleEditClick(initiative.project)}
+                                    data-testid={`button-edit-${initiative.project.id}`}
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm text-muted-foreground">{initiative.project.description || 'No description'}</p>
+                          <Badge variant="outline" className="text-xs">
+                            {initiative.role}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-xs text-muted-foreground">
+                            Progress: {initiative.project.progress || 0}%
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Phase: {initiative.project.currentPhase || 'Not set'}
+                          </div>
+                        </div>
+                        <Progress value={initiative.project.progress || 0} className="h-2" />
+                        {initiative.project.endDate && (
+                          <div className="text-xs text-muted-foreground mt-2">
+                            Due: {new Date(initiative.project.endDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No initiatives assigned to you</p>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
