@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Eye, EyeOff, User, Lock, Mail, Shield, CheckCircle, Clock, Users } from "lucide-react";
+import essayonsLogo from "@assets/image_1758488024387.png";
 import { Link } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 
@@ -149,15 +150,15 @@ export function LoginPage({ onAuthSuccess }: LoginPageProps) {
 
         <div className="relative z-10 flex flex-col justify-center px-12 text-white">
           <div className="mb-8">
-            <Shield className="w-16 h-16 mb-6 text-blue-200" />
+            <img src={essayonsLogo} alt="Essayons Change Logo" className="w-32 h-auto mb-6" />
             <h1 className="text-5xl font-bold mb-4 leading-tight">
-              Project Management
+              Essayons Change
               <span className="block text-3xl font-medium text-blue-200 mt-2">
-                Security Center
+                — Let us try!
               </span>
             </h1>
             <p className="text-xl text-blue-100 mb-8 max-w-md">
-              Comprehensive change management and collaboration platform with enterprise-grade security
+              Guiding change with clarity, accountability, and results. Built to ensure both organizational and individual needs are addressed. Developed through extensive research and grounded in operational focus.
             </p>
           </div>
 
@@ -200,11 +201,11 @@ export function LoginPage({ onAuthSuccess }: LoginPageProps) {
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
-            <Shield className="w-12 h-12 mx-auto mb-4 text-blue-600" />
+            <img src={essayonsLogo} alt="Essayons Change Logo" className="w-20 h-auto mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Project Management
+              Essayons Change
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">Security Center</p>
+            <p className="text-gray-600 dark:text-gray-400">— Let us try!</p>
           </div>
 
           {registrationComplete ? (
