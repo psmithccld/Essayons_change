@@ -107,6 +107,9 @@ const refineP2PEmailContentSchema = z.object({
   urgency: z.enum(['low', 'normal', 'high', 'critical']).default('normal')
 });
 
+// Demo user constant for fallback scenarios
+const DEMO_USER_ID = "demo-user-00000000-0000-0000-0000-000000000000";
+
 // Rate limiting store (in production, use Redis)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
