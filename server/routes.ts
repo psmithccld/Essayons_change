@@ -792,7 +792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Users
-  app.get("/api/users", requirePermission('canSeeUsers'), async (req, res) => {
+  app.get("/api/users", requireAuth, async (req, res) => {
     try {
       const users = await storage.getUsers();
       res.json(users);
@@ -1411,7 +1411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/communications", requireAuthAndPermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/communications", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const processedData = {
         ...req.body,
@@ -3700,7 +3700,7 @@ Return the refined content in JSON format:
   });
 
   // Meeting agenda generation endpoint
-  app.post("/api/gpt/generate-meeting-agenda", requireAuthAndPermission('canGenerateMeetingAgendas'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/generate-meeting-agenda", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       // SECURITY: Input validation with Zod
       const validatedInput = generateMeetingAgendaSchema.parse(req.body);
