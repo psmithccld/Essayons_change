@@ -6,6 +6,7 @@ import ws from "ws";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
+import { initializeVectorStore } from "./vectorStore";
 
 const app = express();
 
@@ -84,6 +85,14 @@ app.use((req, res, next) => {
   } catch (error) {
     console.error("Database seeding failed:", error);
     // Continue startup even if seeding fails (e.g., if already seeded)
+  }
+
+  // Initialize vector store with knowledge base
+  try {
+    await initializeVectorStore();
+  } catch (error) {
+    console.error("Vector store initialization failed:", error);
+    // Continue startup even if vector store fails
   }
   
   const server = await registerRoutes(app);
