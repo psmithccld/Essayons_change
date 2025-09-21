@@ -102,13 +102,10 @@ function P2PEmailsExecutionModule() {
 
   // Create P2P email mutation
   const createP2PEmailMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/projects/${currentProject?.id}/communications`, {
-      method: 'POST',
-      body: {
-        ...data,
-        type: 'point_to_point_email',
-        status: 'draft'
-      }
+    mutationFn: (data: any) => apiRequest('POST', `/api/projects/${currentProject?.id}/communications`, {
+      ...data,
+      type: 'point_to_point_email',
+      status: 'draft'
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
@@ -127,10 +124,7 @@ function P2PEmailsExecutionModule() {
 
   // GPT content generation for P2P emails
   const generateP2PContentMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/gpt/generate-p2p-email-content', {
-      method: 'POST',
-      body: data
-    }),
+    mutationFn: (data: any) => apiRequest('POST', '/api/gpt/generate-p2p-email-content', data),
     onSuccess: (content) => {
       setEmailContent(content);
       setIsGeneratingContent(false);
@@ -150,14 +144,11 @@ function P2PEmailsExecutionModule() {
       recipientName: string;
       dryRun?: boolean 
     }) => 
-      apiRequest(`/api/communications/${emailId}/send-p2p`, {
-        method: 'POST',
-        body: { 
-          recipientEmail,
-          recipientName,
-          visibility,
-          dryRun: dryRun || false
-        }
+      apiRequest('POST', `/api/communications/${emailId}/send-p2p`, {
+        recipientEmail,
+        recipientName,
+        visibility,
+        dryRun: dryRun || false
       }),
     onSuccess: (data, { dryRun }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
@@ -870,13 +861,10 @@ function MeetingsExecutionModule() {
 
   // Create meeting mutation
   const createMeetingMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/projects/${currentProject?.id}/communications`, {
-      method: 'POST',
-      body: {
-        ...data,
-        type: 'meeting',
-        status: 'draft'
-      }
+    mutationFn: (data: any) => apiRequest('POST', `/api/projects/${currentProject?.id}/communications`, {
+      ...data,
+      type: 'meeting',
+      status: 'draft'
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
@@ -891,10 +879,7 @@ function MeetingsExecutionModule() {
 
   // Generate meeting agenda mutation
   const generateAgendaMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/gpt/generate-meeting-agenda', {
-      method: 'POST',
-      body: data
-    }),
+    mutationFn: (data: any) => apiRequest('POST', '/api/gpt/generate-meeting-agenda', data),
     onSuccess: (agendaData) => {
       setGeneratedAgenda(agendaData);
       setIsGeneratingAgenda(false);
@@ -913,9 +898,8 @@ function MeetingsExecutionModule() {
       recipients: Array<{ email: string; name: string; role?: string }>;
       meetingData: any;
       dryRun?: boolean;
-    }) => apiRequest(`/api/communications/${meetingId}/send-meeting-invites`, {
-      method: 'POST',
-      body: { recipients, meetingData, dryRun: dryRun || false }
+    }) => apiRequest('POST', `/api/communications/${meetingId}/send-meeting-invites`, {
+      recipients, meetingData, dryRun: dryRun || false
     }),
     onSuccess: (data, { dryRun }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
@@ -1748,13 +1732,10 @@ function GroupEmailsExecutionModule() {
 
   // Create group email mutation
   const createEmailMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/projects/${currentProject?.id}/communications`, {
-      method: 'POST',
-      body: {
-        ...data,
-        type: 'group_email',
-        status: 'draft'
-      }
+    mutationFn: (data: any) => apiRequest('POST', `/api/projects/${currentProject?.id}/communications`, {
+      ...data,
+      type: 'group_email',
+      status: 'draft'
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
@@ -1771,10 +1752,7 @@ function GroupEmailsExecutionModule() {
 
   // GPT content generation for group emails
   const generateContentMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/gpt/generate-group-email-content', {
-      method: 'POST',
-      body: data
-    }),
+    mutationFn: (data: any) => apiRequest('POST', '/api/gpt/generate-group-email-content', data),
     onSuccess: (content) => {
       setEmailContent(content);
       setIsGeneratingContent(false);
@@ -1793,13 +1771,10 @@ function GroupEmailsExecutionModule() {
       recipients: string[]; 
       dryRun?: boolean 
     }) => 
-      apiRequest(`/api/communications/${emailId}/distribute`, {
-        method: 'POST',
-        body: { 
-          distributionMethod: 'email',
-          recipients,
-          dryRun: dryRun || false
-        }
+      apiRequest('POST', `/api/communications/${emailId}/distribute`, {
+        distributionMethod: 'email',
+        recipients,
+        dryRun: dryRun || false
       }),
     onSuccess: (data, { dryRun }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
@@ -1829,9 +1804,7 @@ function GroupEmailsExecutionModule() {
 
   // Increment template usage
   const incrementUsageMutation = useMutation({
-    mutationFn: (templateId: string) => apiRequest(`/api/communication-templates/${templateId}/usage`, {
-      method: 'POST'
-    }),
+    mutationFn: (templateId: string) => apiRequest('POST', `/api/communication-templates/${templateId}/usage`),
   });
 
   const handleTemplateSelect = (template: CommunicationTemplate) => {
@@ -2554,13 +2527,10 @@ function FlyersExecutionModule() {
 
   // Create flyer mutation
   const createFlyerMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/projects/${currentProject?.id}/communications`, {
-      method: 'POST',
-      body: {
-        ...data,
-        type: 'flyer',
-        status: 'draft'
-      }
+    mutationFn: (data: any) => apiRequest('POST', `/api/projects/${currentProject?.id}/communications`, {
+      ...data,
+      type: 'flyer',
+      status: 'draft'
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
@@ -2575,10 +2545,7 @@ function FlyersExecutionModule() {
 
   // GPT content generation
   const generateContentMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/gpt/generate-flyer-content', {
-      method: 'POST',
-      body: data
-    }),
+    mutationFn: (data: any) => apiRequest('POST', '/api/gpt/generate-flyer-content', data),
     onSuccess: (content) => {
       setFlyerContent(content);
       setIsGeneratingContent(false);
@@ -2592,9 +2559,7 @@ function FlyersExecutionModule() {
 
   // Increment template usage
   const incrementUsageMutation = useMutation({
-    mutationFn: (templateId: string) => apiRequest(`/api/communication-templates/${templateId}/usage`, {
-      method: 'POST'
-    }),
+    mutationFn: (templateId: string) => apiRequest('POST', `/api/communication-templates/${templateId}/usage`),
   });
 
   const handleTemplateSelect = (template: CommunicationTemplate) => {
@@ -2654,16 +2619,10 @@ function FlyersExecutionModule() {
       recipients?: string[]; 
       dryRun?: boolean 
     }) => 
-      apiRequest(`/api/communications/${flyerId}/distribute`, {
-        method: 'POST',
-        body: { 
-          distributionMethod: method,
-          recipients: recipients || [],
-          dryRun: dryRun || false
-        },
-        headers: {
-          'x-user-id': '550e8400-e29b-41d4-a716-446655440000' // Demo user ID for development
-        }
+      apiRequest('POST', `/api/communications/${flyerId}/distribute`, {
+        distributionMethod: method,
+        recipients: recipients || [],
+        dryRun: dryRun || false
       }),
     onSuccess: (data, { method, dryRun }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
@@ -2710,12 +2669,8 @@ function FlyersExecutionModule() {
   // Export mutation with enhanced UX feedback
   const exportFlyerMutation = useMutation({
     mutationFn: ({ flyerId, format }: { flyerId: string; format: string }) => 
-      apiRequest(`/api/communications/${flyerId}/export`, {
-        method: 'POST',
-        body: { format },
-        headers: {
-          'x-user-id': '550e8400-e29b-41d4-a716-446655440000' // Demo user ID for development
-        }
+      apiRequest('POST', `/api/communications/${flyerId}/export`, {
+        format
       }),
     onSuccess: (data, { format }) => {
       // Create and trigger download
@@ -3215,24 +3170,18 @@ function PhaseGuidance() {
 
   const { data: phaseGuidance, isLoading: guidanceLoading } = useQuery({
     queryKey: ['/api/gpt/phase-guidance', selectedPhase],
-    queryFn: () => apiRequest('/api/gpt/phase-guidance', {
-      method: 'POST',
-      body: {
-        projectId: currentProject?.id,
-        phase: selectedPhase,
-        projectName: currentProject?.name,
-        description: currentProject?.description,
-        currentPhase: currentProject?.currentPhase || 'identify_need'
-      }
+    queryFn: () => apiRequest('POST', '/api/gpt/phase-guidance', {
+      projectId: currentProject?.id,
+      phase: selectedPhase,
+      projectName: currentProject?.name,
+      description: currentProject?.description,
+      currentPhase: currentProject?.currentPhase || 'identify_need'
     }),
     enabled: !!currentProject?.id && showGuidanceModal
   });
 
   const createStrategyMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/projects/${currentProject?.id}/communication-strategies`, {
-      method: 'POST',
-      body: data
-    }),
+    mutationFn: (data: any) => apiRequest('POST', `/api/projects/${currentProject?.id}/communication-strategies`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communication-strategies'] });
       toast({ title: "Communication strategy created successfully" });
@@ -3263,15 +3212,12 @@ function PhaseGuidance() {
     setIsGeneratingGuidance(true);
     try {
       // First fetch the AI guidance
-      const guidance = await apiRequest('/api/gpt/phase-guidance', {
-        method: 'POST',
-        body: {
-          projectId: currentProject.id,
-          phase: selectedPhase,
-          projectName: currentProject.name,
-          description: currentProject.description,
-          currentPhase: currentProject.currentPhase || 'identify_need'
-        }
+      const guidance = await apiRequest('POST', '/api/gpt/phase-guidance', {
+        projectId: currentProject.id,
+        phase: selectedPhase,
+        projectName: currentProject.name,
+        description: currentProject.description,
+        currentPhase: currentProject.currentPhase || 'identify_need'
       });
       
       // Show the guidance modal first so user can see what was generated
