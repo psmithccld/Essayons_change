@@ -1,5 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
-import type { Session } from "express-session";
+import type { Session, SessionData } from "express-session";
 import { createServer, type Server } from "http";
 
 // SECURITY: Session type declaration

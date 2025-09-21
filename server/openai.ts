@@ -5,6 +5,9 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || ""
 });
 
+// Export the OpenAI client for direct access when needed
+export { openai };
+
 export async function generateCommunicationPlan(projectInfo: {
   name: string;
   description: string;
@@ -655,6 +658,122 @@ Return as JSON:
   "htmlContent": "formatted HTML email content",
   "textContent": "plain text email content",
   "calendarDescription": "brief description for calendar invite"
+}`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+  });
+
+  return JSON.parse(response.choices[0].message.content || "{}");
+}
+
+export async function refineContent(currentContent: {
+  title: string;
+  content: string;
+  callToAction?: string;
+}, refinementRequest: string, contentType: string = 'content'): Promise<{
+  title: string;
+  content: string;
+  callToAction: string;
+}> {
+  const prompt = `Refine this ${contentType} based on the request:
+
+Current content:
+Title: ${currentContent.title || 'No title'}
+Content: ${currentContent.content || 'No content'}
+Call to Action: ${currentContent.callToAction || 'No CTA'}
+
+Refinement request: ${refinementRequest}
+
+Return the refined content in JSON format:
+{
+  "title": "refined title",
+  "content": "refined content body",
+  "callToAction": "refined call to action"
+}`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+  });
+
+  return JSON.parse(response.choices[0].message.content || "{}");
+}
+
+export async function generateP2PEmailContent(data: {
+  projectName: string;
+  recipientName: string;
+  recipientRole?: string;
+  changeDescription?: string;
+  communicationPurpose: string;
+  keyMessages?: string[];
+  raidLogContext?: Array<{
+    id: string;
+    title: string;
+    type: string;
+    description: string;
+  }>;
+  tone: string;
+  urgency: string;
+  relationship: string;
+}): Promise<{
+  title: string;
+  content: string;
+  callToAction: string;
+}> {
+  const { projectName, recipientName, recipientRole, changeDescription, communicationPurpose, keyMessages, raidLogContext, tone, urgency, relationship } = data;
+
+  const purposeContext = {
+    'check_in': 'Checking in on progress and addressing any concerns',
+    'update': 'Providing important project updates and status changes',
+    'request': 'Requesting specific actions, feedback, or resources',
+    'follow_up': 'Following up on previous conversations or commitments',
+    'collaboration': 'Inviting collaboration and partnership opportunities',
+    'feedback': 'Seeking input and feedback on project elements'
+  };
+
+  const relationshipContext = {
+    'colleague': 'This person is a peer/colleague',
+    'manager': 'This person is in a management role',
+    'stakeholder': 'This person is a project stakeholder',
+    'external': 'This person is external to the organization'
+  };
+
+  const raidContextString = raidLogContext && raidLogContext.length > 0 
+    ? `\n\nRelated Project Information:\n${raidLogContext.map(item => `${item.type.toUpperCase()}: ${item.title} - ${item.description}`).join('\n')}`
+    : '';
+
+  const prompt = `Create a personalized point-to-point email for this change management communication:
+
+Project: ${projectName}
+Recipient: ${recipientName}${recipientRole ? ` (${recipientRole})` : ''}
+Purpose: ${communicationPurpose} - ${purposeContext[communicationPurpose as keyof typeof purposeContext]}
+Relationship: ${relationship} - ${relationshipContext[relationship as keyof typeof relationshipContext]}
+Tone: ${tone}
+Urgency: ${urgency}
+
+Change Description: ${changeDescription || 'General change initiative communication'}${raidContextString}
+
+Key Messages to Include: ${keyMessages && keyMessages.length > 0 ? keyMessages.join(', ') : 'General project update'}
+
+Create a personal email that:
+- Uses a ${tone} tone appropriate for a ${relationship}
+- Addresses ${recipientName} personally
+- Reflects ${urgency} urgency level
+- Focuses on the specific purpose: ${communicationPurpose}
+- Is conversational and feels like it's written person-to-person
+- Includes relevant context about the change initiative
+- Has a clear but not pushy call to action
+- Maintains professional standards while being personal
+
+Return the content in JSON format:
+{
+  "title": "personal email subject line",
+  "content": "personal email body content with proper line breaks",
+  "callToAction": "specific next step or call to action"
 }`;
 
   const response = await openai.chat.completions.create({
