@@ -21,13 +21,6 @@ interface GPTResponse {
 
 const coachingPrompts = [
   {
-    id: "communication",
-    title: "Generate Communication Plan",
-    description: "Create a comprehensive communication strategy for your change initiative",
-    icon: MessageSquare,
-    category: "Communication",
-  },
-  {
     id: "readiness",
     title: "Analyze Change Readiness",
     description: "Assess organizational readiness and get improvement recommendations",
@@ -69,45 +62,6 @@ export default function GptCoach() {
     enabled: !!currentProject?.id,
   });
 
-  const generateCommunicationPlanMutation = useMutation({
-    mutationFn: async () => {
-      if (!currentProject?.id) throw new Error("No project selected");
-
-      const response = await apiRequest("POST", "/api/gpt/communication-plan", {
-        projectId: currentProject.id,
-        projectName: currentProject.name,
-        description: currentProject.description || "",
-        stakeholders: stakeholders.map(s => ({
-          name: s.name,
-          role: s.role,
-          supportLevel: s.supportLevel,
-          influenceLevel: s.influenceLevel,
-        }))
-      });
-      return response.json();
-    },
-    onSuccess: (data) => {
-      const newResponse = {
-        type: "communication_plan",
-        content: data,
-        timestamp: new Date().toISOString(),
-      };
-      setResponses(prev => [newResponse, ...prev]);
-      setCurrentResponse(data);
-      setIsDialogOpen(true);
-      toast({
-        title: "Success",
-        description: "Communication plan generated successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to generate communication plan",
-        variant: "destructive",
-      });
-    },
-  });
 
   const analyzeReadinessMutation = useMutation({
     mutationFn: async () => {
@@ -240,9 +194,6 @@ export default function GptCoach() {
     }
 
     switch (actionId) {
-      case "communication":
-        generateCommunicationPlanMutation.mutate();
-        break;
       case "readiness":
         analyzeReadinessMutation.mutate();
         break;
@@ -340,7 +291,6 @@ export default function GptCoach() {
                     {coachingPrompts.map((prompt) => {
                       const IconComponent = prompt.icon;
                       const isLoading = 
-                        (prompt.id === "communication" && generateCommunicationPlanMutation.isPending) ||
                         (prompt.id === "readiness" && analyzeReadinessMutation.isPending) ||
                         (prompt.id === "risks" && riskMitigationMutation.isPending) ||
                         (prompt.id === "stakeholders" && stakeholderTipsMutation.isPending);
