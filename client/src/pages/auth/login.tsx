@@ -137,59 +137,29 @@ export function LoginPage({ onAuthSuccess }: LoginPageProps) {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-purple-600 to-blue-700 relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/20"></div>
-        
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-10 left-10 w-32 h-32 bg-white rounded-full"></div>
-          <div className="absolute top-40 right-20 w-24 h-24 bg-white rounded-full"></div>
-          <div className="absolute bottom-20 left-20 w-40 h-40 bg-white rounded-full"></div>
-          <div className="absolute bottom-40 right-10 w-16 h-16 bg-white rounded-full"></div>
-        </div>
-
-        <div className="relative z-10 flex flex-col justify-center px-12 text-white">
-          <div className="mb-8">
-            <img src={essayonsLogo} alt="Essayons Change Logo" className="w-32 h-auto mb-6" />
-            <h1 className="text-5xl font-bold mb-4 leading-tight">
+      <div className="hidden lg:flex lg:w-1/2 bg-gray-50 dark:bg-gray-900 relative overflow-hidden">
+        <div className="relative z-10 flex flex-col justify-center items-center px-12 w-full">
+          <div className="text-center">
+            <img src={essayonsLogo} alt="Essayons Change Logo" className="w-80 h-auto mb-8 mx-auto" />
+            <h1 className="text-5xl font-bold mb-4 leading-tight text-gray-900 dark:text-white">
               Essayons Change
-              <span className="block text-3xl font-medium text-blue-200 mt-2">
+              <span className="block text-3xl font-medium text-blue-600 mt-2">
                 — Let us try!
               </span>
             </h1>
-            <p className="text-xl text-blue-100 mb-8 max-w-md">
+            <p className="text-xl text-gray-600 dark:text-gray-400 mb-8 max-w-md">
               Guiding change with clarity, accountability, and results. Built to ensure both organizational and individual needs are addressed. Developed through extensive research and grounded in operational focus.
             </p>
           </div>
 
           <div className="space-y-6">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-500/30 rounded-lg flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-blue-200" />
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Secure Authentication</h3>
-                <p className="text-blue-200">Email verification and session management</p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-purple-500/30 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-purple-200" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">Team Collaboration</h3>
-                <p className="text-purple-200">Role-based access and group management</p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-500/30 rounded-lg flex items-center justify-center">
-                <Clock className="w-6 h-6 text-blue-200" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">Process Management</h3>
-                <p className="text-blue-200">Streamlined workflows and automation</p>
+                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Team Collaboration</h3>
+                <p className="text-gray-600 dark:text-gray-400">Role-based access and group management</p>
               </div>
             </div>
           </div>
