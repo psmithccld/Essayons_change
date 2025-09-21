@@ -1072,13 +1072,13 @@ function MeetingsExecutionModule() {
       <CardContent className="p-6">
         <Tabs value={activeView} onValueChange={(value: any) => setActiveView(value)} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="repository" data-testid="repository-tab" className="flex items-center space-x-2">
-              <FileText className="h-4 w-4" />
-              <span>Repository</span>
-            </TabsTrigger>
             <TabsTrigger value="create" data-testid="create-tab" className="flex items-center space-x-2">
               <CalendarPlus className="h-4 w-4" />
               <span>Create</span>
+            </TabsTrigger>
+            <TabsTrigger value="repository" data-testid="repository-tab" className="flex items-center space-x-2">
+              <FileText className="h-4 w-4" />
+              <span>Repository</span>
             </TabsTrigger>
             <TabsTrigger value="manage" data-testid="manage-tab" className="flex items-center space-x-2">
               <Settings className="h-4 w-4" />
@@ -1116,7 +1116,6 @@ function MeetingsExecutionModule() {
                 className="bg-red-600 hover:bg-red-700 text-white"
                 data-testid="create-meeting-button"
               >
-                <Plus className="h-4 w-4 mr-2" />
                 Schedule Meeting
               </Button>
             </div>
