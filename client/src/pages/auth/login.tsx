@@ -152,17 +152,6 @@ export function LoginPage({ onAuthSuccess }: LoginPageProps) {
             </p>
           </div>
 
-          <div className="space-y-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Team Collaboration</h3>
-                <p className="text-gray-600 dark:text-gray-400">Role-based access and group management</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
