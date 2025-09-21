@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { vectorStore, generateContextAwareResponse } from "./vectorStore";
 
 // Using GPT-4o-mini as requested by the user
 const openai = new OpenAI({ 
@@ -23,7 +24,12 @@ export async function generateCommunicationPlan(projectInfo: {
   frequency: string;
   keyMessages: string[];
 }> {
-  const prompt = `As a change management expert, create a comprehensive communication plan for the following project:
+  const context = await vectorStore.getRelevantContext(
+    `communication planning strategy channels stakeholder engagement ${projectInfo.name} ${projectInfo.description}`,
+    2000
+  );
+
+  const prompt = `As a change management expert using the Essayons Change Framework, create a comprehensive communication plan for the following project:
 
 Project: ${projectInfo.name}
 Description: ${projectInfo.description}
@@ -31,10 +37,12 @@ Description: ${projectInfo.description}
 Stakeholders:
 ${projectInfo.stakeholders.map(s => `- ${s.name} (${s.role}) - Support: ${s.supportLevel}, Influence: ${s.influenceLevel}`).join('\n')}
 
-Please provide a communication strategy including:
-1. Overall communication strategy
-2. Recommended communication channels
-3. Communication frequency
+${context ? `Relevant guidance from knowledge base:\n${context}\n` : ''}
+
+Using the Essayons framework principles, provide a communication strategy including:
+1. Overall communication strategy aligned with change phases
+2. Recommended communication channels (consider flyers, group emails, P2P emails, meetings)
+3. Communication frequency based on change phase
 4. Key messages to emphasize
 
 Return the response as JSON in this format:
@@ -71,7 +79,12 @@ export async function analyzeChangeReadiness(surveyData: {
   recommendations: string[];
   riskAreas: string[];
 }> {
-  const prompt = `As a change management expert, analyze this change readiness data:
+  const context = await vectorStore.getRelevantContext(
+    'readiness survey scoring analysis stakeholder engagement change readiness assessment',
+    1500
+  );
+
+  const prompt = `As a change management expert using the Essayons Change Framework, analyze this change readiness data:
 
 Survey Responses:
 ${surveyData.responses.map(r => `Q: ${r.question} - A: ${r.answer}`).join('\n')}
@@ -79,10 +92,12 @@ ${surveyData.responses.map(r => `Q: ${r.question} - A: ${r.answer}`).join('\n')}
 Stakeholder Data:
 ${surveyData.stakeholderData.map(s => `${s.role}: Support=${s.supportLevel}, Engagement=${s.engagementLevel}`).join('\n')}
 
-Provide an analysis including:
-1. Overall readiness score (0-100)
+${context ? `Relevant scoring guidance:\n${context}\n` : ''}
+
+Using the Essayons framework scoring methodology, provide an analysis including:
+1. Overall readiness score (0-100) based on framework scoring
 2. Key insights from the data
-3. Recommendations for improvement
+3. Recommendations for improvement aligned with change phases
 4. Risk areas to address
 
 Return as JSON:
@@ -206,18 +221,26 @@ export async function generateChangeContent(type: 'flyer' | 'email' | 'meeting_p
   content: string;
   callToAction: string;
 }> {
-  const prompt = `Create ${type} content for this change initiative:
+  const contentContext = await vectorStore.getRelevantContext(
+    `${type} communication content creation ${context.projectName} ${context.changeDescription} leadership toolbox`,
+    1500
+  );
+
+  const prompt = `Using the Essayons Change Framework, create ${type} content for this change initiative:
 
 Project: ${context.projectName}
 Change: ${context.changeDescription}
 Audience: ${context.targetAudience.join(', ')}
 Key Messages: ${context.keyMessages.join(', ')}
 
-Create engaging, clear content that:
-- Explains the change and its benefits
-- Addresses potential concerns
-- Includes a clear call to action
+${contentContext ? `Framework guidance for ${type} communication:\n${contentContext}\n` : ''}
+
+Following the Essayons Leadership Toolbox principles, create engaging, clear content that:
+- Explains the change and its benefits using framework principles
+- Addresses potential concerns with counter-messaging strategies
+- Includes a clear call to action that empowers the receiver
 - Uses appropriate tone for the audience
+- Follows the "clear, consistent, accountable, empowering" guidelines
 
 Return as JSON:
 {
@@ -345,18 +368,25 @@ export async function generatePhaseGuidance(phase: string, projectContext: {
   }[];
   aiError?: AIServiceError;
 }> {
-  const prompt = `As a change management expert, provide communication guidance for the "${phase}" phase of this change initiative:
+  const context = await vectorStore.getRelevantContext(
+    `${phase} phase change management communication guidance framework activities timeline`,
+    2000
+  );
+
+  const prompt = `As a change management expert using the Essayons Change Framework, provide communication guidance for the "${phase}" phase of this change initiative:
 
 Project: ${projectContext.name}
 Description: ${projectContext.description}
 Current Phase: ${projectContext.currentPhase}
 
-For the ${phase} phase, provide:
-1. Key communication themes to emphasize
-2. Primary communication objectives
-3. Most effective communication channels
-4. Core messages to convey
-5. Weekly timeline with key activities
+${context ? `Framework guidance for this phase:\n${context}\n` : ''}
+
+Using the Essayons 5-phase framework, for the ${phase} phase provide:
+1. Key communication themes to emphasize based on framework principles
+2. Primary communication objectives aligned with phase goals
+3. Most effective communication channels (flyers, group emails, P2P emails, meetings)
+4. Core messages to convey for this specific phase
+5. Weekly timeline with key activities following framework guidance
 
 Return as JSON:
 {
