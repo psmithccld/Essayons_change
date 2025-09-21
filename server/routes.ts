@@ -858,8 +858,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/projects/:id", ...requireAuthAndPermission('canEditAllProjects'), async (req: AuthenticatedRequest, res) => {
+  app.put("/api/projects/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
+      const userId = req.userId!;
+      
+      // Get original project to check authorization and for status changes
+      const originalProject = await storage.getProject(req.params.id);
+      if (!originalProject) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      
+      // Check if user can edit this specific project
+      const userPermissions = await storage.resolveUserPermissions(userId);
+      const canEditAllProjects = userPermissions.canEditAllProjects;
+      const isProjectOwner = originalProject.ownerId === userId;
+      
+      // Check if user is assigned to this project with edit rights
+      const userInitiatives = await storage.getUserInitiativesWithRoles(userId);
+      const userAssignment = userInitiatives.find(init => init.project.id === req.params.id);
+      const hasAssignmentEditRights = userAssignment?.canEdit || false;
+      
+      // User can edit if they have global edit permissions, are project owner, or have assignment edit rights
+      if (!canEditAllProjects && !isProjectOwner && !hasAssignmentEditRights) {
+        return res.status(403).json({ error: "Insufficient permissions to edit this project" });
+      }
+      
       // Convert date strings to Date objects and validate
       const processedData = {
         ...req.body,
@@ -870,12 +893,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create update schema by making insertProjectSchema fields optional and omitting generated fields
       const updateProjectSchema = insertProjectSchema.partial().omit({ id: true, ownerId: true, createdAt: true, updatedAt: true });
       const validatedData = updateProjectSchema.parse(processedData);
-      
-      // Get original project to check for status changes
-      const originalProject = await storage.getProject(req.params.id);
-      if (!originalProject) {
-        return res.status(404).json({ error: "Project not found" });
-      }
       
       const project = await storage.updateProject(req.params.id, validatedData);
       if (!project) {

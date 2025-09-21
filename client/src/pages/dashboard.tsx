@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -12,6 +12,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import changeProcessFlowImage from "/images/change-process-flow.png";
 
 interface DashboardStats {
@@ -112,6 +114,7 @@ function getProjectStatusColor(status: string) {
 export default function Dashboard() {
   const [editingProject, setEditingProject] = useState<string | null>(null);
   const [editData, setEditData] = useState<{ status: string; name: string }>({ status: '', name: '' });
+  const { toast } = useToast();
 
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats'],
@@ -123,14 +126,51 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  const updateProjectMutation = useMutation({
+    mutationFn: async ({ projectId, data }: { projectId: string; data: { name: string; status: string } }) => {
+      return await apiRequest(`/api/projects/${projectId}`, 'PUT', data);
+    },
+    onSuccess: () => {
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: ['/api/my/initiatives'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      toast({
+        title: "Success",
+        description: "Project updated successfully",
+      });
+      setEditingProject(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update project",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEditClick = (project: Project) => {
     setEditingProject(project.id);
     setEditData({ status: project.status, name: project.name });
   };
 
   const handleSaveEdit = async (projectId: string) => {
-    // TODO: Implement save functionality
-    setEditingProject(null);
+    if (!editData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Project name cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateProjectMutation.mutate({
+      projectId,
+      data: {
+        name: editData.name.trim(),
+        status: editData.status,
+      },
+    });
   };
 
   const handleCancelEdit = () => {
@@ -361,6 +401,7 @@ export default function Dashboard() {
                                       size="sm" 
                                       variant="ghost" 
                                       onClick={() => handleSaveEdit(initiative.project.id)}
+                                      disabled={updateProjectMutation.isPending}
                                       data-testid={`button-save-${initiative.project.id}`}
                                     >
                                       <Save className="w-3 h-3" />
