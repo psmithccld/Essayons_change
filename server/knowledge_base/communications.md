@@ -1,0 +1,92 @@
+Communication is the leader's most powerful tool. In Essayons Change, communication is split into Strategy (what, who, when, why) and Execution (how).
+
+Strategy
+
+Phase Alignment
+
+Need to Change → explain urgency and vision.
+
+Stakeholders → engage influencers and listen.
+
+Develop → clarify roles, resources, and expectations.
+
+Implement → reinforce, celebrate short-term wins, address blockers.
+
+Reinforce → embed lessons, recognize success.
+
+Stakeholder Identification
+
+Who needs what message?
+
+Who resists, who champions?
+
+Resistance Handling
+
+Listen → acknowledge → respond with clarity.
+
+Use GPT Coach for suggested counter-messaging.
+
+Channel Preferences
+
+Flyers, Group Emails, P2P Emails, Meetings.
+
+Ask teams how they want to hear from leadership.
+
+Execution
+
+Flyers
+
+Use company-approved templates (PowerPoint/Canva).
+
+GPT Coach drafts messaging blocks.
+
+Repository stores past flyers.
+
+Prompt user: distribute via email, P2P, or archive?
+
+Group Emails
+
+For all-hands or defined groups.
+
+GPT Coach guides tone: vision, quick wins, issue response, debriefs.
+
+Allow external recipients.
+
+Integrate RAID log updates if needed.
+
+Sent "on behalf of the initiative/leader."
+
+P2P Emails
+
+For individual outreach.
+
+GPT Coach guides message: feedback request, RAID tracking, stakeholder update.
+
+Visibility options:
+
+Visible to all in initiative.
+
+Private between sender and recipient.
+
+RAID details can be attached.
+
+Meetings
+
+Create meeting invites with the 5Ws (Who, What, When, Where, Why).
+
+GPT Coach builds agenda.
+
+Generate calendar invite + email.
+
+Log agenda/notes for records.
+
+Leadership Toolbox Reminder:
+Every communication should:
+
+Be clear (no jargon).
+
+Be consistent (aligned across leaders).
+
+Create accountability (who, what, when).
+
+Empower the receiver (invite input, encourage ownership).

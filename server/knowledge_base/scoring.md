@@ -1,0 +1,62 @@
+Survey responses are turned into scores that provide leaders with a clear picture of change health.
+
+Readiness Score
+
+Derived from Readiness Survey items (awareness, urgency, readiness, trust).
+
+Formula: average Likert (1–5) → normalize to 0–100.
+
+Interpretation:
+
+80–100 = High readiness, momentum is strong.
+
+50–79 = Moderate readiness, communicate more.
+
+<50 = Low readiness, pause and address barriers.
+
+Understanding Score
+
+From Understanding Survey (clarity, role, purpose, resources).
+
+Formula: average Likert → 0–100.
+
+Interpretation:
+
+80–100 = People "get it."
+
+<50 = Major confusion; stop and clarify.
+
+Reaction Score
+
+From Pulse Survey (sentiment + support + confidence).
+
+Formula: map Excited=5 → Resistant=1, average with Likert, → 0–100.
+
+Interpretation:
+
+Rising score = adoption growing.
+
+Falling score = resistance building; respond quickly.
+
+Success Score
+
+From Post-Mortem (integration, benefits, reinforcement, 1–10 rating).
+
+Formula: average → normalized to 0–100.
+
+Interpretation:
+
+80+ = Sustainable change achieved.
+
+<60 = Risk of regression.
+
+Composite Change Health Score
+
+Formula: 25% each of Readiness, Understanding, Reaction, Success.
+
+Use as an executive dashboard metric.
+
+Leaders should investigate which component is dragging the score down.
+
+Leadership Toolbox Reminder:
+Numbers tell a story, but not the full story. Always pair metrics with conversations, reflection questions, and feedback loops.
