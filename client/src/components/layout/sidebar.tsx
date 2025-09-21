@@ -17,8 +17,7 @@ import {
   GripVertical,
   Briefcase,
   Shield,
-  Building,
-  FolderOpen
+  Building
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
@@ -39,7 +38,6 @@ type NavigationItem = {
 // All navigation items with permission requirements
 const allNavigationItems: NavigationItem[] = [
   { id: "overview", icon: ChartLine, label: "Overview", path: "/" },
-  { id: "projects", icon: FolderOpen, label: "Projects", path: "/projects", permissions: ["canSeeProjects"] },
   { id: "tasks", icon: ListTodo, label: "Tasks & To Do", path: "/tasks" },
   { id: "checklist-templates", icon: ListChecks, label: "Checklist Templates", path: "/checklist-templates" },
   { id: "gantt", icon: ChartGantt, label: "Gantt Charts", path: "/gantt" },
