@@ -16,6 +16,7 @@ interface EmailParams {
   subject: string;
   text?: string;
   html?: string;
+  cc?: string; // Added CC support
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
@@ -25,14 +26,21 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
   }
 
   try {
-    await mailService.send({
+    const mailOptions: any = {
       to: params.to,
       from: params.from,
       subject: params.subject,
       text: params.text || '',
       html: params.html || '',
-    });
-    console.log(`Email sent successfully to ${params.to}`);
+    };
+    
+    // Add CC if provided
+    if (params.cc) {
+      mailOptions.cc = params.cc;
+    }
+    
+    await mailService.send(mailOptions);
+    console.log(`Email sent successfully to ${params.to}${params.cc ? ` with CC to ${params.cc}` : ''}`);
     return true;
   } catch (error) {
     console.error('SendGrid email error:', error);
@@ -270,7 +278,8 @@ export async function sendP2PEmail(
   projectName: string,
   senderName: string,
   visibility: 'private' | 'team' | 'archive' = 'private',
-  raidLogInfo?: { title: string; type: string; description: string }[]
+  raidLogInfo?: { title: string; type: string; description: string }[],
+  ccEmail?: string // Added CC parameter
 ): Promise<boolean> {
   const subject = `Personal Communication: ${emailTitle}`;
   

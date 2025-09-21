@@ -2030,7 +2030,7 @@ Return the refined content in JSON format:
   // P2P Email Sending - SECURITY: Requires individual email permission and proper auth
   app.post("/api/communications/:id/send-p2p", requireAuthAndPermission('canSendEmails'), async (req: AuthenticatedRequest, res) => {
     try {
-      const { recipientEmail, recipientName, visibility, dryRun } = req.body;
+      const { recipientEmail, recipientName, visibility, dryRun, senderEmail } = req.body;
 
       // Validate input
       if (!recipientEmail || !recipientName) {
@@ -2120,7 +2120,7 @@ Return the refined content in JSON format:
         }
       }
 
-      // Send P2P email
+      // Send P2P email with CC to sender
       const emailSent = await sendP2PEmail(
         recipientEmail,
         recipientName,
@@ -2129,7 +2129,8 @@ Return the refined content in JSON format:
         project.name,
         sender.name,
         visibility as 'private' | 'team' | 'archive',
-        raidLogInfo.length > 0 ? raidLogInfo : undefined
+        raidLogInfo.length > 0 ? raidLogInfo : undefined,
+        senderEmail || sender.email // CC the sender
       );
 
       if (!emailSent) {

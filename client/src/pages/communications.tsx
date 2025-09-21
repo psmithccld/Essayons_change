@@ -41,6 +41,7 @@ import {
   Archive
 } from "lucide-react";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
@@ -52,6 +53,7 @@ import CommunicationRepository from "@/components/CommunicationRepository";
 // P2P Emails Execution Module Component
 function P2PEmailsExecutionModule() {
   const { currentProject } = useCurrentProject();
+  const { user } = useAuth();
   const [activeView, setActiveView] = useState<'repository' | 'create' | 'manage'>('repository');
   const [selectedTemplate, setSelectedTemplate] = useState<CommunicationTemplate | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -100,16 +102,39 @@ function P2PEmailsExecutionModule() {
     enabled: !!currentProject?.id
   });
 
-  // Create P2P email mutation
+  // Create P2P email mutation - Modified to save AND send automatically
   const createP2PEmailMutation = useMutation({
     mutationFn: (data: any) => apiRequest('POST', `/api/projects/${currentProject?.id}/communications`, {
       ...data,
       type: 'point_to_point_email',
       status: 'draft'
     }),
-    onSuccess: () => {
+    onSuccess: async (newEmail) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
-      toast({ title: "P2P email created successfully" });
+      
+      // Automatically send the email after saving
+      try {
+        const sendResult = await apiRequest('POST', `/api/communications/${newEmail.id}/send-p2p`, {
+          recipientEmail,
+          recipientName,
+          visibility,
+          dryRun: false,
+          senderEmail: user?.email // Include sender email for CC
+        });
+        
+        toast({ 
+          title: "Personal email saved and sent successfully", 
+          description: `Email sent to ${recipientName} with copy to ${user?.email || 'sender'}` 
+        });
+      } catch (sendError) {
+        console.error('Failed to send email after saving:', sendError);
+        toast({ 
+          title: "Email saved but failed to send", 
+          description: "The email was saved to the repository but could not be sent automatically.",
+          variant: "destructive" 
+        });
+      }
+      
       setShowCreateModal(false);
       setEmailContent({ title: '', content: '', callToAction: '' });
       setSelectedRaidLogs([]);
@@ -218,6 +243,7 @@ function P2PEmailsExecutionModule() {
       return;
     }
 
+    // Modified to save AND send automatically
     createP2PEmailMutation.mutate({
       title: emailContent.title,
       content: emailContent.content,
@@ -234,7 +260,8 @@ function P2PEmailsExecutionModule() {
         communicationPurpose,
         relationship,
         tone,
-        urgency
+        urgency,
+        senderEmail: user?.email // Store sender email for CC
       }
     });
   };
