@@ -29,6 +29,7 @@ import {
   Plus,
   Eye,
   Edit,
+  X,
   Send,
   Bot,
   Save,
@@ -817,10 +818,31 @@ function MeetingsExecutionModule() {
   const [selectedRaidLogs, setSelectedRaidLogs] = useState<string[]>([]);
   const { toast } = useToast();
 
+  // Fetch users for participant selection
+  const { data: users = [], isLoading: usersLoading } = useQuery({
+    queryKey: ['/api/users']
+  });
+
+  // Fetch stakeholders for participant selection in meetings
+  const { data: meetingStakeholders = [], isLoading: meetingStakeholdersLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
+    enabled: !!currentProject?.id
+  });
+
+  // Fetch RAID logs for context integration in meetings
+  const { data: meetingRaidLogs = [], isLoading: meetingRaidLogsLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'raid-logs'],
+    enabled: !!currentProject?.id
+  });
+
   // Meeting form state - 5Ws Capture System
   const [meetingWho, setMeetingWho] = useState<{ participants: Array<{ name: string; role: string; email?: string }> }>({
     participants: []
   });
+  const [externalParticipantName, setExternalParticipantName] = useState('');
+  const [externalParticipantEmail, setExternalParticipantEmail] = useState('');
+  const [externalParticipantRole, setExternalParticipantRole] = useState('');
+  const [activeParticipantTab, setActiveParticipantTab] = useState('stakeholders');
   const [meetingWhat, setMeetingWhat] = useState({
     title: '',
     purpose: '',
@@ -952,6 +974,39 @@ function MeetingsExecutionModule() {
     }
   });
 
+  const handleAddExternalParticipant = () => {
+    if (!externalParticipantName.trim() || !externalParticipantEmail.trim()) {
+      toast({ title: "Please enter both name and email for external participant", variant: "destructive" });
+      return;
+    }
+
+    // Check if participant already exists
+    const exists = meetingWho.participants.some(
+      p => p.email === externalParticipantEmail.trim() || 
+      (p.name === externalParticipantName.trim() && !p.email)
+    );
+
+    if (exists) {
+      toast({ title: "Participant already added", variant: "destructive" });
+      return;
+    }
+
+    setMeetingWho(prev => ({
+      participants: [...prev.participants, {
+        name: externalParticipantName.trim(),
+        role: externalParticipantRole.trim() || 'External Participant',
+        email: externalParticipantEmail.trim()
+      }]
+    }));
+
+    // Clear form
+    setExternalParticipantName('');
+    setExternalParticipantEmail('');
+    setExternalParticipantRole('');
+    
+    toast({ title: "External participant added successfully" });
+  };
+
   const resetMeetingForm = () => {
     setMeetingWho({ participants: [] });
     setMeetingWhat({ title: '', purpose: '', objectives: [], expectedOutcomes: '' });
@@ -960,6 +1015,10 @@ function MeetingsExecutionModule() {
     setMeetingWhy({ context: '', urgency: 'normal', projectRelation: '', decisionRequired: false });
     setGeneratedAgenda(null);
     setSelectedRaidLogs([]);
+    setExternalParticipantName('');
+    setExternalParticipantEmail('');
+    setExternalParticipantRole('');
+    setActiveParticipantTab('stakeholders');
   };
 
   const handleGenerateAgenda = () => {
@@ -978,7 +1037,7 @@ function MeetingsExecutionModule() {
       participants: meetingWho.participants,
       objectives: meetingWhat.objectives,
       raidLogContext: selectedRaidLogs.map(id => {
-        const raidLog = raidLogs.find((log: any) => log.id === id);
+        const raidLog = meetingRaidLogs.find((log: any) => log.id === id);
         return raidLog ? {
           id: raidLog.id,
           title: raidLog.title,
@@ -1285,40 +1344,154 @@ function MeetingsExecutionModule() {
                         </Select>
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <Label>Add Participants</Label>
-                        {stakeholdersLoading ? (
-                          <Skeleton className="h-10 w-full" />
-                        ) : (
-                          <div className="space-y-2">
-                            {stakeholders.map((stakeholder: Stakeholder) => (
-                              <div key={stakeholder.id} className="flex items-center space-x-2">
-                                <Checkbox
-                                  checked={meetingWho.participants.some(p => p.name === stakeholder.name)}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      setMeetingWho(prev => ({
-                                        participants: [...prev.participants, {
-                                          name: stakeholder.name,
-                                          role: stakeholder.role,
-                                          email: stakeholder.email
-                                        }]
-                                      }));
-                                    } else {
-                                      setMeetingWho(prev => ({
-                                        participants: prev.participants.filter(p => p.name !== stakeholder.name)
-                                      }));
-                                    }
-                                  }}
-                                  data-testid={`participant-checkbox-${stakeholder.id}`}
-                                />
-                                <span className="text-sm">{stakeholder.name} ({stakeholder.role})</span>
+                        
+                        <Tabs value={activeParticipantTab} onValueChange={setActiveParticipantTab} className="space-y-3">
+                          <TabsList className="grid w-full grid-cols-3">
+                            <TabsTrigger value="users" data-testid="tab-users">
+                              Users
+                            </TabsTrigger>
+                            <TabsTrigger value="stakeholders" data-testid="tab-stakeholders">
+                              Stakeholders
+                            </TabsTrigger>
+                            <TabsTrigger value="external" data-testid="tab-external">
+                              External
+                            </TabsTrigger>
+                          </TabsList>
+
+                          <TabsContent value="users" className="space-y-2">
+                            {usersLoading ? (
+                              <Skeleton className="h-10 w-full" />
+                            ) : (
+                              <div className="space-y-2 max-h-32 overflow-y-auto">
+                                {users.map((user: any) => (
+                                  <div key={user.id} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      checked={meetingWho.participants.some(p => p.email === (user.email || `${user.username}@company.com`))}
+                                      onCheckedChange={(checked) => {
+                                        const userEmail = user.email || `${user.username}@company.com`;
+                                        if (checked) {
+                                          setMeetingWho(prev => ({
+                                            participants: [...prev.participants, {
+                                              name: user.name,
+                                              role: 'Team Member',
+                                              email: userEmail
+                                            }]
+                                          }));
+                                        } else {
+                                          setMeetingWho(prev => ({
+                                            participants: prev.participants.filter(p => p.email !== userEmail)
+                                          }));
+                                        }
+                                      }}
+                                      data-testid={`user-checkbox-${user.id}`}
+                                    />
+                                    <span className="text-sm">{user.name} ({user.username})</span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            )}
+                          </TabsContent>
+
+                          <TabsContent value="stakeholders" className="space-y-2">
+                            {meetingStakeholdersLoading ? (
+                              <Skeleton className="h-10 w-full" />
+                            ) : (
+                              <div className="space-y-2 max-h-32 overflow-y-auto">
+                                {meetingStakeholders.map((stakeholder: Stakeholder) => (
+                                  <div key={stakeholder.id} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      checked={meetingWho.participants.some(p => p.email === stakeholder.email)}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setMeetingWho(prev => ({
+                                            participants: [...prev.participants, {
+                                              name: stakeholder.name,
+                                              role: stakeholder.role,
+                                              email: stakeholder.email
+                                            }]
+                                          }));
+                                        } else {
+                                          setMeetingWho(prev => ({
+                                            participants: prev.participants.filter(p => p.email !== stakeholder.email)
+                                          }));
+                                        }
+                                      }}
+                                      data-testid={`stakeholder-checkbox-${stakeholder.id}`}
+                                    />
+                                    <span className="text-sm">{stakeholder.name} ({stakeholder.role})</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </TabsContent>
+
+                          <TabsContent value="external" className="space-y-3">
+                            <div className="space-y-2">
+                              <Input
+                                placeholder="Participant name"
+                                value={externalParticipantName}
+                                onChange={(e) => setExternalParticipantName(e.target.value)}
+                                data-testid="input-external-name"
+                              />
+                              <Input
+                                placeholder="Participant email"
+                                type="email"
+                                value={externalParticipantEmail}
+                                onChange={(e) => setExternalParticipantEmail(e.target.value)}
+                                data-testid="input-external-email"
+                              />
+                              <Input
+                                placeholder="Role (optional)"
+                                value={externalParticipantRole}
+                                onChange={(e) => setExternalParticipantRole(e.target.value)}
+                                data-testid="input-external-role"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleAddExternalParticipant}
+                                data-testid="button-add-external"
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add External Participant
+                              </Button>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+
+                        {/* Selected participants list */}
+                        <div className="space-y-2">
+                          <div className="text-xs text-gray-600 font-medium">
+                            Selected: {meetingWho.participants.length} participants
                           </div>
-                        )}
-                        <div className="text-xs text-gray-500">
-                          Selected: {meetingWho.participants.length} participants
+                          {meetingWho.participants.length > 0 && (
+                            <div className="space-y-1 max-h-20 overflow-y-auto">
+                              {meetingWho.participants.map((participant, index) => (
+                                <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded text-xs">
+                                  <span>
+                                    {participant.name} ({participant.role})
+                                    {participant.email && <span className="text-gray-500 ml-1">- {participant.email}</span>}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setMeetingWho(prev => ({
+                                        participants: prev.participants.filter((_, i) => i !== index)
+                                      }));
+                                    }}
+                                    data-testid={`remove-participant-${index}`}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
