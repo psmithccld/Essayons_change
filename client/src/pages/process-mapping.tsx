@@ -18,12 +18,12 @@ import {
   Plus, Save, Download, Upload, Pen, Square, Circle, Diamond, FileText, 
   Database, Layers, Move, Clock, Triangle, ArrowRight, MoreVertical, 
   Trash2, Edit, Undo, Redo, ZoomIn, ZoomOut, RotateCcw, MousePointer2,
-  Type, Eraser, Palette
+  Type, Eraser, Palette, CheckSquare, Calendar, AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
-import type { ProcessMap } from "@shared/schema";
+import type { ProcessMap, User } from "@shared/schema";
 import { insertProcessMapSchema, type InsertProcessMap } from "@shared/schema";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -35,12 +35,13 @@ type ProcessMapFormData = z.infer<typeof processMapFormSchema>;
 
 interface ProcessElement {
   id: string;
-  type: 'start' | 'end' | 'process' | 'decision' | 'document' | 'database' | 'subprocess' | 'manual' | 'delay' | 'storage';
+  type: 'start' | 'end' | 'process' | 'decision' | 'document' | 'database' | 'subprocess' | 'manual' | 'delay' | 'storage' | 'task' | 'milestone' | 'action';
   text: string;
   x: number;
   y: number;
   width: number;
   height: number;
+  linkedItemId?: string; // For task, milestone, action symbols - link to created item
 }
 
 interface Connection {
@@ -63,8 +64,17 @@ interface CanvasTools {
   fillColor: string;
 }
 
+// Symbol definition interface
+interface SymbolDefinition {
+  name: string;
+  icon: any;
+  shape: string;
+  color: string;
+  isChangeItem?: boolean;
+}
+
 // Process mapping symbol definitions with industry standard shapes
-const PROCESS_SYMBOLS = {
+const PROCESS_SYMBOLS: Record<string, SymbolDefinition> = {
   start: { name: "Start/End", icon: Circle, shape: "ellipse", color: "#22c55e" },
   end: { name: "Start/End", icon: Circle, shape: "ellipse", color: "#ef4444" },
   process: { name: "Process", icon: Square, shape: "rectangle", color: "#3b82f6" },
@@ -76,7 +86,38 @@ const PROCESS_SYMBOLS = {
   delay: { name: "Delay", icon: Clock, shape: "delay", color: "#84cc16" },
   storage: { name: "Storage", icon: Triangle, shape: "triangle", color: "#6366f1" },
   thoughtBubble: { name: "Thought Bubble", icon: Circle, shape: "ellipse", color: "#ec4899" },
+  // Change Management Symbols
+  task: { name: "Task", icon: CheckSquare, shape: "rectangle", color: "#3b82f6", isChangeItem: true },
+  milestone: { name: "Milestone", icon: Calendar, shape: "diamond", color: "#22c55e", isChangeItem: true },
+  action: { name: "Action", icon: AlertTriangle, shape: "pentagon", color: "#f59e0b", isChangeItem: true },
 };
+
+// Form schemas reused from fishbone.tsx for item creation
+const taskFormSchema = z.object({
+  name: z.string().min(1, "Task name is required"),
+  description: z.string().optional(),
+  assigneeId: z.string().optional(),
+  dueDate: z.string().optional(),
+  priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
+});
+
+const milestoneFormSchema = z.object({
+  name: z.string().min(1, "Milestone name is required"),
+  description: z.string().optional(),
+  targetDate: z.string().min(1, "Target date is required"),
+});
+
+const actionFormSchema = z.object({
+  type: z.literal("action"),
+  title: z.string().min(1, "Action title is required"),
+  description: z.string().min(1, "Description is required"),
+  severity: z.enum(["low", "medium", "high", "critical"]).default("medium"),
+  assigneeId: z.string().optional(),
+});
+
+type TaskFormData = z.infer<typeof taskFormSchema>;
+type MilestoneFormData = z.infer<typeof milestoneFormSchema>;
+type ActionFormData = z.infer<typeof actionFormSchema>;
 
 export default function DevelopmentMaps() {
   const [canvas, setCanvas] = useState<FabricCanvas | null>(null);
@@ -89,6 +130,11 @@ export default function DevelopmentMaps() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [selectedSymbolType, setSelectedSymbolType] = useState<string | null>(null);
   const selectedSymbolTypeRef = useRef<string | null>(null);
+  
+  // Item creation dialogue states
+  const [isItemCreationOpen, setIsItemCreationOpen] = useState(false);
+  const [selectedItemType, setSelectedItemType] = useState<'task' | 'milestone' | 'action' | null>(null);
+  const [pendingSymbolPosition, setPendingSymbolPosition] = useState<{ x: number; y: number } | null>(null);
   
   const [tools, setTools] = useState<CanvasTools>({
     mode: 'select',
@@ -111,6 +157,81 @@ export default function DevelopmentMaps() {
   const { data: processMaps = [], isLoading } = useQuery<ProcessMap[]>({
     queryKey: ['/api/projects', currentProject?.id, 'process-maps'],
     enabled: !!currentProject?.id,
+  });
+
+  // Fetch users for assignment in item creation
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ['/api/users'],
+    enabled: !!currentProject?.id,
+  });
+
+  // Item creation mutations
+  const createTaskMutation = useMutation({
+    mutationFn: async (data: TaskFormData) => {
+      if (!currentProject?.id) throw new Error("No project selected");
+      const cleanData = {
+        ...data,
+        assigneeId: data.assigneeId && data.assigneeId.trim() && data.assigneeId !== 'unassigned' ? data.assigneeId : undefined,
+        dueDate: data.dueDate && data.dueDate.trim() ? data.dueDate : undefined,
+        status: "pending",
+      };
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, cleanData);
+      return response.json();
+    },
+    onSuccess: (createdTask) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
+      // Create symbol on canvas after successful creation
+      if (pendingSymbolPosition) {
+        addProcessElementWithItem('task', pendingSymbolPosition.x, pendingSymbolPosition.y, createdTask.id, createdTask.name);
+        setPendingSymbolPosition(null);
+      }
+      setIsItemCreationOpen(false);
+      toast({ title: "Task created and added to map", description: "Task has been created and symbol placed on the map." });
+    },
+  });
+
+  const createMilestoneMutation = useMutation({
+    mutationFn: async (data: MilestoneFormData) => {
+      if (!currentProject?.id) throw new Error("No project selected");
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/milestones`, {
+        ...data,
+        status: "pending",
+      });
+      return response.json();
+    },
+    onSuccess: (createdMilestone) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'milestones'] });
+      // Create symbol on canvas after successful creation
+      if (pendingSymbolPosition) {
+        addProcessElementWithItem('milestone', pendingSymbolPosition.x, pendingSymbolPosition.y, createdMilestone.id, createdMilestone.name);
+        setPendingSymbolPosition(null);
+      }
+      setIsItemCreationOpen(false);
+      toast({ title: "Milestone created and added to map", description: "Milestone has been created and symbol placed on the map." });
+    },
+  });
+
+  const createActionMutation = useMutation({
+    mutationFn: async (data: ActionFormData) => {
+      if (!currentProject?.id) throw new Error("No project selected");
+      const cleanData = {
+        ...data,
+        assigneeId: data.assigneeId && data.assigneeId.trim() && data.assigneeId !== 'unassigned' ? data.assigneeId : undefined,
+        status: "open",
+      };
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/raid-logs`, cleanData);
+      return response.json();
+    },
+    onSuccess: (createdAction) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'raid-logs'] });
+      // Create symbol on canvas after successful creation
+      if (pendingSymbolPosition) {
+        addProcessElementWithItem('action', pendingSymbolPosition.x, pendingSymbolPosition.y, createdAction.id, createdAction.title);
+        setPendingSymbolPosition(null);
+      }
+      setIsItemCreationOpen(false);
+      toast({ title: "Action created and added to map", description: "Action has been created and symbol placed on the map." });
+    },
   });
 
   // Auto-load the first process map when available
@@ -208,6 +329,18 @@ export default function DevelopmentMaps() {
       // Handle symbol placement
       if (currentSymbolType && e.pointer) {
         console.log('Adding process element:', currentSymbolType, 'at', e.pointer.x, e.pointer.y);
+        
+        // Check if this is a change management symbol that needs item creation
+        const symbol = PROCESS_SYMBOLS[currentSymbolType];
+        if (symbol?.isChangeItem) {
+          // Open item creation dialog first
+          setPendingSymbolPosition({ x: e.pointer.x, y: e.pointer.y });
+          setSelectedItemType(currentSymbolType as 'task' | 'milestone' | 'action');
+          setIsItemCreationOpen(true);
+          setSelectedSymbolType(null);
+          return;
+        }
+        
         addProcessElement(currentSymbolType, e.pointer.x, e.pointer.y);
         setSelectedSymbolType(null);
         return;
