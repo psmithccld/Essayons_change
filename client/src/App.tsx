@@ -23,6 +23,7 @@ import InitiativeManagement from "@/pages/initiative-management";
 import SecurityManagement from "@/pages/security-management";
 import ChangeProcessFlow from "@/pages/fishbone";
 import Reports from "@/pages/reports";
+import Projects from "@/pages/projects";
 import { LoginPage } from "@/pages/auth/login";
 import { EmailVerifyPage } from "@/pages/auth/verify-email";
 import { Loader2 } from "lucide-react";
@@ -49,6 +50,7 @@ function AuthenticatedApp() {
         <main className="flex-1 overflow-y-auto p-6">
           <Switch>
             <Route path="/" component={Dashboard} />
+            <Route path="/projects" component={Projects} />
             <Route path="/tasks" component={Tasks} />
             <Route path="/checklist-templates" component={ChecklistTemplates} />
             <Route path="/gantt" component={GanttChart} />

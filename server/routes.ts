@@ -847,7 +847,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects", requirePermission('canModifyProjects'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/projects", ...requireAuthAndPermission('canModifyProjects'), async (req: AuthenticatedRequest, res) => {
     try {
       // Convert date strings to Date objects before validation
       const processedData = {
@@ -866,7 +866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/projects/:id", requirePermission('canEditAllProjects'), async (req, res) => {
+  app.put("/api/projects/:id", ...requireAuthAndPermission('canEditAllProjects'), async (req: AuthenticatedRequest, res) => {
     try {
       // Convert date strings to Date objects and validate
       const processedData = {
@@ -921,7 +921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/projects/:id", requirePermission('canDeleteProjects'), async (req, res) => {
+  app.delete("/api/projects/:id", ...requireAuthAndPermission('canDeleteProjects'), async (req: AuthenticatedRequest, res) => {
     try {
       const success = await storage.deleteProject(req.params.id);
       if (!success) {
