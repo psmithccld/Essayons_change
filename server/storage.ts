@@ -1771,22 +1771,14 @@ export class DatabaseStorage implements IStorage {
     stakeholderEngagement: number;
     changeReadiness: number;
   }> {
-    // Get active projects count (all projects that are not completed or cancelled)
-    const [activeProjectsResult] = await db
-      .select({ count: count() })
-      .from(projects)
-      .where(and(
-        eq(projects.ownerId, userId),
-        sql`${projects.status} NOT IN ('completed', 'cancelled')`
-      ));
-
-    // Get all user's projects for further queries
-    const userProjects = await db
-      .select({ id: projects.id })
-      .from(projects)
-      .where(eq(projects.ownerId, userId));
-
-    const projectIds = userProjects.map(p => p.id);
+    // Get all user's accessible projects (owned + assigned)
+    const allUserProjects = await this.getUserProjects(userId);
+    const projectIds = allUserProjects.map(p => p.id);
+    
+    // Count active projects (not completed or cancelled)
+    const activeProjectsCount = allUserProjects.filter(p => 
+      p.status !== 'completed' && p.status !== 'cancelled'
+    ).length;
 
     let totalTasks = 0;
     let completedTasks = 0;
@@ -1862,7 +1854,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     return {
-      activeProjects: activeProjectsResult.count,
+      activeProjects: activeProjectsCount,
       totalTasks,
       completedTasks,
       openRisks,
