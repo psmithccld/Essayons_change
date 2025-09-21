@@ -958,9 +958,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Copy assignments if requested
       if (copyAssignments) {
         try {
-          const assignments = await storage.getProjectAssignments(req.params.id);
+          const assignments = await storage.getInitiativeAssignments(req.params.id);
           for (const assignment of assignments) {
-            await storage.createUserInitiativeAssignment({
+            await storage.assignUserToInitiative({
               userId: assignment.userId,
               projectId: copiedProject.id,
               role: assignment.role,
@@ -2126,15 +2126,15 @@ Return the refined content in JSON format:
         distributionMethod: 'email'
       });
 
-      // Create recipient record
-      await storage.createCommunicationRecipient({
-        communicationId: communication.id,
-        recipientType: 'external_email',
-        recipientEmail,
-        recipientName,
-        recipientRole: communication.metadata?.recipientRole || undefined,
-        deliveryStatus: 'sent'
-      });
+      // TODO: Implement communication recipient tracking
+      // await storage.createCommunicationRecipient({
+      //   communicationId: communication.id,
+      //   recipientType: 'external_email',
+      //   recipientEmail,
+      //   recipientName,
+      //   recipientRole: communication.metadata?.recipientRole || undefined,
+      //   deliveryStatus: 'sent'
+      // });
 
       // SECURITY: Log P2P email sending
       console.log(`[P2P EMAIL SENT] User ${req.userId}`, {
@@ -3789,17 +3789,17 @@ Return the refined content in JSON format:
         distributionMethod: 'email'
       });
 
-      // Create recipient records
-      for (const recipient of recipients) {
-        await storage.createCommunicationRecipient({
-          communicationId: communication.id,
-          recipientType: 'meeting_participant',
-          recipientEmail: recipient.email,
-          recipientName: recipient.name,
-          recipientRole: recipient.role,
-          deliveryStatus: distributionResult.results.find(r => r.email === recipient.email)?.success ? 'sent' : 'failed'
-        });
-      }
+      // TODO: Implement communication recipient tracking
+      // for (const recipient of recipients) {
+      //   await storage.createCommunicationRecipient({
+      //     communicationId: communication.id,
+      //     recipientType: 'meeting_participant',
+      //     recipientEmail: recipient.email,
+      //     recipientName: recipient.name,
+      //     recipientRole: recipient.role,
+      //     deliveryStatus: distributionResult.results.find(r => r.email === recipient.email)?.success ? 'sent' : 'failed'
+      //   });
+      // }
 
       // SECURITY: Log meeting invites distribution
       console.log(`[MEETING INVITES] User ${req.userId}`, {
