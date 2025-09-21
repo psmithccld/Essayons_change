@@ -273,7 +273,7 @@ interface CreateItemFormProps {
   onSuccess: () => void;
 }
 
-function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormProps) {
+export function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItemFormProps) {
   const queryClient = useQueryClient();
   const { currentProject } = useCurrentProject();
 

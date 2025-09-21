@@ -27,6 +27,7 @@ import type { ProcessMap, User } from "@shared/schema";
 import { insertProcessMapSchema, type InsertProcessMap } from "@shared/schema";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { usePermissions } from "@/hooks/use-permissions";
+import { CreateItemForm } from "./fishbone";
 
 // Form schema for creating/editing process maps
 const processMapFormSchema = insertProcessMapSchema.omit({ projectId: true, createdById: true, canvasData: true, elements: true, connections: true });
@@ -89,7 +90,7 @@ const PROCESS_SYMBOLS: Record<string, SymbolDefinition> = {
   // Change Management Symbols
   task: { name: "Task", icon: CheckSquare, shape: "rectangle", color: "#3b82f6", isChangeItem: true },
   milestone: { name: "Milestone", icon: Calendar, shape: "diamond", color: "#22c55e", isChangeItem: true },
-  action: { name: "Action", icon: AlertTriangle, shape: "pentagon", color: "#f59e0b", isChangeItem: true },
+  action: { name: "Action", icon: AlertTriangle, shape: "triangle", color: "#f59e0b", isChangeItem: true },
 };
 
 // Form schemas reused from fishbone.tsx for item creation
@@ -165,74 +166,21 @@ export default function DevelopmentMaps() {
     enabled: !!currentProject?.id,
   });
 
-  // Item creation mutations
-  const createTaskMutation = useMutation({
-    mutationFn: async (data: TaskFormData) => {
-      if (!currentProject?.id) throw new Error("No project selected");
-      const cleanData = {
-        ...data,
-        assigneeId: data.assigneeId && data.assigneeId.trim() && data.assigneeId !== 'unassigned' ? data.assigneeId : undefined,
-        dueDate: data.dueDate && data.dueDate.trim() ? data.dueDate : undefined,
-        status: "pending",
-      };
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, cleanData);
-      return response.json();
-    },
-    onSuccess: (createdTask) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
-      // Create symbol on canvas after successful creation
-      if (pendingSymbolPosition) {
-        addProcessElementWithItem('task', pendingSymbolPosition.x, pendingSymbolPosition.y, createdTask.id, createdTask.name);
-        setPendingSymbolPosition(null);
-      }
-      setIsItemCreationOpen(false);
-      toast({ title: "Task created and added to map", description: "Task has been created and symbol placed on the map." });
-    },
-  });
-
-  const createMilestoneMutation = useMutation({
-    mutationFn: async (data: MilestoneFormData) => {
-      if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/milestones`, {
-        ...data,
-        status: "pending",
-      });
-      return response.json();
-    },
-    onSuccess: (createdMilestone) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'milestones'] });
-      // Create symbol on canvas after successful creation
-      if (pendingSymbolPosition) {
-        addProcessElementWithItem('milestone', pendingSymbolPosition.x, pendingSymbolPosition.y, createdMilestone.id, createdMilestone.name);
-        setPendingSymbolPosition(null);
-      }
-      setIsItemCreationOpen(false);
-      toast({ title: "Milestone created and added to map", description: "Milestone has been created and symbol placed on the map." });
-    },
-  });
-
-  const createActionMutation = useMutation({
-    mutationFn: async (data: ActionFormData) => {
-      if (!currentProject?.id) throw new Error("No project selected");
-      const cleanData = {
-        ...data,
-        assigneeId: data.assigneeId && data.assigneeId.trim() && data.assigneeId !== 'unassigned' ? data.assigneeId : undefined,
-        status: "open",
-      };
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/raid-logs`, cleanData);
-      return response.json();
-    },
-    onSuccess: (createdAction) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'raid-logs'] });
-      // Create symbol on canvas after successful creation
-      if (pendingSymbolPosition) {
-        addProcessElementWithItem('action', pendingSymbolPosition.x, pendingSymbolPosition.y, createdAction.id, createdAction.title);
-        setPendingSymbolPosition(null);
-      }
-      setIsItemCreationOpen(false);
-      toast({ title: "Action created and added to map", description: "Action has been created and symbol placed on the map." });
-    },
-  });
+  // Handle successful item creation from CreateItemForm
+  const handleItemCreationSuccess = () => {
+    // Create symbol on canvas after successful creation
+    if (pendingSymbolPosition && selectedItemType) {
+      // Create symbol with generic name since we don't have access to the created item data
+      const symbolName = `${selectedItemType.charAt(0).toUpperCase() + selectedItemType.slice(1)} Item`;
+      addProcessElementWithItem(selectedItemType, pendingSymbolPosition.x, pendingSymbolPosition.y, `temp-${Date.now()}`, symbolName);
+      setPendingSymbolPosition(null);
+    }
+    setIsItemCreationOpen(false);
+    toast({ 
+      title: `${selectedItemType?.charAt(0).toUpperCase() + selectedItemType?.slice(1)} created and added to map`, 
+      description: `${selectedItemType?.charAt(0).toUpperCase() + selectedItemType?.slice(1)} has been created and symbol placed on the map.` 
+    });
+  };
 
   // Auto-load the first process map when available
   useEffect(() => {
@@ -1795,6 +1743,26 @@ export default function DevelopmentMaps() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Item Creation Dialog */}
+      <Dialog open={isItemCreationOpen} onOpenChange={setIsItemCreationOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Create {selectedItemType === 'task' ? 'Task' : selectedItemType === 'milestone' ? 'Milestone' : 'Action'}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedItemType && (
+            <CreateItemForm
+              itemType={selectedItemType === 'action' ? 'raid' : selectedItemType}
+              phase="Process Mapping"
+              users={users}
+              onSuccess={handleItemCreationSuccess}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
