@@ -655,6 +655,36 @@ export default function DevelopmentMaps() {
     }
   };
 
+  // Add process element to canvas with linked item data
+  const addProcessElementWithItem = (type: string, x: number, y: number, linkedItemId: string, itemName: string) => {
+    if (!canvas) return;
+
+    const shape = createProcessShape(type, x, y);
+    if (shape) {
+      // Add custom properties for linked item
+      (shape as any).linkedItemId = linkedItemId;
+      (shape as any).linkedItemName = itemName;
+      
+      canvas.add(shape);
+      canvas.setActiveObject(shape);
+      
+      // Add to elements state with item data
+      const newElement: ProcessElement = {
+        id: (shape as any).processId,
+        type: type as ProcessElement['type'],
+        text: itemName, // Use the actual item name
+        x: x,
+        y: y,
+        width: 120,
+        height: 60,
+        linkedItemId: linkedItemId,
+      };
+      
+      setElements(prev => [...prev, newElement]);
+      canvas.renderAll();
+    }
+  };
+
   // Create connection between elements
   const createConnection = (startElement: any, endElement: any) => {
     if (!canvas || !startElement || !endElement) return;
