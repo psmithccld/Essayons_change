@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import changeProcessFlowImage from "/images/change-process-flow.png";
+import ChangeProcessFlow from "@/components/ChangeProcessFlow";
 
 interface DashboardStats {
   activeProjects: number;
@@ -24,6 +24,14 @@ interface DashboardStats {
   openIssues: number;
   stakeholderEngagement: number;
   changeReadiness: number;
+}
+
+interface UserDashboardMetrics {
+  activeInitiatives: number;
+  pendingSurveys: number;
+  pendingTasks: number;
+  openIssues: number;
+  initiativesByPhase: Record<string, number>;
 }
 
 interface Project {
@@ -116,8 +124,8 @@ export default function Dashboard() {
   const [editData, setEditData] = useState<{ status: string; name: string }>({ status: '', name: '' });
   const { toast } = useToast();
 
-  const { data: stats, isLoading } = useQuery<DashboardStats>({
-    queryKey: ['/api/dashboard/stats'],
+  const { data: userMetrics, isLoading: isLoadingMetrics } = useQuery<UserDashboardMetrics>({
+    queryKey: ['/api/my/dashboard-metrics'],
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -133,7 +141,7 @@ export default function Dashboard() {
     onSuccess: () => {
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: ['/api/my/initiatives'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/my/dashboard-metrics'] });
       toast({
         title: "Success",
         description: "Project updated successfully",
@@ -178,7 +186,7 @@ export default function Dashboard() {
     setEditData({ status: '', name: '' });
   };
 
-  if (isLoading) {
+  if (isLoadingMetrics) {
     return (
       <div className="space-y-6" data-testid="dashboard-loading">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -202,9 +210,9 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Active Initiatives</p>
-                <p className="text-2xl font-bold text-foreground" data-testid="metric-active-projects">
-                  {stats?.activeProjects || 0}
+                <p className="text-sm font-medium text-muted-foreground">My Active Initiatives</p>
+                <p className="text-2xl font-bold text-foreground" data-testid="metric-my-active-initiatives">
+                  {userMetrics?.activeInitiatives || 0}
                 </p>
               </div>
               <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -212,8 +220,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="mt-4 flex items-center text-sm">
-              <span className="text-secondary font-medium">+15%</span>
-              <span className="text-muted-foreground ml-1">from last month</span>
+              <span className="text-secondary font-medium">Assigned to you</span>
             </div>
           </CardContent>
         </Card>
@@ -222,18 +229,17 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Stakeholder Engagement</p>
-                <p className="text-2xl font-bold text-foreground" data-testid="metric-stakeholder-engagement">
-                  {stats?.stakeholderEngagement || 0}%
+                <p className="text-sm font-medium text-muted-foreground">My Pending Surveys</p>
+                <p className="text-2xl font-bold text-foreground" data-testid="metric-my-pending-surveys">
+                  {userMetrics?.pendingSurveys || 0}
                 </p>
               </div>
               <div className="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center">
-                <Users className="text-secondary w-6 h-6" />
+                <CheckCircle className="text-secondary w-6 h-6" />
               </div>
             </div>
             <div className="mt-4 flex items-center text-sm">
-              <span className="text-secondary font-medium">+3%</span>
-              <span className="text-muted-foreground ml-1">engagement rate</span>
+              <span className="text-secondary font-medium">Awaiting response</span>
             </div>
           </CardContent>
         </Card>
@@ -242,18 +248,17 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Change Readiness</p>
-                <p className="text-2xl font-bold text-foreground" data-testid="metric-change-readiness">
-                  {stats?.changeReadiness || 0}%
+                <p className="text-sm font-medium text-muted-foreground">My Pending Tasks</p>
+                <p className="text-2xl font-bold text-foreground" data-testid="metric-my-pending-tasks">
+                  {userMetrics?.pendingTasks || 0}
                 </p>
               </div>
               <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
-                <TrendingUp className="text-accent w-6 h-6" />
+                <Clock className="text-accent w-6 h-6" />
               </div>
             </div>
             <div className="mt-4 flex items-center text-sm">
-              <span className="text-accent font-medium">+8%</span>
-              <span className="text-muted-foreground ml-1">readiness score</span>
+              <span className="text-accent font-medium">Tasks assigned</span>
             </div>
           </CardContent>
         </Card>
@@ -262,9 +267,9 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Open Issues</p>
-                <p className="text-2xl font-bold text-foreground" data-testid="metric-open-issues">
-                  {(stats?.openRisks || 0) + (stats?.openIssues || 0)}
+                <p className="text-sm font-medium text-muted-foreground">My Open Issues</p>
+                <p className="text-2xl font-bold text-foreground" data-testid="metric-my-open-issues">
+                  {userMetrics?.openIssues || 0}
                 </p>
               </div>
               <div className="w-12 h-12 bg-destructive/10 rounded-lg flex items-center justify-center">
@@ -272,8 +277,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="mt-4 flex items-center text-sm">
-              <span className="text-destructive font-medium">-12%</span>
-              <span className="text-muted-foreground ml-1">from last week</span>
+              <span className="text-destructive font-medium">Need attention</span>
             </div>
           </CardContent>
         </Card>
@@ -291,15 +295,8 @@ export default function Dashboard() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="flex justify-center p-4">
-              <img 
-                src={changeProcessFlowImage} 
-                alt="Change Process Flow - Organizational Actions and Individual Actions" 
-                className="w-full max-w-4xl h-auto"
-                data-testid="change-process-flow-image"
-              />
-            </div>
+          <CardContent className="p-6">
+            <ChangeProcessFlow initiativesByPhase={userMetrics?.initiativesByPhase} />
           </CardContent>
         </Card>
 
@@ -546,7 +543,7 @@ export default function Dashboard() {
             {[
               {
                 title: "Risks",
-                count: stats?.openRisks || 0,
+                count: 0,
                 detail: "3 High Priority",
                 color: "destructive",
                 icon: AlertTriangle
@@ -560,7 +557,7 @@ export default function Dashboard() {
               },
               {
                 title: "Issues",
-                count: stats?.openIssues || 0,
+                count: userMetrics?.openIssues || 0,
                 detail: "2 Critical", 
                 color: "primary",
                 icon: AlertCircle

@@ -3267,6 +3267,32 @@ Return the refined content in JSON format:
     }
   });
 
+  // User-specific dashboard metrics
+  app.get("/api/my/dashboard-metrics", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      
+      const [activeInitiatives, pendingSurveys, pendingTasks, openIssues, initiativesByPhase] = await Promise.all([
+        storage.getUserActiveInitiatives(userId),
+        storage.getUserPendingSurveys(userId),
+        storage.getUserPendingTasks(userId),
+        storage.getUserOpenIssues(userId),
+        storage.getUserInitiativesByPhase(userId)
+      ]);
+
+      res.json({
+        activeInitiatives,
+        pendingSurveys,
+        pendingTasks,
+        openIssues,
+        initiativesByPhase
+      });
+    } catch (error) {
+      console.error("Error fetching user dashboard metrics:", error);
+      res.status(500).json({ error: "Failed to fetch user dashboard metrics" });
+    }
+  });
+
   app.get("/api/projects/:projectId/assignments", async (req, res) => {
     try {
       const assignments = await storage.getInitiativeAssignments(req.params.projectId);

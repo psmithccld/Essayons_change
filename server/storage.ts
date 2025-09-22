@@ -16,7 +16,7 @@ import {
   type PasswordResetToken, type InsertPasswordResetToken, type RegistrationRequest, type EmailVerificationResponse
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql, count, isNull, inArray } from "drizzle-orm";
+import { eq, desc, and, sql, count, isNull, inArray, ne } from "drizzle-orm";
 
 const SALT_ROUNDS = 12;
 
@@ -186,6 +186,13 @@ export interface IStorage {
     stakeholderEngagement: number;
     changeReadiness: number;
   }>;
+
+  // User-specific Dashboard Analytics  
+  getUserActiveInitiatives(userId: string): Promise<number>;
+  getUserPendingSurveys(userId: string): Promise<number>;
+  getUserPendingTasks(userId: string): Promise<number>;
+  getUserOpenIssues(userId: string): Promise<number>;
+  getUserInitiativesByPhase(userId: string): Promise<Record<string, number>>;
 
   // User-Initiative Assignments
   getUserInitiativeAssignments(userId: string): Promise<UserInitiativeAssignment[]>;
@@ -1778,11 +1785,14 @@ export class DatabaseStorage implements IStorage {
     changeReadiness: number;
   }> {
     // Get all user's accessible projects (owned + assigned)
-    const allUserProjects = await this.getUserProjects(userId);
-    const projectIds = allUserProjects.map(p => p.id);
+    const projectIds = await this.getUserAuthorizedProjectIds(userId);
+    const allUserProjects = await Promise.all(
+      projectIds.map(id => this.getProject(id))
+    );
+    const validProjects = allUserProjects.filter(p => p !== undefined);
     
     // Count active projects (not completed or cancelled)
-    const activeProjectsCount = allUserProjects.filter(p => 
+    const activeProjectsCount = validProjects.filter(p => 
       p.status !== 'completed' && p.status !== 'cancelled'
     ).length;
 
@@ -1868,6 +1878,91 @@ export class DatabaseStorage implements IStorage {
       stakeholderEngagement,
       changeReadiness
     };
+  }
+
+  // User-specific Dashboard Analytics Implementations
+  async getUserActiveInitiatives(userId: string): Promise<number> {
+    const initiatives = await this.getUserInitiativesWithRoles(userId);
+    return initiatives.filter(i => i.project.status !== 'completed' && i.project.status !== 'cancelled').length;
+  }
+
+  async getUserPendingSurveys(userId: string): Promise<number> {
+    // Get all surveys from user's projects that user hasn't responded to yet
+    const userProjects = await this.getUserAuthorizedProjectIds(userId);
+    if (userProjects.length === 0) return 0;
+    
+    const allSurveys = await db.select()
+      .from(surveys)
+      .where(inArray(surveys.projectId, userProjects));
+    
+    let pendingCount = 0;
+    for (const survey of allSurveys) {
+      const existingResponse = await db.select()
+        .from(surveyResponses)
+        .where(and(
+          eq(surveyResponses.surveyId, survey.id),
+          eq(surveyResponses.userId, userId)
+        ));
+      
+      if (existingResponse.length === 0) {
+        pendingCount++;
+      }
+    }
+    
+    return pendingCount;
+  }
+
+  async getUserPendingTasks(userId: string): Promise<number> {
+    const userProjects = await this.getUserAuthorizedProjectIds(userId);
+    if (userProjects.length === 0) return 0;
+    
+    const [result] = await db.select({ count: count() })
+      .from(tasks)
+      .where(and(
+        inArray(tasks.projectId, userProjects),
+        eq(tasks.assigneeId, userId),
+        ne(tasks.status, 'completed')
+      ));
+    
+    return Number(result.count);
+  }
+
+  async getUserOpenIssues(userId: string): Promise<number> {
+    const userProjects = await this.getUserAuthorizedProjectIds(userId);
+    if (userProjects.length === 0) return 0;
+    
+    const [result] = await db.select({ count: count() })
+      .from(raidLogs)
+      .where(and(
+        inArray(raidLogs.projectId, userProjects),
+        eq(raidLogs.type, 'issue'),
+        eq(raidLogs.assigneeId, userId),
+        eq(raidLogs.status, 'open')
+      ));
+    
+    return Number(result.count);
+  }
+
+  async getUserInitiativesByPhase(userId: string): Promise<Record<string, number>> {
+    const initiatives = await this.getUserInitiativesWithRoles(userId);
+    const phaseCount: Record<string, number> = {
+      'identify_need': 0,
+      'identify_stakeholders': 0,
+      'develop_change': 0,
+      'implement_change': 0,
+      'reinforce_change': 0
+    };
+    
+    initiatives.forEach(initiative => {
+      if (initiative.project.status !== 'completed' && initiative.project.status !== 'cancelled') {
+        const phase = initiative.project.currentPhase || 'identify_need';
+        if (phaseCount.hasOwnProperty(phase)) {
+          phaseCount[phase]++;
+        }
+      }
+    });
+    
+    return phaseCount;
   }
 
   // User-Initiative Assignments
