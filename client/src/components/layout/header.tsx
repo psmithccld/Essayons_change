@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Plus, User, Shield, Briefcase, ChevronDown, Settings, Palette, Check, Trash2, UserPlus, AlertTriangle, BarChart3, RefreshCw, Loader2, LogOut } from "lucide-react";
+import { Bell, Plus, User, Shield, Briefcase, ChevronDown, Settings, Palette, Check, Trash2, UserPlus, AlertTriangle, BarChart3, RefreshCw, Loader2, LogOut, Lock, Eye, EyeOff } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -45,12 +45,25 @@ const userSettingsSchema = z.object({
   autoSave: z.boolean().default(true),
 });
 
+const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string().min(1, "Please confirm your password"),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
 type UserSettingsData = z.infer<typeof userSettingsSchema>;
+type PasswordChangeData = z.infer<typeof passwordChangeSchema>;
 
 export default function Header() {
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { currentProject, setCurrentProject, projects, isLoading } = useCurrentProject();
@@ -235,6 +248,42 @@ export default function Header() {
     },
   });
 
+  const passwordForm = useForm<PasswordChangeData>({
+    resolver: zodResolver(passwordChangeSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data: PasswordChangeData) => {
+      const response = await apiRequest("POST", "/api/auth/change-password", {
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Password Changed",
+        description: "Your password has been updated successfully!",
+      });
+      passwordForm.reset();
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change password",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSettingsSubmit = (data: UserSettingsData) => {
     console.log("Settings updated:", data);
     toast({
@@ -242,6 +291,10 @@ export default function Header() {
       description: "Your preferences have been saved successfully!",
     });
     setIsSettingsOpen(false);
+  };
+
+  const onPasswordSubmit = (data: PasswordChangeData) => {
+    changePasswordMutation.mutate(data);
   };
 
   return (
@@ -795,6 +848,140 @@ export default function Header() {
                       </FormItem>
                     )}
                   />
+                </div>
+
+                {/* Security Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
+                    <Lock className="w-4 h-4" />
+                    Security
+                  </div>
+                  
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <h4 className="text-sm font-medium mb-3">Change Password</h4>
+                    <Form {...passwordForm}>
+                      <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+                        <FormField
+                          control={passwordForm.control}
+                          name="currentPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Current Password</FormLabel>
+                              <div className="relative">
+                                <FormControl>
+                                  <Input 
+                                    type={showCurrentPassword ? "text" : "password"}
+                                    data-testid="input-current-password"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                  data-testid="button-toggle-current-password"
+                                >
+                                  {showCurrentPassword ? (
+                                    <EyeOff className="h-4 w-4" />
+                                  ) : (
+                                    <Eye className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={passwordForm.control}
+                          name="newPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>New Password</FormLabel>
+                              <div className="relative">
+                                <FormControl>
+                                  <Input 
+                                    type={showNewPassword ? "text" : "password"}
+                                    data-testid="input-new-password"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                  onClick={() => setShowNewPassword(!showNewPassword)}
+                                  data-testid="button-toggle-new-password"
+                                >
+                                  {showNewPassword ? (
+                                    <EyeOff className="h-4 w-4" />
+                                  ) : (
+                                    <Eye className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={passwordForm.control}
+                          name="confirmPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Confirm New Password</FormLabel>
+                              <div className="relative">
+                                <FormControl>
+                                  <Input 
+                                    type={showConfirmPassword ? "text" : "password"}
+                                    data-testid="input-confirm-password"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                  data-testid="button-toggle-confirm-password"
+                                >
+                                  {showConfirmPassword ? (
+                                    <EyeOff className="h-4 w-4" />
+                                  ) : (
+                                    <Eye className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <Button 
+                          type="submit" 
+                          variant="outline"
+                          disabled={changePasswordMutation.isPending}
+                          data-testid="button-change-password"
+                          className="w-full"
+                        >
+                          {changePasswordMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Changing Password...
+                            </>
+                          ) : (
+                            "Change Password"
+                          )}
+                        </Button>
+                      </form>
+                    </Form>
+                  </div>
                 </div>
 
                 <div className="flex gap-2 pt-4">
