@@ -38,6 +38,7 @@ export interface IStorage {
   updateUser(id: string, user: Partial<Omit<InsertUser, 'password'> & { passwordHash?: string }>): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
   verifyPassword(username: string, password: string): Promise<User | null>;
+  changePassword(userId: string, newPassword: string): Promise<boolean>;
 
   // Authentication & Email Verification
   createPendingUser(request: RegistrationRequest, roleId: string): Promise<{ success: boolean; message: string }>;
@@ -956,6 +957,25 @@ export class DatabaseStorage implements IStorage {
     // SECURITY: Remove passwordHash from response
     const { passwordHash, ...userWithoutHash } = userWithPassword;
     return userWithoutHash as User;
+  }
+
+  async changePassword(userId: string, newPassword: string): Promise<boolean> {
+    try {
+      // Hash the new password
+      const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+      
+      // Update the user's password hash
+      const [updatedUser] = await db
+        .update(users)
+        .set({ passwordHash: hashedPassword })
+        .where(eq(users.id, userId))
+        .returning();
+      
+      return !!updatedUser;
+    } catch (error) {
+      console.error("Error changing password:", error);
+      return false;
+    }
   }
 
   // Authentication & Email Verification Methods

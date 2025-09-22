@@ -639,6 +639,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Logout failed" });
     }
   });
+
+  // Password change endpoint
+  app.post("/api/auth/change-password", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      
+      // Validation
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Current password and new password are required" });
+      }
+      
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "New password must be at least 8 characters long" });
+      }
+      
+      const userId = req.userId!;
+      
+      // Verify current password
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Verify the current password
+      const isCurrentPasswordValid = await storage.verifyPassword(user.username, currentPassword);
+      if (!isCurrentPasswordValid) {
+        return res.status(400).json({ error: "Current password is incorrect" });
+      }
+      
+      // Update password using the changePassword method
+      const success = await storage.changePassword(userId, newPassword);
+      if (!success) {
+        return res.status(500).json({ error: "Failed to update password" });
+      }
+      
+      res.json({ message: "Password changed successfully" });
+    } catch (error) {
+      console.error("Error changing password:", error);
+      res.status(500).json({ error: "Failed to change password" });
+    }
+  });
   
   // SECURITY: Check authentication status endpoint
   app.get("/api/auth/status", async (req: SessionRequest, res) => {
