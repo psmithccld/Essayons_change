@@ -1027,6 +1027,12 @@ function MeetingsExecutionModule() {
       return;
     }
 
+    const validObjectives = meetingWhat.objectives.filter(obj => obj.trim());
+    if (validObjectives.length === 0) {
+      toast({ title: "Please add at least one meeting objective before generating the agenda", variant: "destructive" });
+      return;
+    }
+
     setIsGeneratingAgenda(true);
     
     const agendaData = {
@@ -1035,7 +1041,7 @@ function MeetingsExecutionModule() {
       meetingPurpose: meetingWhat.purpose,
       duration: meetingWhen.duration,
       participants: meetingWho.participants,
-      objectives: meetingWhat.objectives,
+      objectives: validObjectives,
       raidLogContext: selectedRaidLogs.map(id => {
         const raidLog = meetingRaidLogs.find((log: any) => log.id === id);
         return raidLog ? {
@@ -1293,7 +1299,7 @@ function MeetingsExecutionModule() {
                     <Button 
                       variant="outline"
                       onClick={handleGenerateAgenda}
-                      disabled={isGeneratingAgenda || !meetingWhat.purpose}
+                      disabled={isGeneratingAgenda || !meetingWhat.purpose || meetingWhat.objectives.filter(obj => obj.trim()).length === 0}
                       data-testid="generate-agenda-button"
                     >
                       <Bot className="h-4 w-4 mr-2" />
