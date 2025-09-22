@@ -848,7 +848,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/notifications/:id - delete single notification
-  app.delete("/api/notifications/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/notifications/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
       const notificationId = req.params.id;
@@ -866,7 +866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/notifications/clear-all - clear all user notifications
-  app.delete("/api/notifications/clear-all", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/notifications/clear-all", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
       
@@ -879,7 +879,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/notifications/unread-count - get unread notification count
-  app.get("/api/notifications/unread-count", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/notifications/unread-count", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
       
@@ -892,7 +892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Users
-  app.get("/api/users", requireAuth, async (req, res) => {
+  app.get("/api/users", requireAuthAndOrg, async (req, res) => {
     try {
       const users = await storage.getUsers();
       res.json(users);
@@ -903,7 +903,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard
-  app.get("/api/dashboard/stats", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/dashboard/stats", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
       const stats = await storage.getDashboardStats(userId);
@@ -915,7 +915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Projects
-  app.get("/api/projects", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/projects", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
       const projects = await storage.getProjects(userId);
@@ -926,7 +926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/projects/:id", async (req, res) => {
+  app.get("/api/projects/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const project = await storage.getProject(req.params.id);
       if (!project) {
@@ -958,7 +958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/projects/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/projects/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
       
@@ -1511,7 +1511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/communications", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/communications", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const processedData = {
         ...req.body,
@@ -1532,7 +1532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Advanced search for communications
-  app.post('/api/communications/search', requireAuth, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/communications/search', requireAuthAndOrg, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const searchParams = req.body;
       
@@ -1564,7 +1564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get communication metrics and analytics
-  app.get('/api/communications/metrics', requireAuth, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/communications/metrics', requireAuthAndOrg, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId, type } = req.query;
       
@@ -1590,7 +1590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get communication version history
-  app.get('/api/communications/:id/versions', requireAuth, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/communications/:id/versions', requireAuthAndOrg, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params;
       
@@ -1617,7 +1617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Archive communications (bulk action)
-  app.post('/api/communications/archive', requireAuth, requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/communications/archive', requireAuthAndOrg, requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { ids } = req.body;
       if (!Array.isArray(ids) || ids.length === 0) {
@@ -1657,7 +1657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get communications by stakeholder
-  app.get('/api/communications/by-stakeholder/:stakeholderId', requireAuth, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/communications/by-stakeholder/:stakeholderId', requireAuthAndOrg, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { stakeholderId } = req.params;
       const { projectId } = req.query;
@@ -2359,7 +2359,7 @@ Return the refined content in JSON format:
   });
 
   // Stakeholders
-  app.get("/api/projects/:projectId/stakeholders", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/projects/:projectId/stakeholders", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const stakeholders = await storage.getStakeholdersByProject(req.params.projectId);
       res.json(stakeholders);
@@ -2369,7 +2369,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/projects/:projectId/stakeholders", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/projects/:projectId/stakeholders", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertStakeholderSchema.parse({
         ...req.body,
@@ -2410,7 +2410,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.put("/api/stakeholders/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/stakeholders/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const stakeholder = await storage.updateStakeholder(req.params.id, req.body);
       if (!stakeholder) {
@@ -2423,7 +2423,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.delete("/api/stakeholders/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/stakeholders/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const success = await storage.deleteStakeholder(req.params.id);
       if (!success) {
@@ -2436,7 +2436,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/projects/:projectId/stakeholders/import", async (req, res) => {
+  app.post("/api/projects/:projectId/stakeholders/import", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const { sourceProjectId, stakeholderIds } = req.body;
       if (!sourceProjectId || !Array.isArray(stakeholderIds) || stakeholderIds.length === 0) {
@@ -2481,7 +2481,7 @@ Return the refined content in JSON format:
   });
 
   // RAID Logs
-  app.get("/api/projects/:projectId/raid-logs", async (req, res) => {
+  app.get("/api/projects/:projectId/raid-logs", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const raidLogs = await storage.getRaidLogsByProject(req.params.projectId);
       
@@ -2498,7 +2498,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/projects/:projectId/raid-logs", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/projects/:projectId/raid-logs", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       // Add backward compatibility mapping
       let processedBody = { ...req.body };
@@ -2571,7 +2571,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.put("/api/raid-logs/:id", async (req, res) => {
+  app.put("/api/raid-logs/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       // Add backward compatibility mapping
       let processedBody = { ...req.body };
@@ -2665,7 +2665,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/projects/:projectId/communications", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/projects/:projectId/communications", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       // Determine required permission based on communication type
       let requiredPermission: keyof Permissions = 'canModifyCommunications';
@@ -3356,7 +3356,7 @@ Return the refined content in JSON format:
   });
 
   // Get current user's initiatives with roles and permissions
-  app.get("/api/my/initiatives", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/my/initiatives", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
       const initiatives = await storage.getUserInitiativesWithRoles(userId);
@@ -3368,7 +3368,7 @@ Return the refined content in JSON format:
   });
 
   // User-specific dashboard metrics
-  app.get("/api/my/dashboard-metrics", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/my/dashboard-metrics", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
       
@@ -3827,7 +3827,7 @@ Return the refined content in JSON format:
   });
 
   // Meeting agenda generation endpoint
-  app.post("/api/gpt/generate-meeting-agenda", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/generate-meeting-agenda", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       // SECURITY: Input validation with Zod
       const validatedInput = generateMeetingAgendaSchema.parse(req.body);
@@ -4035,7 +4035,7 @@ Return the refined content in JSON format:
   });
 
   // A. User Reports
-  app.post('/api/reports/users/login-activity', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/users/login-activity', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4057,7 +4057,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/users/role-assignment', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/users/role-assignment', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4073,7 +4073,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/users/initiatives-participation', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/users/initiatives-participation', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4090,7 +4090,7 @@ Return the refined content in JSON format:
   });
 
   // B. Task Reports
-  app.post('/api/reports/tasks/status', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/tasks/status', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4110,7 +4110,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/tasks/upcoming-deadlines', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/tasks/upcoming-deadlines', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4432,7 +4432,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/cross-cutting/stakeholder-sentiment', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/cross-cutting/stakeholder-sentiment', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4457,7 +4457,7 @@ Return the refined content in JSON format:
   // =====================================
 
   // Get upload URL for object storage (protected file uploading)
-  app.post("/api/objects/upload", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  app.post("/api/objects/upload", requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
@@ -4469,7 +4469,7 @@ Return the refined content in JSON format:
   });
 
   // Serve private objects (with ACL check)
-  app.get("/objects/:objectPath(*)", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  app.get("/objects/:objectPath(*)", requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.userId!;
       const objectStorageService = new ObjectStorageService();
@@ -4496,7 +4496,7 @@ Return the refined content in JSON format:
   });
 
   // Create Change Artifact entry after upload
-  app.post('/api/projects/:projectId/change-artifacts', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/projects/:projectId/change-artifacts', requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId } = req.params;
       const userId = req.userId!;
@@ -4542,7 +4542,7 @@ Return the refined content in JSON format:
   });
 
   // Get Change Artifacts by project
-  app.get('/api/projects/:projectId/change-artifacts', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/projects/:projectId/change-artifacts', requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId } = req.params;
       const userId = req.userId!;
@@ -4562,7 +4562,7 @@ Return the refined content in JSON format:
   });
 
   // Search Change Artifacts
-  app.post('/api/change-artifacts/search', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/change-artifacts/search', requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.userId!;
       
