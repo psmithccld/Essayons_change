@@ -918,7 +918,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/projects", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
-      const projects = await storage.getProjects(userId);
+      const projects = await storage.getProjects(userId, req.organizationId!);
       res.json(projects);
     } catch (error) {
       console.error("Error fetching projects:", error);
@@ -928,7 +928,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/projects/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const project = await storage.getProject(req.params.id);
+      const project = await storage.getProject(req.params.id, req.organizationId!);
       if (!project) {
         return res.status(404).json({ error: "Project not found" });
       }
@@ -945,6 +945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const processedData = {
         ...req.body,
         ownerId: req.userId!, // Use authenticated user ID
+        organizationId: req.organizationId!, // Override client value - prevent org spoofing
         startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
         endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
       };
@@ -963,7 +964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.userId!;
       
       // Get original project to check authorization and for status changes
-      const originalProject = await storage.getProject(req.params.id);
+      const originalProject = await storage.getProject(req.params.id, req.organizationId!);
       if (!originalProject) {
         return res.status(404).json({ error: "Project not found" });
       }
@@ -990,11 +991,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
       };
       
-      // Create update schema by making insertProjectSchema fields optional and omitting generated fields
-      const updateProjectSchema = insertProjectSchema.partial().omit({ id: true, ownerId: true, createdAt: true, updatedAt: true });
+      // Create update schema by making insertProjectSchema fields optional and omitting generated fields + organizationId (prevent org hopping)
+      const updateProjectSchema = insertProjectSchema.partial().omit({ id: true, ownerId: true, organizationId: true, createdAt: true, updatedAt: true });
       const validatedData = updateProjectSchema.parse(processedData);
       
-      const project = await storage.updateProject(req.params.id, validatedData);
+      const project = await storage.updateProject(req.params.id, req.organizationId!, validatedData);
       if (!project) {
         return res.status(404).json({ error: "Project not found" });
       }
@@ -1032,7 +1033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/projects/:id", ...requireAuthAndPermission('canDeleteProjects'), async (req: AuthenticatedRequest, res) => {
     try {
-      const success = await storage.deleteProject(req.params.id);
+      const success = await storage.deleteProject(req.params.id, req.organizationId!);
       if (!success) {
         return res.status(404).json({ error: "Project not found" });
       }
@@ -1044,9 +1045,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Copy project endpoint
-  app.post("/api/projects/:id/copy", requirePermission('canModifyProjects'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/projects/:id/copy", ...requireAuthAndPermission('canModifyProjects'), async (req: AuthenticatedRequest, res) => {
     try {
-      const originalProject = await storage.getProject(req.params.id);
+      const originalProject = await storage.getProject(req.params.id, req.organizationId!);
       if (!originalProject) {
         return res.status(404).json({ error: "Original project not found" });
       }

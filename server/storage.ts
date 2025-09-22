@@ -50,12 +50,12 @@ export interface IStorage {
   completeEmailVerification(response: EmailVerificationResponse): Promise<{ success: boolean; user?: User; message: string }>;
   cleanupExpiredTokens(): Promise<void>;
 
-  // Projects
-  getProjects(userId: string): Promise<Project[]>;
-  getProject(id: string): Promise<Project | undefined>;
+  // Projects - SECURITY: Organization-scoped for tenant isolation
+  getProjects(userId: string, organizationId: string): Promise<Project[]>;
+  getProject(id: string, organizationId: string): Promise<Project | undefined>;
   createProject(project: InsertProject): Promise<Project>;
-  updateProject(id: string, project: Partial<InsertProject>): Promise<Project | undefined>;
-  deleteProject(id: string): Promise<boolean>;
+  updateProject(id: string, organizationId: string, project: Partial<InsertProject>): Promise<Project | undefined>;
+  deleteProject(id: string, organizationId: string): Promise<boolean>;
   
   // SECURITY: Authorization helpers for BOLA prevention
   getUserAuthorizedProjectIds(userId: string): Promise<string[]>;
@@ -1119,9 +1119,11 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Projects
-  async getProjects(userId: string): Promise<Project[]> {
-    const userProjects = await db.select().from(projects).where(eq(projects.ownerId, userId)).orderBy(desc(projects.createdAt));
+  // Projects - SECURITY: Organization-scoped for tenant isolation
+  async getProjects(userId: string, organizationId: string): Promise<Project[]> {
+    const userProjects = await db.select().from(projects)
+      .where(and(eq(projects.ownerId, userId), eq(projects.organizationId, organizationId)))
+      .orderBy(desc(projects.createdAt));
     
     // Get projects where user has assignments
     const assignedProjects = await db.select({
@@ -1186,8 +1188,9 @@ export class DatabaseStorage implements IStorage {
     return projectIds.filter(id => authorizedProjectIds.includes(id));
   }
 
-  async getProject(id: string): Promise<Project | undefined> {
-    const [project] = await db.select().from(projects).where(eq(projects.id, id));
+  async getProject(id: string, organizationId: string): Promise<Project | undefined> {
+    const [project] = await db.select().from(projects)
+      .where(and(eq(projects.id, id), eq(projects.organizationId, organizationId)));
     return project || undefined;
   }
 
@@ -1196,16 +1199,17 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateProject(id: string, project: Partial<InsertProject>): Promise<Project | undefined> {
+  async updateProject(id: string, organizationId: string, project: Partial<InsertProject>): Promise<Project | undefined> {
     const [updated] = await db.update(projects)
       .set({ ...project, updatedAt: new Date() })
-      .where(eq(projects.id, id))
+      .where(and(eq(projects.id, id), eq(projects.organizationId, organizationId)))
       .returning();
     return updated || undefined;
   }
 
-  async deleteProject(id: string): Promise<boolean> {
-    const result = await db.delete(projects).where(eq(projects.id, id));
+  async deleteProject(id: string, organizationId: string): Promise<boolean> {
+    const result = await db.delete(projects)
+      .where(and(eq(projects.id, id), eq(projects.organizationId, organizationId)));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
