@@ -25,6 +25,7 @@ import SecurityManagement from "@/pages/security-management";
 import ChangeProcessFlow from "@/pages/fishbone";
 import Reports from "@/pages/reports";
 import Projects from "@/pages/projects";
+import OrganizationSettings from "@/pages/organization-settings";
 import { LoginPage } from "@/pages/auth/login";
 import { EmailVerifyPage } from "@/pages/auth/verify-email";
 import { Loader2 } from "lucide-react";
@@ -63,6 +64,7 @@ function AuthenticatedApp() {
             <Route path="/users" component={UserManagement} />
             <Route path="/initiatives" component={InitiativeManagement} />
             <Route path="/security" component={SecurityManagement} />
+            <Route path="/organization" component={OrganizationSettings} />
             <Route path="/process-mapping" component={ProcessMapping} />
             <Route path="/change-process-flow" component={ChangeProcessFlow} />
             <Route path="/change-artifacts" component={ChangeArtifacts} />

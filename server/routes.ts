@@ -29,6 +29,7 @@ import {
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema,
   insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
   insertUserGroupSchema, insertUserGroupMembershipSchema, insertUserPermissionSchema, insertNotificationSchema, insertChangeArtifactSchema,
+  insertOrganizationSettingsSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification
 } from "@shared/schema";
 import * as openaiService from "./openai";
@@ -646,14 +647,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SECURITY: Auth status endpoint
   app.get("/api/auth/status", async (req: SessionRequest, res) => {
     try {
-      if (!req.session?.userId) {
+      let userId = req.session?.userId;
+      
+      // DEVELOPMENT: Allow demo user fallback for development mode
+      if (!userId && process.env.NODE_ENV === 'development') {
+        userId = "550e8400-e29b-41d4-a716-446655440000";
+        console.log('Using demo user ID for auth status in development mode');
+      }
+      
+      if (!userId) {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
-      const user = await storage.getUser(req.session.userId);
+      const user = await storage.getUser(userId);
       if (!user || !user.isActive) {
-        // Clear invalid session
-        req.session.destroy(() => {});
+        // Clear invalid session only if we had a session user
+        if (req.session?.userId) {
+          req.session.destroy(() => {});
+        }
         return res.status(401).json({ error: "Invalid session" });
       }
 
@@ -4694,6 +4705,77 @@ Return the refined content in JSON format:
     }
   });
 
+  // Organization Settings API Endpoints
+  app.get("/api/organization/current", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const organizationId = req.organizationId!;
+      const organization = await storage.getOrganization(organizationId);
+      
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      res.json(organization);
+    } catch (error) {
+      console.error("Error fetching current organization:", error);
+      res.status(500).json({ error: "Failed to fetch current organization" });
+    }
+  });
+
+  app.get("/api/organization/settings", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const organizationId = req.organizationId!;
+      const settings = await storage.getOrganizationSettings(organizationId);
+      
+      // Return settings or defaults if none exist
+      const defaultSettings = {
+        logoUrl: "",
+        primaryColor: "#3b82f6",
+        secondaryColor: "#64748b",
+        customDomain: "",
+        timezone: "UTC",
+        dateFormat: "MM/dd/yyyy",
+        billingEmail: "",
+        taxId: "",
+        invoicePrefix: "",
+        enabledFeatures: {},
+        customLimits: {},
+        customFields: [],
+        integrationSettings: {},
+        billingAddress: {},
+        isConsultationComplete: false,
+        consultationNotes: "",
+        setupProgress: {}
+      };
+      
+      res.json(settings || defaultSettings);
+    } catch (error) {
+      console.error("Error fetching organization settings:", error);
+      res.status(500).json({ error: "Failed to fetch organization settings" });
+    }
+  });
+
+  app.put("/api/organization/settings", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const organizationId = req.organizationId!;
+      
+      // Validate request body
+      const validation = insertOrganizationSettingsSchema.partial().safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid settings data", 
+          details: validation.error.errors 
+        });
+      }
+      
+      const updatedSettings = await storage.updateOrganizationSettings(organizationId, validation.data);
+      res.json(updatedSettings);
+    } catch (error) {
+      console.error("Error updating organization settings:", error);
+      res.status(500).json({ error: "Failed to update organization settings" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
@@ -4776,3 +4858,4 @@ const sendMeetingInviteSchema = z.object({
   }),
   dryRun: z.boolean().default(false)
 });
+

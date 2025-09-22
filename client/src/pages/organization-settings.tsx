@@ -217,7 +217,7 @@ export default function OrganizationSettings() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Timezone</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="input-timezone">
                               <SelectValue placeholder="Select timezone" />
@@ -248,7 +248,7 @@ export default function OrganizationSettings() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Date Format</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="input-date-format">
                               <SelectValue placeholder="Select date format" />

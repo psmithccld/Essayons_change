@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import { 
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
-  organizations, organizationMemberships, plans, subscriptions, invitations,
+  organizations, organizationMemberships, organizationSettings, plans, subscriptions, invitations,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type CommunicationVersion, type InsertCommunicationVersion, type Survey, type InsertSurvey,
@@ -17,6 +17,7 @@ import {
   type PasswordResetToken, type InsertPasswordResetToken, type RegistrationRequest, type EmailVerificationResponse,
   type ChangeArtifact, type InsertChangeArtifact,
   type Organization, type InsertOrganization, type OrganizationMembership, type InsertOrganizationMembership,
+  type OrganizationSettings, type InsertOrganizationSettings,
   type Plan, type InsertPlan, type Subscription, type InsertSubscription, type Invitation, type InsertInvitation
 } from "@shared/schema";
 import { db } from "./db";
@@ -847,6 +848,10 @@ export interface IStorage {
       }>;
     }>;
   }>;
+
+  // Organization Settings
+  getOrganizationSettings(organizationId: string): Promise<OrganizationSettings | undefined>;
+  updateOrganizationSettings(organizationId: string, settings: Partial<InsertOrganizationSettings>): Promise<OrganizationSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4363,6 +4368,44 @@ export class DatabaseStorage implements IStorage {
         eq(organizationMemberships.organizationId, organizationId)
       ));
     return result.rowCount > 0;
+  }
+
+  // Organization Settings
+  async getOrganizationSettings(organizationId: string): Promise<OrganizationSettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(organizationSettings)
+      .where(eq(organizationSettings.organizationId, organizationId));
+    return settings || undefined;
+  }
+
+  async updateOrganizationSettings(organizationId: string, settings: Partial<InsertOrganizationSettings>): Promise<OrganizationSettings> {
+    // First try to update existing settings
+    const [updated] = await db
+      .update(organizationSettings)
+      .set({ ...settings, updatedAt: new Date() })
+      .where(eq(organizationSettings.organizationId, organizationId))
+      .returning();
+    
+    if (updated) {
+      return updated;
+    }
+    
+    // If no existing settings, create new ones
+    const [created] = await db
+      .insert(organizationSettings)
+      .values({ 
+        organizationId, 
+        ...settings,
+        // Ensure defaults are set
+        primaryColor: settings.primaryColor || "#3b82f6",
+        secondaryColor: settings.secondaryColor || "#64748b",
+        timezone: settings.timezone || "UTC",
+        dateFormat: settings.dateFormat || "MM/dd/yyyy"
+      })
+      .returning();
+    
+    return created;
   }
 }
 
