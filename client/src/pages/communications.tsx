@@ -3756,17 +3756,14 @@ function ResistanceIdentification() {
 
   const { data: counterMessages, isLoading: counterMessagesLoading } = useQuery({
     queryKey: ['/api/gpt/resistance-counter-messages', resistancePoints],
-    queryFn: () => apiRequest('/api/gpt/resistance-counter-messages', {
-      method: 'POST',
-      body: {
-        projectId: currentProject?.id,
-        resistancePoints: resistancePoints.map(r => ({
-          title: r.title,
-          description: r.description,
-          severity: r.severity,
-          affectedGroups: r.affectedGroups
-        }))
-      }
+    queryFn: () => apiRequest('POST', '/api/gpt/resistance-counter-messages', {
+      projectId: currentProject?.id,
+      resistancePoints: resistancePoints.map(r => ({
+        title: r.title,
+        description: r.description,
+        severity: r.severity,
+        affectedGroups: r.affectedGroups
+      }))
     }),
     enabled: !!currentProject?.id && showCounterMessages && resistancePoints.length > 0
   });
