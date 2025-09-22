@@ -228,7 +228,7 @@ export const userInitiativeAssignments = pgTable("user_initiative_assignments", 
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
-  role: text("role").notNull(), // Initiative-specific role: "Lead", "Member", "Observer"
+  role: text("role").notNull(), // Initiative-specific role: "Change Owner", "Change Champion", "Change Agent", "Member", "Observer"
   assignedAt: timestamp("assigned_at").defaultNow().notNull(),
   assignedById: uuid("assigned_by_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
 }, (table) => ({

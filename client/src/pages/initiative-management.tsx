@@ -93,7 +93,7 @@ const copyInitiativeSchema = z.object({
 const assignUserSchema = z.object({
   userId: z.string().uuid("Please select a user"),
   projectId: z.string().uuid(),
-  role: z.enum(["Lead", "Member", "Observer"])
+  role: z.enum(["Change Owner", "Change Champion", "Change Agent", "Member", "Observer"])
 });
 
 type CreateInitiativeFormData = z.infer<typeof createInitiativeSchema>;
@@ -2257,7 +2257,9 @@ function InitiativeManagementContent() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="Lead">Lead</SelectItem>
+                                <SelectItem value="Change Owner">Change Owner</SelectItem>
+                                <SelectItem value="Change Champion">Change Champion</SelectItem>
+                                <SelectItem value="Change Agent">Change Agent</SelectItem>
                                 <SelectItem value="Member">Member</SelectItem>
                                 <SelectItem value="Observer">Observer</SelectItem>
                               </SelectContent>

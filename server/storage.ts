@@ -2876,7 +2876,7 @@ export class DatabaseStorage implements IStorage {
       if (row.projectId && row.assignmentId) {
         user.initiativeCount++;
         // Calculate workload score based on role complexity
-        const roleComplexity = row.assignmentRole === 'Lead' ? 3 : row.assignmentRole === 'Member' ? 2 : 1;
+        const roleComplexity = row.assignmentRole === 'Change Owner' ? 4 : row.assignmentRole === 'Change Champion' ? 3 : row.assignmentRole === 'Change Agent' ? 2 : row.assignmentRole === 'Member' ? 1 : 0;
         user.workloadScore += roleComplexity;
         
         user.initiatives.push({
