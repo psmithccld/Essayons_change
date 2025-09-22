@@ -62,11 +62,11 @@ export interface IStorage {
   validateUserProjectAccess(userId: string, projectIds: string[]): Promise<string[]>;
 
   // Tasks
-  getTasksByProject(projectId: string): Promise<Task[]>;
-  getTask(id: string): Promise<Task | undefined>;
+  getTasksByProject(projectId: string, organizationId: string): Promise<Task[]>;
+  getTask(id: string, organizationId: string): Promise<Task | undefined>;
   createTask(task: InsertTask): Promise<Task>;
-  updateTask(id: string, task: Partial<InsertTask>): Promise<Task | undefined>;
-  deleteTask(id: string): Promise<boolean>;
+  updateTask(id: string, organizationId: string, task: Partial<InsertTask>): Promise<Task | undefined>;
+  deleteTask(id: string, organizationId: string): Promise<boolean>;
 
   // Stakeholders
   getStakeholdersByProject(projectId: string): Promise<Stakeholder[]>;
@@ -1214,13 +1214,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Tasks
-  async getTasksByProject(projectId: string): Promise<Task[]> {
-    return await db.select().from(tasks).where(eq(tasks.projectId, projectId)).orderBy(desc(tasks.createdAt));
+  async getTasksByProject(projectId: string, organizationId: string): Promise<Task[]> {
+    return await db.select().from(tasks)
+      .innerJoin(projects, eq(tasks.projectId, projects.id))
+      .where(and(eq(tasks.projectId, projectId), eq(projects.organizationId, organizationId)))
+      .orderBy(desc(tasks.createdAt))
+      .then(results => results.map(r => r.tasks));
   }
 
-  async getTask(id: string): Promise<Task | undefined> {
-    const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
-    return task || undefined;
+  async getTask(id: string, organizationId: string): Promise<Task | undefined> {
+    const [result] = await db.select({ task: tasks })
+      .from(tasks)
+      .innerJoin(projects, eq(tasks.projectId, projects.id))
+      .where(and(eq(tasks.id, id), eq(projects.organizationId, organizationId)));
+    return result?.task || undefined;
   }
 
   async createTask(task: InsertTask): Promise<Task> {
@@ -1228,16 +1235,27 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateTask(id: string, task: Partial<InsertTask>): Promise<Task | undefined> {
+  async updateTask(id: string, organizationId: string, task: Partial<InsertTask>): Promise<Task | undefined> {
     const [updated] = await db.update(tasks)
       .set({ ...task, updatedAt: new Date() })
-      .where(eq(tasks.id, id))
+      .where(and(
+        eq(tasks.id, id),
+        inArray(tasks.projectId, 
+          db.select({ id: projects.id }).from(projects).where(eq(projects.organizationId, organizationId))
+        )
+      ))
       .returning();
     return updated || undefined;
   }
 
-  async deleteTask(id: string): Promise<boolean> {
-    const result = await db.delete(tasks).where(eq(tasks.id, id));
+  async deleteTask(id: string, organizationId: string): Promise<boolean> {
+    const result = await db.delete(tasks)
+      .where(and(
+        eq(tasks.id, id),
+        inArray(tasks.projectId, 
+          db.select({ id: projects.id }).from(projects).where(eq(projects.organizationId, organizationId))
+        )
+      ));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 

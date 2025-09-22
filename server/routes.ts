@@ -1140,9 +1140,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Tasks
-  app.get("/api/projects/:projectId/tasks", async (req, res) => {
+  app.get("/api/projects/:projectId/tasks", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const tasks = await storage.getTasksByProject(req.params.projectId);
+      const tasks = await storage.getTasksByProject(req.params.projectId, req.organizationId!);
       res.json(tasks);
     } catch (error) {
       console.error("Error fetching tasks:", error);
@@ -1150,12 +1150,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects/:projectId/tasks", async (req, res) => {
+  app.post("/api/projects/:projectId/tasks", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
+      // Verify project belongs to organization (parent/child validation)
+      const project = await storage.getProject(req.params.projectId, req.organizationId!);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      
       // Convert date strings to Date objects before validation
       const processedData = {
         ...req.body,
-        projectId: req.params.projectId,
+        projectId: req.params.projectId, // Use validated projectId from params
+        organizationId: req.organizationId!, // Override client value - prevent org spoofing
         startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : undefined,
       };
@@ -1198,10 +1205,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/tasks/:id", async (req, res) => {
+  app.put("/api/tasks/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const oldTask = await storage.getTask(req.params.id);
-      const task = await storage.updateTask(req.params.id, req.body);
+      const oldTask = await storage.getTask(req.params.id, req.organizationId!);
+      
+      // Strip organizationId and projectId from request body to prevent cross-tenant changes
+      const { organizationId, projectId, ...updateData } = req.body;
+      const task = await storage.updateTask(req.params.id, req.organizationId!, updateData);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
@@ -1232,9 +1242,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/tasks/:id", async (req, res) => {
+  app.delete("/api/tasks/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const success = await storage.deleteTask(req.params.id);
+      const success = await storage.deleteTask(req.params.id, req.organizationId!);
       if (!success) {
         return res.status(404).json({ error: "Task not found" });
       }
