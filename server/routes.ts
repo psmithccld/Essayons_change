@@ -980,7 +980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.assignUserToInitiative({
               userId: assignment.userId,
               projectId: copiedProject.id,
-              role: assignment.role,
+              role: assignment.role === 'Lead' ? 'Change Owner' : assignment.role, // Map legacy role
               assignedById: req.userId || DEMO_USER_ID
             });
             
@@ -989,7 +989,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.createNotification({
                 userId: assignment.userId,
                 title: "Initiative Assignment",
-                message: `You have been assigned to the copied initiative "${copiedProject.name}" as ${assignment.role}`,
+                message: `You have been assigned to the copied initiative "${copiedProject.name}" as ${assignment.role === 'Lead' ? 'Change Owner' : assignment.role}`,
                 type: "initiative_assignment",
                 relatedId: copiedProject.id,
                 relatedType: "project"

@@ -875,6 +875,8 @@ export const emailVerificationResponseSchema = z.object({
 export const insertUserInitiativeAssignmentSchema = createInsertSchema(userInitiativeAssignments).omit({
   id: true,
   assignedAt: true,
+}).extend({
+  role: z.enum(["Change Owner", "Change Champion", "Change Agent", "Member", "Observer"])
 });
 
 export const insertProjectSchema = createInsertSchema(projects).omit({
