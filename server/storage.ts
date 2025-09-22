@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import { 
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
+  organizations, organizationMemberships, plans, subscriptions, invitations,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type CommunicationVersion, type InsertCommunicationVersion, type Survey, type InsertSurvey,
@@ -14,7 +15,9 @@ import {
   type InsertUserGroupMembership, type UserPermission, type InsertUserPermission,
   type Notification, type InsertNotification, type EmailVerificationToken, type InsertEmailVerificationToken,
   type PasswordResetToken, type InsertPasswordResetToken, type RegistrationRequest, type EmailVerificationResponse,
-  type ChangeArtifact, type InsertChangeArtifact
+  type ChangeArtifact, type InsertChangeArtifact,
+  type Organization, type InsertOrganization, type OrganizationMembership, type InsertOrganizationMembership,
+  type Plan, type InsertPlan, type Subscription, type InsertSubscription, type Invitation, type InsertInvitation
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray, ne } from "drizzle-orm";
@@ -4214,6 +4217,72 @@ export class DatabaseStorage implements IStorage {
         }],
       }],
     };
+  }
+
+  // Organizations - Multi-tenant Management (CRITICAL for security)
+  async getOrganization(id: string): Promise<Organization | undefined> {
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
+    return org || undefined;
+  }
+
+  async getUserOrganizationMemberships(userId: string): Promise<OrganizationMembership[]> {
+    return await db
+      .select()
+      .from(organizationMemberships)
+      .where(eq(organizationMemberships.userId, userId))
+      .orderBy(organizationMemberships.joinedAt);
+  }
+
+  async getOrganizations(): Promise<Organization[]> {
+    return await db.select().from(organizations).orderBy(organizations.name);
+  }
+
+  async createOrganization(org: InsertOrganization): Promise<Organization> {
+    const [created] = await db.insert(organizations).values(org).returning();
+    return created;
+  }
+
+  async updateOrganization(id: string, org: Partial<InsertOrganization>): Promise<Organization | undefined> {
+    const [updated] = await db.update(organizations)
+      .set({ ...org, updatedAt: new Date() })
+      .where(eq(organizations.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteOrganization(id: string): Promise<boolean> {
+    const result = await db.delete(organizations).where(eq(organizations.id, id));
+    return result.rowCount > 0;
+  }
+
+  async getOrganizationMembers(organizationId: string): Promise<OrganizationMembership[]> {
+    return await db
+      .select()
+      .from(organizationMemberships)
+      .where(eq(organizationMemberships.organizationId, organizationId))
+      .orderBy(organizationMemberships.joinedAt);
+  }
+
+  async addUserToOrganization(membership: InsertOrganizationMembership): Promise<OrganizationMembership> {
+    const [created] = await db.insert(organizationMemberships).values(membership).returning();
+    return created;
+  }
+
+  async updateOrganizationMembership(id: string, membership: Partial<InsertOrganizationMembership>): Promise<OrganizationMembership | undefined> {
+    const [updated] = await db.update(organizationMemberships)
+      .set(membership)
+      .where(eq(organizationMemberships.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async removeUserFromOrganization(userId: string, organizationId: string): Promise<boolean> {
+    const result = await db.delete(organizationMemberships)
+      .where(and(
+        eq(organizationMemberships.userId, userId),
+        eq(organizationMemberships.organizationId, organizationId)
+      ));
+    return result.rowCount > 0;
   }
 }
 

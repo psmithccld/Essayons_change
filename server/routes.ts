@@ -166,6 +166,18 @@ interface AuthenticatedRequest extends SessionRequest {
     roleId: string;
     isActive: boolean;
   };
+  // Organization context for multi-tenant security
+  organizationId?: string;
+  organization?: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+  };
+  organizationMembership?: {
+    role: string;
+    isActive: boolean;
+  };
 }
 
 // SECURITY: Authentication middleware - uses secure session-based authentication
@@ -232,6 +244,48 @@ const requireAuth = async (req: AuthenticatedRequest, res: Response, next: NextF
   }
 };
 
+// SECURITY: Organization context middleware - enforces tenant isolation
+const requireOrgContext = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    // Get user's organization membership (for now, use first active membership)
+    // TODO: In production, resolve from URL slug, header, or user preference
+    const memberships = await storage.getUserOrganizationMemberships(req.userId);
+    const activeMembership = memberships.find(m => m.isActive);
+
+    if (!activeMembership) {
+      return res.status(403).json({ error: "No organization access. Please contact your administrator." });
+    }
+
+    // Get organization details
+    const organization = await storage.getOrganization(activeMembership.organizationId);
+    if (!organization || organization.status !== 'active') {
+      return res.status(403).json({ error: "Organization unavailable or suspended" });
+    }
+
+    // Attach organization context to request
+    req.organizationId = organization.id;
+    req.organization = {
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
+      status: organization.status
+    };
+    req.organizationMembership = {
+      role: activeMembership.orgRole,
+      isActive: activeMembership.isActive
+    };
+
+    next();
+  } catch (error) {
+    console.error("Organization context error:", error);
+    res.status(500).json({ error: "Organization service unavailable" });
+  }
+};
+
 // Permission middleware factory - requires authentication first
 const requirePermission = (permission: keyof Permissions) => {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -255,10 +309,13 @@ const requirePermission = (permission: keyof Permissions) => {
   };
 };
 
-// Combined middleware for auth + permission
+// Combined middleware for auth + organization context + permission
 const requireAuthAndPermission = (permission: keyof Permissions) => {
-  return [requireAuth, requirePermission(permission)];
+  return [requireAuth, requireOrgContext, requirePermission(permission)];
 };
+
+// Combined middleware for auth + organization context (for routes that need org context but no special permissions)
+const requireAuthAndOrg = [requireAuth, requireOrgContext];
 
 // Helper function to build complete RAID log from template-specific data
 function buildRaidInsertFromTemplate(type: string, baseData: any): any {
@@ -641,7 +698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Password change endpoint
-  app.post("/api/auth/change-password", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/auth/change-password", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const { currentPassword, newPassword } = req.body;
       
@@ -715,7 +772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // RBAC: User permissions endpoint for frontend permission gating
-  app.get("/api/users/me/permissions", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/users/me/permissions", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!; // Always available after requireAuth middleware
       
@@ -744,7 +801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Notifications endpoints
   // GET /api/notifications - get user's notifications (unread first, with pagination)
-  app.get("/api/notifications", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/notifications", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
       const limit = parseInt(req.query.limit as string) || 20;
@@ -760,7 +817,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/notifications/:id/read - mark single notification as read
-  app.post("/api/notifications/:id/read", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/notifications/:id/read", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
       const notificationId = req.params.id;
@@ -778,7 +835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/notifications/mark-all-read - mark all user notifications as read
-  app.post("/api/notifications/mark-all-read", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/notifications/mark-all-read", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
       
