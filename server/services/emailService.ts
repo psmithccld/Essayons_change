@@ -3,11 +3,26 @@ import { MailService } from '@sendgrid/mail';
 
 if (!process.env.SENDGRID_API_KEY) {
   console.warn("SENDGRID_API_KEY environment variable not set - email notifications disabled");
+} else {
+  const keyPrefix = process.env.SENDGRID_API_KEY.substring(0, 3);
+  console.log(`SendGrid API key detected with prefix: ${keyPrefix}...`);
+  
+  if (!process.env.SENDGRID_API_KEY.startsWith('SG.')) {
+    console.error("SendGrid API key format error: Key must start with 'SG.'");
+    console.error("Please verify your SendGrid API key is correct");
+  }
 }
 
 const mailService = new MailService();
-if (process.env.SENDGRID_API_KEY) {
-  mailService.setApiKey(process.env.SENDGRID_API_KEY);
+if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith('SG.')) {
+  try {
+    mailService.setApiKey(process.env.SENDGRID_API_KEY);
+    console.log("SendGrid email service initialized successfully");
+  } catch (error) {
+    console.error("SendGrid initialization error:", error);
+  }
+} else {
+  console.warn("SendGrid not initialized due to invalid API key format");
 }
 
 interface EmailParams {
