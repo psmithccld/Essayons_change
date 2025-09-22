@@ -58,21 +58,38 @@ interface ChangeProcessFlowProps {
 
 export default function ChangeProcessFlow({ initiativesByPhase }: ChangeProcessFlowProps) {
   return (
-    <div className="relative w-full min-h-[500px] bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-lg overflow-hidden">
+    <div className="relative w-full min-h-[600px] bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-lg overflow-hidden">
       {/* Background Design */}
       <div className="absolute inset-0">
         {/* Organizational Actions Bar */}
-        <div className="absolute top-[100px] left-[50px] right-[50px] h-[60px] bg-gradient-to-r from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg">
+        <div className="absolute top-[60px] left-[80px] right-[80px] h-[50px] bg-gradient-to-r from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg">
           <h3 className="text-white font-semibold text-lg">Organizational Actions</h3>
         </div>
         
         {/* Individual Actions Bar */}
-        <div className="absolute bottom-[100px] left-[50px] right-[50px] h-[60px] bg-gradient-to-r from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg">
+        <div className="absolute bottom-[60px] left-[80px] right-[80px] h-[50px] bg-gradient-to-r from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg">
           <h3 className="text-white font-semibold text-lg">Individual Actions</h3>
         </div>
         
-        {/* Arrow Flow */}
+        {/* Connecting Lines from Organizational to Categories */}
         <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }}>
+          {/* Vertical connection lines from organizational bar to phases */}
+          {CHANGE_PHASES.map((phase, index) => (
+            <g key={`org-connection-${phase.id}`}>
+              <line
+                x1={phase.position.x}
+                y1={130}
+                x2={phase.position.x}
+                y2={220}
+                stroke="#dc2626"
+                strokeWidth="2"
+                strokeDasharray="5,5"
+                opacity="0.6"
+              />
+            </g>
+          ))}
+          
+          {/* Horizontal arrow flow between phases */}
           {CHANGE_PHASES.slice(0, -1).map((phase, index) => {
             const nextPhase = CHANGE_PHASES[index + 1];
             return (
@@ -93,9 +110,9 @@ export default function ChangeProcessFlow({ initiativesByPhase }: ChangeProcessF
                   </marker>
                 </defs>
                 <line
-                  x1={phase.position.x + 75}
+                  x1={phase.position.x + 60}
                   y1={phase.position.y}
-                  x2={nextPhase.position.x - 75}
+                  x2={nextPhase.position.x - 60}
                   y2={nextPhase.position.y}
                   stroke="#dc2626"
                   strokeWidth="3"
@@ -104,10 +121,26 @@ export default function ChangeProcessFlow({ initiativesByPhase }: ChangeProcessF
               </g>
             );
           })}
+          
+          {/* Vertical connection lines from phases to individual bar */}
+          {CHANGE_PHASES.map((phase, index) => (
+            <g key={`ind-connection-${phase.id}`}>
+              <line
+                x1={phase.position.x}
+                y1={380}
+                x2={phase.position.x}
+                y2={470}
+                stroke="#dc2626"
+                strokeWidth="2"
+                strokeDasharray="5,5"
+                opacity="0.6"
+              />
+            </g>
+          ))}
         </svg>
       </div>
 
-      {/* Phase Nodes */}
+      {/* Phase Categories - Centered between action bars */}
       <div className="relative" style={{ zIndex: 2 }}>
         {CHANGE_PHASES.map((phase) => {
           const count = initiativesByPhase?.[phase.id] || 0;
@@ -118,29 +151,30 @@ export default function ChangeProcessFlow({ initiativesByPhase }: ChangeProcessF
               key={phase.id}
               className="absolute"
               style={{
-                left: phase.position.x - 75,
+                left: phase.position.x - 60,
                 top: phase.position.y - 60,
-                width: '150px',
+                width: '120px',
                 height: '120px'
               }}
+              data-testid={`phase-bubble-${phase.id}`}
             >
-              <Card className="relative bg-white dark:bg-slate-800 shadow-lg border-2 border-gray-200 dark:border-slate-600 hover:shadow-xl transition-shadow">
-                <CardContent className="p-4 text-center">
-                  <div className={`w-12 h-12 ${phase.color} rounded-full flex items-center justify-center mx-auto mb-2`}>
-                    <IconComponent className="w-6 h-6 text-white" />
+              <Card className="relative bg-white dark:bg-slate-800 shadow-lg border-2 border-gray-200 dark:border-slate-600 hover:shadow-xl transition-shadow h-full">
+                <CardContent className="p-3 text-center h-full flex flex-col justify-center">
+                  <div className={`w-10 h-10 ${phase.color} rounded-full flex items-center justify-center mx-auto mb-2`}>
+                    <IconComponent className="w-5 h-5 text-white" />
                   </div>
                   <h4 className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 leading-tight">
                     {phase.shortName}
                   </h4>
                   <div className="text-[10px] text-gray-600 dark:text-gray-400">
-                    Change
+                    Phase
                   </div>
                 </CardContent>
                 
                 {/* Count Bubble */}
                 {count > 0 && (
-                  <div className="absolute -top-3 -right-3 w-8 h-8 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
-                    <span className="text-white font-bold text-sm">{count}</span>
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+                    <span className="text-white font-bold text-xs">{count}</span>
                   </div>
                 )}
               </Card>
