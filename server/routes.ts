@@ -2503,7 +2503,7 @@ Return the refined content in JSON format:
   // RAID Logs
   app.get("/api/projects/:projectId/raid-logs", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const raidLogs = await storage.getRaidLogsByProject(req.params.projectId);
+      const raidLogs = await storage.getRaidLogsByProject(req.params.projectId, req.organizationId!);
       
       // Add backward compatibility mapping for any legacy data
       const normalizedRaidLogs = raidLogs.map(log => ({
@@ -2545,7 +2545,7 @@ Return the refined content in JSON format:
       
       // Create notifications for RAID log creation
       try {
-        const project = await storage.getProject(req.params.projectId);
+        const project = await storage.getProject(req.params.projectId, req.organizationId!);
         if (project) {
           // Always create notification for the creator
           await storage.createNotification({
@@ -2618,12 +2618,12 @@ Return the refined content in JSON format:
       }
       
       // Get original RAID log to check for assignee changes
-      const originalRaidLog = await storage.getRaidLog(req.params.id);
+      const originalRaidLog = await storage.getRaidLog(req.params.id, req.organizationId!);
       if (!originalRaidLog) {
         return res.status(404).json({ error: "RAID log not found" });
       }
       
-      const raidLog = await storage.updateRaidLog(req.params.id, validatedData);
+      const raidLog = await storage.updateRaidLog(req.params.id, req.organizationId!, validatedData);
       if (!raidLog) {
         return res.status(404).json({ error: "RAID log not found" });
       }
@@ -2661,9 +2661,9 @@ Return the refined content in JSON format:
     }
   });
 
-  app.delete("/api/raid-logs/:id", async (req, res) => {
+  app.delete("/api/raid-logs/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const success = await storage.deleteRaidLog(req.params.id);
+      const success = await storage.deleteRaidLog(req.params.id, req.organizationId!);
       if (!success) {
         return res.status(404).json({ error: "RAID log not found" });
       }

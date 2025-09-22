@@ -77,11 +77,11 @@ export interface IStorage {
   importStakeholders(targetProjectId: string, sourceProjectId: string, stakeholderIds: string[], organizationId: string): Promise<{ imported: number; skipped: number }>;
 
   // RAID Logs
-  getRaidLogsByProject(projectId: string): Promise<RaidLog[]>;
-  getRaidLog(id: string): Promise<RaidLog | undefined>;
+  getRaidLogsByProject(projectId: string, organizationId: string): Promise<RaidLog[]>;
+  getRaidLog(id: string, organizationId: string): Promise<RaidLog | undefined>;
   createRaidLog(raidLog: InsertRaidLog): Promise<RaidLog>;
-  updateRaidLog(id: string, raidLog: Partial<InsertRaidLog>): Promise<RaidLog | undefined>;
-  deleteRaidLog(id: string): Promise<boolean>;
+  updateRaidLog(id: string, organizationId: string, raidLog: Partial<InsertRaidLog>): Promise<RaidLog | undefined>;
+  deleteRaidLog(id: string, organizationId: string): Promise<boolean>;
 
   // Communications
   getCommunications(): Promise<Communication[]>;
@@ -1356,13 +1356,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   // RAID Logs
-  async getRaidLogsByProject(projectId: string): Promise<RaidLog[]> {
-    return await db.select().from(raidLogs).where(eq(raidLogs.projectId, projectId)).orderBy(desc(raidLogs.createdAt));
+  async getRaidLogsByProject(projectId: string, organizationId: string): Promise<RaidLog[]> {
+    return await db.select().from(raidLogs)
+      .innerJoin(projects, eq(raidLogs.projectId, projects.id))
+      .where(and(
+        eq(raidLogs.projectId, projectId),
+        eq(projects.organizationId, organizationId)
+      ))
+      .orderBy(desc(raidLogs.createdAt))
+      .then(results => results.map(result => result.raid_logs));
   }
 
-  async getRaidLog(id: string): Promise<RaidLog | undefined> {
-    const [raidLog] = await db.select().from(raidLogs).where(eq(raidLogs.id, id));
-    return raidLog || undefined;
+  async getRaidLog(id: string, organizationId: string): Promise<RaidLog | undefined> {
+    const [result] = await db.select().from(raidLogs)
+      .innerJoin(projects, eq(raidLogs.projectId, projects.id))
+      .where(and(
+        eq(raidLogs.id, id),
+        eq(projects.organizationId, organizationId)
+      ));
+    return result?.raid_logs || undefined;
   }
 
   async createRaidLog(raidLog: InsertRaidLog): Promise<RaidLog> {
@@ -1370,16 +1382,41 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateRaidLog(id: string, raidLog: Partial<InsertRaidLog>): Promise<RaidLog | undefined> {
+  async updateRaidLog(id: string, organizationId: string, raidLog: Partial<InsertRaidLog>): Promise<RaidLog | undefined> {
+    // First get project IDs that belong to this organization
+    const orgProjectIds = await db.select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.organizationId, organizationId))
+      .then(results => results.map(p => p.id));
+    
+    if (orgProjectIds.length === 0) return undefined;
+    
+    // Update only if RAID log belongs to a project in this organization
     const [updated] = await db.update(raidLogs)
       .set({ ...raidLog, updatedAt: new Date() })
-      .where(eq(raidLogs.id, id))
+      .where(and(
+        eq(raidLogs.id, id),
+        inArray(raidLogs.projectId, orgProjectIds)
+      ))
       .returning();
     return updated || undefined;
   }
 
-  async deleteRaidLog(id: string): Promise<boolean> {
-    const result = await db.delete(raidLogs).where(eq(raidLogs.id, id));
+  async deleteRaidLog(id: string, organizationId: string): Promise<boolean> {
+    // First get project IDs that belong to this organization
+    const orgProjectIds = await db.select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.organizationId, organizationId))
+      .then(results => results.map(p => p.id));
+    
+    if (orgProjectIds.length === 0) return false;
+    
+    // Delete only if RAID log belongs to a project in this organization
+    const result = await db.delete(raidLogs)
+      .where(and(
+        eq(raidLogs.id, id),
+        inArray(raidLogs.projectId, orgProjectIds)
+      ));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
