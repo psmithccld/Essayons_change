@@ -108,6 +108,12 @@ export const permissionsSchema = z.object({
   canModifyEmailTemplates: z.boolean().default(false),
   canEditEmailSettings: z.boolean().default(false),
   
+  // Change Artifacts Management - granular CRUD operations
+  canSeeArtifacts: z.boolean().default(false),
+  canModifyArtifacts: z.boolean().default(false),
+  canEditArtifacts: z.boolean().default(false),
+  canDeleteArtifacts: z.boolean().default(false),
+  
   // System Administration - high-level permissions
   canSeeSystemSettings: z.boolean().default(false),
   canModifySystemSettings: z.boolean().default(false),
@@ -473,6 +479,56 @@ export const notifications = pgTable("notifications", {
   userUnreadIdx: index("notifications_user_unread_idx").on(table.userId, table.isRead, table.createdAt),
 }));
 
+// Change Artifacts - Document Repository Management
+export const changeArtifacts = pgTable("change_artifacts", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
+  filename: text("filename").notNull(), // System filename (unique)
+  originalFilename: text("original_filename").notNull(), // User's original filename
+  fileSize: integer("file_size").notNull(), // File size in bytes
+  mimeType: text("mime_type").notNull(), // File MIME type (application/pdf, image/png, etc.)
+  fileUrl: text("file_url").notNull(), // Storage path/URL
+  description: text("description"), // User-provided description
+  tags: text("tags").array().default([]), // Searchable tags
+  category: text("category").default("general"), // document, image, template, presentation, other
+  version: integer("version").default(1), // Version tracking
+  isActive: boolean("is_active").default(true), // Soft delete capability
+  accessLevel: text("access_level").notNull().default("project"), // project, public, restricted
+  downloadCount: integer("download_count").default(0), // Usage tracking
+  lastAccessedAt: timestamp("last_accessed_at"), // Last download/view time
+  uploadedById: uuid("uploaded_by_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  metadata: jsonb("metadata").default({}), // Extended metadata (upload client, processing info, etc.)
+}, (table) => ({
+  // Performance indexes for artifact queries
+  projectIdIdx: index("change_artifacts_project_id_idx").on(table.projectId),
+  categoryIdx: index("change_artifacts_category_idx").on(table.category),
+  accessLevelIdx: index("change_artifacts_access_level_idx").on(table.accessLevel),
+  uploadedByIdx: index("change_artifacts_uploaded_by_idx").on(table.uploadedById),
+  createdAtIdx: index("change_artifacts_created_at_idx").on(table.createdAt),
+  // Composite indexes for common queries
+  projectCategoryIdx: index("change_artifacts_project_category_idx").on(table.projectId, table.category),
+  projectActiveIdx: index("change_artifacts_project_active_idx").on(table.projectId, table.isActive),
+  // GIN index for tag searches
+  tagsIdx: index("change_artifacts_tags_gin_idx").using("gin", table.tags),
+  // Text search indexes
+  filenameTextIdx: index("change_artifacts_filename_trgm_idx").using("gin", sql`${table.originalFilename} gin_trgm_ops`),
+  descriptionTextIdx: index("change_artifacts_description_trgm_idx").using("gin", sql`${table.description} gin_trgm_ops`),
+}));
+
+// Change Artifacts Relations
+export const changeArtifactsRelations = relations(changeArtifacts, ({ one }) => ({
+  project: one(projects, {
+    fields: [changeArtifacts.projectId],
+    references: [projects.id],
+  }),
+  uploadedBy: one(users, {
+    fields: [changeArtifacts.uploadedById],
+    references: [users.id],
+  }),
+}));
+
 export const surveys = pgTable("surveys", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
@@ -613,6 +669,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   createdCommunicationTemplates: many(communicationTemplates),
   communicationRecipients: many(communicationRecipients),
   createdCommunicationStrategies: many(communicationStrategy),
+  // Change Artifacts Relations
+  uploadedArtifacts: many(changeArtifacts),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -631,6 +689,8 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   userAssignments: many(userInitiativeAssignments),
   // Communication Module Relations
   communicationStrategies: many(communicationStrategy),
+  // Change Artifacts Relations
+  changeArtifacts: many(changeArtifacts),
 }));
 
 export const userInitiativeAssignmentsRelations = relations(userInitiativeAssignments, ({ one }) => ({
@@ -989,6 +1049,16 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   createdAt: true,
 }).extend({
   type: z.enum(['initiative_assignment', 'stakeholder_added', 'raid_identified', 'phase_change']),
+});
+
+// Change Artifacts Insert Schema
+export const insertChangeArtifactSchema = createInsertSchema(changeArtifacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  category: z.enum(['document', 'image', 'template', 'presentation', 'other']).default('document'),
+  accessLevel: z.enum(['project', 'public', 'restricted']).default('project'),
 });
 
 // Base schema without refinements for operations that need .omit()
@@ -1449,6 +1519,10 @@ export type InsertCommunicationStrategy = z.infer<typeof insertCommunicationStra
 // Notifications Types
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// Change Artifacts Types
+export type ChangeArtifact = typeof changeArtifacts.$inferSelect;
+export type InsertChangeArtifact = z.infer<typeof insertChangeArtifactSchema>;
 
 export type Survey = typeof surveys.$inferSelect;
 export type InsertSurvey = z.infer<typeof insertSurveySchema>;
