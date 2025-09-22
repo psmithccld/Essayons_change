@@ -119,6 +119,37 @@ export const permissionsSchema = z.object({
   canModifySystemSettings: z.boolean().default(false),
   canEditSystemSettings: z.boolean().default(false),
   canManageSystem: z.boolean().default(false),
+  
+  // Organizational Management - SaaS administrative permissions
+  canManageOrganizations: z.boolean().default(false),
+  canSeeAllOrganizations: z.boolean().default(false),
+  canModifyOrganizationSettings: z.boolean().default(false),
+  canDeleteOrganizations: z.boolean().default(false),
+  canSeeOrganizationBilling: z.boolean().default(false),
+  canModifyOrganizationBilling: z.boolean().default(false),
+  
+  // Subscription and Plan Management
+  canManageSubscriptions: z.boolean().default(false),
+  canSeeAllSubscriptions: z.boolean().default(false),
+  canModifySubscriptions: z.boolean().default(false),
+  canCancelSubscriptions: z.boolean().default(false),
+  canManagePlans: z.boolean().default(false),
+  canCreateCustomPlans: z.boolean().default(false),
+  canModifyPlanPricing: z.boolean().default(false),
+  
+  // Consultation and Custom Package Management
+  canManageConsultations: z.boolean().default(false),
+  canSeeAllConsultations: z.boolean().default(false),
+  canScheduleConsultations: z.boolean().default(false),
+  canCreateCustomPackages: z.boolean().default(false),
+  canModifyCustomPackages: z.boolean().default(false),
+  canAccessConsultationNotes: z.boolean().default(false),
+  
+  // Multi-tenant Organization Switching
+  canSwitchOrganizations: z.boolean().default(false),
+  canInviteToOrganizations: z.boolean().default(false),
+  canManageOrganizationMembers: z.boolean().default(false),
+  canAssignOrganizationRoles: z.boolean().default(false),
 });
 
 export type Permissions = z.infer<typeof permissionsSchema>;
@@ -294,6 +325,71 @@ export const invitations = pgTable("invitations", {
   tokenIdx: index("invitations_token_idx").on(table.token),
   statusIdx: index("invitations_status_idx").on(table.status),
   expiresIdx: index("invitations_expires_idx").on(table.expiresAt),
+}));
+
+// Organization settings - custom configuration and branding
+export const organizationSettings = pgTable("organization_settings", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull().unique(),
+  // Branding and customization
+  logoUrl: text("logo_url"),
+  primaryColor: text("primary_color").default("#3b82f6"),
+  secondaryColor: text("secondary_color").default("#64748b"),
+  customDomain: text("custom_domain"),
+  timezone: text("timezone").default("UTC"),
+  dateFormat: text("date_format").default("MM/dd/yyyy"),
+  // Feature toggles and limits
+  enabledFeatures: jsonb("enabled_features").default({}), // Feature flags
+  customLimits: jsonb("custom_limits").default({}), // Custom package limits
+  // Custom fields and configurations
+  customFields: jsonb("custom_fields").default([]), // Custom form fields
+  integrationSettings: jsonb("integration_settings").default({}), // External integrations config
+  // Billing and subscription preferences
+  invoicePrefix: text("invoice_prefix"),
+  billingEmail: text("billing_email"),
+  taxId: text("tax_id"),
+  billingAddress: jsonb("billing_address").default({}),
+  // Consultation and setup tracking
+  isConsultationComplete: boolean("is_consultation_complete").default(false),
+  consultationNotes: text("consultation_notes"),
+  setupProgress: jsonb("setup_progress").default({}), // Track setup completion
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("org_settings_org_idx").on(table.organizationId),
+}));
+
+// Custom consultation workflows - post-consultation user setup
+export const consultationWorkflows = pgTable("consultation_workflows", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  consultantId: uuid("consultant_id").references(() => users.id, { onDelete: "set null" }),
+  // Consultation details
+  consultationType: text("consultation_type").notNull(), // initial, follow_up, package_review
+  status: text("status").notNull().default("scheduled"), // scheduled, in_progress, completed, cancelled
+  scheduledAt: timestamp("scheduled_at"),
+  completedAt: timestamp("completed_at"),
+  duration: integer("duration"), // Duration in minutes
+  // Custom package configuration
+  recommendedPlanId: uuid("recommended_plan_id").references(() => plans.id),
+  customFeatures: jsonb("custom_features").default({}), // Recommended custom features
+  customLimits: jsonb("custom_limits").default({}), // Recommended custom limits
+  // User setup and training
+  setupTasks: jsonb("setup_tasks").default([]), // Array of setup tasks
+  trainingModules: jsonb("training_modules").default([]), // Recommended training
+  followUpDate: timestamp("follow_up_date"),
+  // Notes and documentation
+  consultationNotes: text("consultation_notes"),
+  userRequirements: text("user_requirements"),
+  businessObjectives: text("business_objectives"),
+  successMetrics: text("success_metrics"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgUserIdx: index("consultation_workflows_org_user_idx").on(table.organizationId, table.userId),
+  statusIdx: index("consultation_workflows_status_idx").on(table.status),
+  consultantIdx: index("consultation_workflows_consultant_idx").on(table.consultantId),
 }));
 
 export const projects = pgTable("projects", {
@@ -1227,6 +1323,47 @@ export const insertProcessMapSchema = createInsertSchema(processMaps).omit({
   updatedAt: true,
 });
 
+// Organizational Management Insert Schemas
+export const insertOrganizationSchema = createInsertSchema(organizations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOrganizationMembershipSchema = createInsertSchema(organizationMemberships).omit({
+  id: true,
+  joinedAt: true,
+});
+
+export const insertPlanSchema = createInsertSchema(plans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertInvitationSchema = createInsertSchema(invitations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertOrganizationSettingsSchema = createInsertSchema(organizationSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertConsultationWorkflowSchema = createInsertSchema(consultationWorkflows).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Security Management Insert Schemas
 export const insertUserGroupSchema = createInsertSchema(userGroups).omit({
   id: true,
@@ -1643,6 +1780,28 @@ export type InsertChecklistTemplate = z.infer<typeof insertChecklistTemplateSche
 
 export type ProcessMap = typeof processMaps.$inferSelect;
 export type InsertProcessMap = z.infer<typeof insertProcessMapSchema>;
+
+// Organizational Management Types
+export type Organization = typeof organizations.$inferSelect;
+export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
+
+export type OrganizationMembership = typeof organizationMemberships.$inferSelect;
+export type InsertOrganizationMembership = z.infer<typeof insertOrganizationMembershipSchema>;
+
+export type Plan = typeof plans.$inferSelect;
+export type InsertPlan = z.infer<typeof insertPlanSchema>;
+
+export type Subscription = typeof subscriptions.$inferSelect;
+export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
+
+export type Invitation = typeof invitations.$inferSelect;
+export type InsertInvitation = z.infer<typeof insertInvitationSchema>;
+
+export type OrganizationSettings = typeof organizationSettings.$inferSelect;
+export type InsertOrganizationSettings = z.infer<typeof insertOrganizationSettingsSchema>;
+
+export type ConsultationWorkflow = typeof consultationWorkflows.$inferSelect;
+export type InsertConsultationWorkflow = z.infer<typeof insertConsultationWorkflowSchema>;
 
 // Security Management Center Types
 export type UserGroup = typeof userGroups.$inferSelect;
