@@ -41,6 +41,11 @@ Preferred communication style: Simple, everyday language.
 - **Stakeholder Analysis**: AI-driven recommendations for stakeholder engagement
 - **Risk Assessment**: Intelligent risk mitigation strategies
 
+### Calendar Integration Status
+- **Outlook Integration**: User dismissed Replit's Outlook connector integration
+- **Alternative Options**: Manual API integration using stored credentials or .ics file export
+- **Future Consideration**: Replit Outlook integration available if user wants to complete authorization flow later
+
 ### Component Architecture
 - **Modular Components**: Reusable UI components following atomic design principles
 - **Layout System**: Sidebar navigation with header and main content areas
