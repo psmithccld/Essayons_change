@@ -203,8 +203,102 @@ export const userPermissions = pgTable("user_permissions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Multi-tenant Organization System
+
+// Organizations table - the core of multi-tenancy
+export const organizations = pgTable("organizations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(), // URL-friendly identifier
+  description: text("description"),
+  status: text("status").notNull().default("active"), // active, suspended, trial
+  ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  slugIdx: index("organizations_slug_idx").on(table.slug),
+  ownerIdx: index("organizations_owner_idx").on(table.ownerUserId),
+}));
+
+// Organization memberships - users belong to organizations with roles
+export const organizationMemberships = pgTable("organization_memberships", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  orgRole: text("org_role").notNull().default("member"), // owner, admin, member
+  isActive: boolean("is_active").notNull().default(true),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  invitedById: uuid("invited_by_id").references(() => users.id, { onDelete: "set null" }),
+}, (table) => ({
+  uniqueUserOrg: unique().on(table.userId, table.organizationId), // Prevent duplicate memberships
+  orgUserIdx: index("org_memberships_org_user_idx").on(table.organizationId, table.userId),
+  userIdx: index("org_memberships_user_idx").on(table.userId),
+}));
+
+// Subscription plans - licensing tiers with features and limits
+export const plans = pgTable("plans", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(), // basic, pro, enterprise
+  name: text("name").notNull(), // "Basic Plan", "Professional", etc.
+  description: text("description"),
+  maxSeats: integer("max_seats").notNull(), // Maximum users per organization
+  billingInterval: text("billing_interval").notNull(), // month, year
+  priceCents: integer("price_cents").notNull(), // Price in cents
+  features: jsonb("features").default({}), // Available features and limits
+  stripeProductId: text("stripe_product_id"), // Stripe product ID
+  stripePriceId: text("stripe_price_id"), // Stripe price ID
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  codeIdx: index("plans_code_idx").on(table.code),
+  activeIdx: index("plans_active_idx").on(table.isActive),
+}));
+
+// Organization subscriptions - billing and license tracking
+export const subscriptions = pgTable("subscriptions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  planId: uuid("plan_id").references(() => plans.id, { onDelete: "restrict" }).notNull(),
+  status: text("status").notNull().default("trialing"), // trialing, active, past_due, canceled, incomplete
+  seatsPurchased: integer("seats_purchased").notNull().default(1), // Number of licensed seats
+  trialEndsAt: timestamp("trial_ends_at"),
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  // Stripe integration fields
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id").unique(),
+  stripePriceId: text("stripe_price_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("subscriptions_org_idx").on(table.organizationId),
+  stripeSubIdx: index("subscriptions_stripe_sub_idx").on(table.stripeSubscriptionId),
+  statusIdx: index("subscriptions_status_idx").on(table.status),
+}));
+
+// Organization invitations - manage pending user invitations
+export const invitations = pgTable("invitations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  email: text("email").notNull(),
+  orgRole: text("org_role").notNull().default("member"), // owner, admin, member
+  status: text("status").notNull().default("pending"), // pending, accepted, expired, cancelled
+  invitedById: uuid("invited_by_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  expiresAt: timestamp("expires_at").notNull(), // 7 days from creation
+  token: text("token").notNull().unique(), // Secure invitation token
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgEmailIdx: index("invitations_org_email_idx").on(table.organizationId, table.email),
+  tokenIdx: index("invitations_token_idx").on(table.token),
+  statusIdx: index("invitations_status_idx").on(table.status),
+  expiresIdx: index("invitations_expires_idx").on(table.expiresAt),
+}));
+
 export const projects = pgTable("projects", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }), // Nullable for migration
   name: text("name").notNull(),
   description: text("description"),
   status: text("status").notNull().default("planning"), // planning, active, completed, cancelled
@@ -243,6 +337,7 @@ export const userInitiativeAssignments = pgTable("user_initiative_assignments", 
 
 export const tasks = pgTable("tasks", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }), // Nullable for migration
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
   name: text("name").notNull(),
   description: text("description"),
@@ -262,6 +357,7 @@ export const tasks = pgTable("tasks", {
 
 export const stakeholders = pgTable("stakeholders", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }), // Nullable for migration
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
   name: text("name").notNull(),
   role: text("role").notNull(),
@@ -279,6 +375,7 @@ export const stakeholders = pgTable("stakeholders", {
 
 export const raidLogs = pgTable("raid_logs", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }), // Nullable for migration
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
   type: text("type").notNull(), // risk, action, issue, deficiency
   title: text("title").notNull(),
@@ -316,6 +413,7 @@ export const raidLogs = pgTable("raid_logs", {
 // Communication Templates Repository
 export const communicationTemplates = pgTable("communication_templates", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }), // Nullable for migration
   name: text("name").notNull(),
   description: text("description"),
   category: text("category").notNull(), // flyer, email, meeting_agenda, newsletter, meeting
@@ -332,6 +430,7 @@ export const communicationTemplates = pgTable("communication_templates", {
 
 export const communications = pgTable("communications", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }), // Nullable for migration
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
   type: text("type").notNull(), // flyer, group_email, point_to_point_email, meeting_prompt, meeting
   title: text("title").notNull(),
@@ -441,6 +540,7 @@ export const communicationRecipients = pgTable("communication_recipients", {
 // Communication Strategy for phase-based guidance
 export const communicationStrategy = pgTable("communication_strategy", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }), // Nullable for migration
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
   phase: text("phase").notNull(), // identify_need, develop_solution, implement_change, sustain_change, evaluate_results
   strategyName: text("strategy_name").notNull(),
@@ -482,6 +582,7 @@ export const notifications = pgTable("notifications", {
 // Change Artifacts - Document Repository Management
 export const changeArtifacts = pgTable("change_artifacts", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }), // Nullable for migration
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
   filename: text("filename").notNull(), // System filename (unique)
   originalFilename: text("original_filename").notNull(), // User's original filename
