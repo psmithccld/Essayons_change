@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { 
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
@@ -848,6 +849,25 @@ export interface IStorage {
       }>;
     }>;
   }>;
+
+  // Organization Management
+  getCurrentOrganization(userId: string): Promise<Organization | undefined>;
+  switchOrganization(userId: string, organizationId: string): Promise<boolean>;
+  
+  // Organization Memberships
+  listUserOrganizations(userId: string): Promise<Array<{ organization: Organization; membership: OrganizationMembership }>>;
+  updateMemberRole(organizationId: string, memberUserId: string, orgRole: string): Promise<OrganizationMembership | undefined>;
+  deactivateMember(organizationId: string, memberUserId: string): Promise<boolean>;
+  
+  // Invitations
+  inviteMember(organizationId: string, email: string, orgRole: string, invitedById: string): Promise<Invitation>;
+  acceptInvite(token: string, userId: string): Promise<{ success: boolean; membership?: OrganizationMembership; error?: string }>;
+  revokeInvite(invitationId: string): Promise<boolean>;
+  getInvitationByToken(token: string): Promise<Invitation | undefined>;
+  getOrganizationInvitations(organizationId: string): Promise<Invitation[]>;
+  
+  // Seat Management
+  getSeatUsage(organizationId: string): Promise<{ activeMembers: number; seatLimit: number; available: number }>;
 
   // Organization Settings
   getOrganizationSettings(organizationId: string): Promise<OrganizationSettings | undefined>;
@@ -4406,6 +4426,483 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return created;
+  }
+
+  // Organization Management
+  async getCurrentOrganization(userId: string): Promise<Organization | undefined> {
+    // Get user's current organization selection
+    const [user] = await db
+      .select({ currentOrganizationId: users.currentOrganizationId })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user || !user.currentOrganizationId) {
+      // No current organization set, get most recent active membership
+      const [result] = await db
+        .select({ organization: organizations })
+        .from(organizationMemberships)
+        .innerJoin(organizations, eq(organizations.id, organizationMemberships.organizationId))
+        .where(and(
+          eq(organizationMemberships.userId, userId),
+          eq(organizationMemberships.isActive, true)
+        ))
+        .orderBy(desc(organizationMemberships.joinedAt))
+        .limit(1);
+      
+      if (result) {
+        // Set this as current organization for future use
+        await db
+          .update(users)
+          .set({ currentOrganizationId: result.organization.id })
+          .where(eq(users.id, userId));
+        
+        return result.organization;
+      }
+      
+      return undefined;
+    }
+
+    // Verify user still has active membership in current organization
+    const [result] = await db
+      .select({ organization: organizations })
+      .from(organizations)
+      .innerJoin(organizationMemberships, eq(organizationMemberships.organizationId, organizations.id))
+      .where(and(
+        eq(organizations.id, user.currentOrganizationId),
+        eq(organizationMemberships.userId, userId),
+        eq(organizationMemberships.isActive, true)
+      ));
+
+    if (!result) {
+      // User no longer has access to current org, clear and find fallback
+      await db
+        .update(users)
+        .set({ currentOrganizationId: null })
+        .where(eq(users.id, userId));
+      
+      return this.getCurrentOrganization(userId); // Recursively find new current org
+    }
+
+    return result.organization;
+  }
+
+  async switchOrganization(userId: string, organizationId: string): Promise<boolean> {
+    // Check if user is a member of the target organization
+    const [membership] = await db
+      .select()
+      .from(organizationMemberships)
+      .where(and(
+        eq(organizationMemberships.userId, userId),
+        eq(organizationMemberships.organizationId, organizationId),
+        eq(organizationMemberships.isActive, true)
+      ));
+    
+    if (!membership) {
+      return false;
+    }
+    
+    // Persist the organization selection
+    const result = await db
+      .update(users)
+      .set({ currentOrganizationId: organizationId })
+      .where(eq(users.id, userId));
+    
+    return result.rowCount > 0;
+  }
+
+  // Organization Memberships
+  async listUserOrganizations(userId: string): Promise<Array<{ organization: Organization; membership: OrganizationMembership }>> {
+    const results = await db
+      .select({
+        organization: organizations,
+        membership: organizationMemberships
+      })
+      .from(organizationMemberships)
+      .innerJoin(organizations, eq(organizations.id, organizationMemberships.organizationId))
+      .where(and(
+        eq(organizationMemberships.userId, userId),
+        eq(organizationMemberships.isActive, true)
+      ))
+      .orderBy(organizationMemberships.joinedAt);
+    
+    return results;
+  }
+
+  async updateMemberRole(organizationId: string, memberUserId: string, orgRole: string): Promise<OrganizationMembership | undefined> {
+    // Validate role
+    const validRoles = ['owner', 'admin', 'member'];
+    if (!validRoles.includes(orgRole)) {
+      throw new Error('Invalid organization role');
+    }
+
+    // Check if membership exists and belongs to organization
+    const [membership] = await db
+      .select()
+      .from(organizationMemberships)
+      .where(and(
+        eq(organizationMemberships.organizationId, organizationId),
+        eq(organizationMemberships.userId, memberUserId),
+        eq(organizationMemberships.isActive, true)
+      ));
+
+    if (!membership) {
+      throw new Error('User is not an active member of this organization');
+    }
+
+    // Prevent demotion of last owner
+    if (membership.orgRole === 'owner' && orgRole !== 'owner') {
+      const [ownerCount] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(organizationMemberships)
+        .where(and(
+          eq(organizationMemberships.organizationId, organizationId),
+          eq(organizationMemberships.orgRole, 'owner'),
+          eq(organizationMemberships.isActive, true)
+        ));
+
+      if (Number(ownerCount.count) <= 1) {
+        throw new Error('Cannot demote the last owner of the organization');
+      }
+    }
+
+    const [updated] = await db
+      .update(organizationMemberships)
+      .set({ orgRole })
+      .where(and(
+        eq(organizationMemberships.organizationId, organizationId),
+        eq(organizationMemberships.userId, memberUserId)
+      ))
+      .returning();
+    
+    return updated || undefined;
+  }
+
+  async deactivateMember(organizationId: string, memberUserId: string): Promise<boolean> {
+    // Check if membership exists and belongs to organization
+    const [membership] = await db
+      .select()
+      .from(organizationMemberships)
+      .where(and(
+        eq(organizationMemberships.organizationId, organizationId),
+        eq(organizationMemberships.userId, memberUserId),
+        eq(organizationMemberships.isActive, true)
+      ));
+
+    if (!membership) {
+      return false; // Member doesn't exist or is already inactive
+    }
+
+    // Prevent deactivation of last owner
+    if (membership.orgRole === 'owner') {
+      const [ownerCount] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(organizationMemberships)
+        .where(and(
+          eq(organizationMemberships.organizationId, organizationId),
+          eq(organizationMemberships.orgRole, 'owner'),
+          eq(organizationMemberships.isActive, true)
+        ));
+
+      if (Number(ownerCount.count) <= 1) {
+        throw new Error('Cannot deactivate the last owner of the organization');
+      }
+    }
+
+    const result = await db
+      .update(organizationMemberships)
+      .set({ isActive: false })
+      .where(and(
+        eq(organizationMemberships.organizationId, organizationId),
+        eq(organizationMemberships.userId, memberUserId)
+      ));
+
+    // Clear currentOrganizationId if user was using this organization
+    const [user] = await db
+      .select({ currentOrganizationId: users.currentOrganizationId })
+      .from(users)
+      .where(eq(users.id, memberUserId));
+
+    if (user?.currentOrganizationId === organizationId) {
+      // Find a fallback organization for the user
+      const [fallbackMembership] = await db
+        .select({ organizationId: organizationMemberships.organizationId })
+        .from(organizationMemberships)
+        .where(and(
+          eq(organizationMemberships.userId, memberUserId),
+          eq(organizationMemberships.isActive, true),
+          ne(organizationMemberships.organizationId, organizationId)
+        ))
+        .orderBy(desc(organizationMemberships.joinedAt))
+        .limit(1);
+
+      await db
+        .update(users)
+        .set({ 
+          currentOrganizationId: fallbackMembership?.organizationId || null 
+        })
+        .where(eq(users.id, memberUserId));
+    }
+    
+    return result.rowCount > 0;
+  }
+
+  // Invitations
+  async inviteMember(organizationId: string, email: string, orgRole: string, invitedById: string): Promise<Invitation> {
+    // Normalize email to lowercase for consistency
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Validate role
+    const validRoles = ['owner', 'admin', 'member'];
+    if (!validRoles.includes(orgRole)) {
+      throw new Error('Invalid organization role');
+    }
+
+    // Check if user is already a member
+    const [existingUser] = await db
+      .select({ user: users })
+      .from(users)
+      .where(eq(users.email, normalizedEmail));
+
+    if (existingUser) {
+      const [existingMembership] = await db
+        .select()
+        .from(organizationMemberships)
+        .where(and(
+          eq(organizationMemberships.userId, existingUser.user.id),
+          eq(organizationMemberships.organizationId, organizationId),
+          eq(organizationMemberships.isActive, true)
+        ));
+
+      if (existingMembership) {
+        throw new Error('User is already a member of this organization');
+      }
+    }
+
+    // Check for existing pending invitation
+    const [existingInvitation] = await db
+      .select()
+      .from(invitations)
+      .where(and(
+        eq(invitations.organizationId, organizationId),
+        eq(invitations.email, normalizedEmail),
+        eq(invitations.status, 'pending')
+      ));
+
+    if (existingInvitation) {
+      throw new Error('Invitation already sent to this email address');
+    }
+
+    // Generate secure invitation token
+    const token = crypto.randomBytes(32).toString('hex');
+    
+    // Set expiration to 7 days from now
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    const [invitation] = await db
+      .insert(invitations)
+      .values({
+        organizationId,
+        email: normalizedEmail,
+        orgRole,
+        invitedById,
+        token,
+        expiresAt,
+        status: 'pending'
+      })
+      .returning();
+
+    return invitation;
+  }
+
+  async acceptInvite(token: string, userId: string): Promise<{ success: boolean; membership?: OrganizationMembership; error?: string }> {
+    return await db.transaction(async (tx) => {
+      // Get invitation by token within transaction WITH LOCK
+      const [invitation] = await tx
+        .select()
+        .from(invitations)
+        .where(and(
+          eq(invitations.token, token),
+          eq(invitations.status, 'pending')
+        ))
+        .for('update');
+
+      if (!invitation) {
+        return { success: false, error: 'Invalid or expired invitation' };
+      }
+
+      if (invitation.expiresAt < new Date()) {
+        // Mark as expired
+        await tx
+          .update(invitations)
+          .set({ status: 'expired' })
+          .where(eq(invitations.id, invitation.id));
+        
+        return { success: false, error: 'Invitation has expired' };
+      }
+
+      // SECURITY: Verify accepting user's email matches invitation email
+      const [user] = await tx
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, userId));
+      
+      if (!user || user.email.toLowerCase() !== invitation.email.toLowerCase()) {
+        return { success: false, error: 'This invitation is for a different email address' };
+      }
+
+      // Check if user already has membership in this organization
+      const [existingMembership] = await tx
+        .select()
+        .from(organizationMemberships)
+        .where(and(
+          eq(organizationMemberships.userId, userId),
+          eq(organizationMemberships.organizationId, invitation.organizationId)
+        ));
+
+      if (existingMembership && existingMembership.isActive) {
+        return { success: false, error: 'User is already a member of this organization' };
+      }
+
+      // CRITICAL: Lock organization to serialize ALL acceptances for this org
+      // This prevents race conditions between different invitation tokens
+      await tx
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, invitation.organizationId))
+        .for('update');
+
+      // Check seat limits within transaction after org lock
+      const [memberCount] = await tx
+        .select({ count: sql<number>`count(*)` })
+        .from(organizationMemberships)
+        .where(and(
+          eq(organizationMemberships.organizationId, invitation.organizationId),
+          eq(organizationMemberships.isActive, true)
+        ));
+
+      const activeMembers = Number(memberCount.count) || 0;
+      const seatLimit = 5; // TODO: Get from subscription/plan
+      
+      if (activeMembers >= seatLimit) {
+        return { success: false, error: 'No available seats in organization' };
+      }
+
+      try {
+        let membership: OrganizationMembership;
+        
+        if (existingMembership) {
+          // Reactivate existing membership
+          const [updated] = await tx
+            .update(organizationMemberships)
+            .set({
+              isActive: true,
+              orgRole: invitation.orgRole,
+              invitedById: invitation.invitedById,
+              joinedAt: new Date()
+            })
+            .where(eq(organizationMemberships.id, existingMembership.id))
+            .returning();
+          membership = updated;
+        } else {
+          // Create new membership
+          const [created] = await tx
+            .insert(organizationMemberships)
+            .values({
+              organizationId: invitation.organizationId,
+              userId,
+              orgRole: invitation.orgRole,
+              invitedById: invitation.invitedById,
+              isActive: true
+            })
+            .returning();
+          membership = created;
+        }
+
+        // Mark invitation as accepted (single-use enforcement)
+        await tx
+          .update(invitations)
+          .set({ 
+            status: 'accepted',
+            acceptedAt: new Date()
+          })
+          .where(and(
+            eq(invitations.id, invitation.id),
+            eq(invitations.status, 'pending') // Ensure still pending
+          ));
+
+        // Set this as user's current organization if they don't have one
+        const [user] = await tx
+          .select({ currentOrganizationId: users.currentOrganizationId })
+          .from(users)
+          .where(eq(users.id, userId));
+        
+        if (!user.currentOrganizationId) {
+          await tx
+            .update(users)
+            .set({ currentOrganizationId: invitation.organizationId })
+            .where(eq(users.id, userId));
+        }
+
+        return { success: true, membership };
+      } catch (error) {
+        return { success: false, error: 'Failed to create membership' };
+      }
+    });
+  }
+
+  async revokeInvite(invitationId: string): Promise<boolean> {
+    const result = await db
+      .update(invitations)
+      .set({ status: 'cancelled' })
+      .where(and(
+        eq(invitations.id, invitationId),
+        eq(invitations.status, 'pending')
+      ));
+    
+    return result.rowCount > 0;
+  }
+
+  async getInvitationByToken(token: string): Promise<Invitation | undefined> {
+    const [invitation] = await db
+      .select()
+      .from(invitations)
+      .where(eq(invitations.token, token));
+    
+    return invitation || undefined;
+  }
+
+  async getOrganizationInvitations(organizationId: string): Promise<Invitation[]> {
+    return await db
+      .select()
+      .from(invitations)
+      .where(eq(invitations.organizationId, organizationId))
+      .orderBy(invitations.createdAt);
+  }
+
+  // Seat Management
+  async getSeatUsage(organizationId: string): Promise<{ activeMembers: number; seatLimit: number; available: number }> {
+    // Count active members
+    const [memberCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(organizationMemberships)
+      .where(and(
+        eq(organizationMemberships.organizationId, organizationId),
+        eq(organizationMemberships.isActive, true)
+      ));
+
+    const activeMembers = Number(memberCount.count) || 0;
+    
+    // Get seat limit from subscription (default to 5 for now)
+    // TODO: Get actual seat limit from subscription/plan
+    const seatLimit = 5; 
+    const available = Math.max(0, seatLimit - activeMembers);
+
+    return {
+      activeMembers,
+      seatLimit,
+      available
+    };
   }
 }
 
