@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { 
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
-  userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens,
+  userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type CommunicationVersion, type InsertCommunicationVersion, type Survey, type InsertSurvey,
@@ -13,7 +13,8 @@ import {
   type Permissions, type UserGroup, type InsertUserGroup, type UserGroupMembership, 
   type InsertUserGroupMembership, type UserPermission, type InsertUserPermission,
   type Notification, type InsertNotification, type EmailVerificationToken, type InsertEmailVerificationToken,
-  type PasswordResetToken, type InsertPasswordResetToken, type RegistrationRequest, type EmailVerificationResponse
+  type PasswordResetToken, type InsertPasswordResetToken, type RegistrationRequest, type EmailVerificationResponse,
+  type ChangeArtifact, type InsertChangeArtifact
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray, ne } from "drizzle-orm";
@@ -175,6 +176,21 @@ export interface IStorage {
   createProcessMap(processMap: InsertProcessMap): Promise<ProcessMap>;
   updateProcessMap(id: string, processMap: Partial<InsertProcessMap>): Promise<ProcessMap | undefined>;
   deleteProcessMap(id: string): Promise<boolean>;
+
+  // Change Artifacts
+  getChangeArtifactsByProject(projectId: string): Promise<ChangeArtifact[]>;
+  getChangeArtifact(id: string): Promise<ChangeArtifact | undefined>;
+  createChangeArtifact(artifact: InsertChangeArtifact): Promise<ChangeArtifact>;
+  updateChangeArtifact(id: string, artifact: Partial<InsertChangeArtifact>): Promise<ChangeArtifact | undefined>;
+  deleteChangeArtifact(id: string): Promise<boolean>;
+  searchChangeArtifacts(params: {
+    projectId?: string;
+    category?: string;
+    tags?: string[];
+    query?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ artifacts: ChangeArtifact[]; total: number; }>;
 
   // Dashboard Analytics
   getDashboardStats(userId: string): Promise<{

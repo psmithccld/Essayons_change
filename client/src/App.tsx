@@ -16,6 +16,7 @@ import Stakeholders from "@/pages/stakeholders";
 import Surveys from "@/pages/surveys";
 import GptCoach from "@/pages/gpt-coach";
 import ProcessMapping from "@/pages/process-mapping";
+import ChangeArtifacts from "@/pages/change-artifacts";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import UserManagement from "@/pages/user-management";
@@ -64,6 +65,7 @@ function AuthenticatedApp() {
             <Route path="/security" component={SecurityManagement} />
             <Route path="/process-mapping" component={ProcessMapping} />
             <Route path="/change-process-flow" component={ChangeProcessFlow} />
+            <Route path="/change-artifacts" component={ChangeArtifacts} />
             <Route path="/reports" component={Reports} />
             <Route path="/verify-email" component={() => <EmailVerifyPage onAuthSuccess={login} />} />
             <Route component={NotFound} />

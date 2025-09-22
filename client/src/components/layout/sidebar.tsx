@@ -17,7 +17,8 @@ import {
   GripVertical,
   Briefcase,
   Shield,
-  Building
+  Building,
+  FileText
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
@@ -46,6 +47,7 @@ const allNavigationItems: NavigationItem[] = [
   { id: "communications", icon: Megaphone, label: "Communications", path: "/communications" },
   { id: "stakeholders", icon: Building, label: "Stakeholders", path: "/stakeholders" },
   { id: "surveys", icon: ClipboardCheck, label: "Readiness Surveys", path: "/surveys" },
+  { id: "change-artifacts", icon: FileText, label: "Change Artifacts", path: "/change-artifacts" },
   { id: "gpt-coach", icon: Bot, label: "GPT Coach", path: "/gpt-coach" },
   { id: "fishbone", icon: Fish, label: "Change Process Flow", path: "/change-process-flow" },
   { id: "process-mapping", icon: GitBranch, label: "Development Maps", path: "/process-mapping", permissions: ["canSeeAllProjects", "canModifyProjects"], requireAll: false }

@@ -20,13 +20,15 @@ interface SessionRequest extends Request {
   session: Session & SessionData;
 }
 import { storage } from "./storage";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { ObjectPermission } from "./objectAcl";
 import { 
   insertProjectSchema, insertTaskSchema, insertStakeholderSchema, insertRaidLogSchema,
   insertCommunicationSchema, insertCommunicationStrategySchema, insertCommunicationTemplateSchema, insertSurveySchema, baseSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
   insertMilestoneSchema, insertChecklistTemplateSchema, insertProcessMapSchema,
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema,
   insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
-  insertUserGroupSchema, insertUserGroupMembershipSchema, insertUserPermissionSchema, insertNotificationSchema,
+  insertUserGroupSchema, insertUserGroupMembershipSchema, insertUserPermissionSchema, insertNotificationSchema, insertChangeArtifactSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification
 } from "@shared/schema";
 import * as openaiService from "./openai";
@@ -4349,6 +4351,228 @@ Return the refined content in JSON format:
     } catch (error) {
       console.error('Stakeholder sentiment report error:', error);
       res.status(500).json({ error: 'Failed to generate stakeholder sentiment report' });
+    }
+  });
+
+  // =====================================
+  // CHANGE ARTIFACTS ENDPOINTS
+  // =====================================
+
+  // Get upload URL for object storage (protected file uploading)
+  app.post("/api/objects/upload", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error('Error getting upload URL:', error);
+      res.status(500).json({ error: 'Failed to get upload URL' });
+    }
+  });
+
+  // Serve private objects (with ACL check)
+  app.get("/objects/:objectPath(*)", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const objectStorageService = new ObjectStorageService();
+      
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      const canAccess = await objectStorageService.canAccessObjectEntity({
+        objectFile,
+        userId: userId,
+        requestedPermission: ObjectPermission.READ,
+      });
+      
+      if (!canAccess) {
+        return res.sendStatus(401);
+      }
+      
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error checking object access:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  // Create Change Artifact entry after upload
+  app.post('/api/projects/:projectId/change-artifacts', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { projectId } = req.params;
+      const userId = req.userId!;
+      
+      // SECURITY: Check if user has access to this project
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId);
+      if (!authorizedProjectIds.includes(projectId)) {
+        return res.status(403).json({ error: 'Access denied to this project' });
+      }
+      
+      const validation = insertChangeArtifactSchema.safeParse({
+        ...req.body,
+        projectId,
+        uploadedById: userId,
+        uploadedAt: new Date()
+      });
+
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid change artifact data", 
+          details: validation.error.errors 
+        });
+      }
+
+      // Set ACL policy for the uploaded file
+      if (req.body.objectPath) {
+        const objectStorageService = new ObjectStorageService();
+        await objectStorageService.trySetObjectEntityAclPolicy(
+          req.body.objectPath,
+          {
+            owner: userId,
+            visibility: req.body.isPublic ? "public" : "private",
+          }
+        );
+      }
+
+      const artifact = await storage.createChangeArtifact(validation.data);
+      res.status(201).json(artifact);
+    } catch (error) {
+      console.error('Error creating change artifact:', error);
+      res.status(500).json({ error: 'Failed to create change artifact' });
+    }
+  });
+
+  // Get Change Artifacts by project
+  app.get('/api/projects/:projectId/change-artifacts', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { projectId } = req.params;
+      const userId = req.userId!;
+      
+      // SECURITY: Check if user has access to this project
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId);
+      if (!authorizedProjectIds.includes(projectId)) {
+        return res.status(403).json({ error: 'Access denied to this project' });
+      }
+      
+      const artifacts = await storage.getChangeArtifactsByProject(projectId);
+      res.json(artifacts);
+    } catch (error) {
+      console.error('Error getting change artifacts:', error);
+      res.status(500).json({ error: 'Failed to get change artifacts' });
+    }
+  });
+
+  // Search Change Artifacts
+  app.post('/api/change-artifacts/search', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+      
+      // SECURITY: Get user's authorized projects for filtering
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId);
+      
+      const searchParams = {
+        ...req.body,
+        projectIds: req.body.projectIds ? 
+          req.body.projectIds.filter((id: string) => authorizedProjectIds.includes(id)) :
+          authorizedProjectIds
+      };
+
+      const result = await storage.searchChangeArtifacts(searchParams);
+      res.json(result);
+    } catch (error) {
+      console.error('Error searching change artifacts:', error);
+      res.status(500).json({ error: 'Failed to search change artifacts' });
+    }
+  });
+
+  // Get single Change Artifact
+  app.get('/api/change-artifacts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const artifact = await storage.getChangeArtifact(id);
+      
+      if (!artifact) {
+        return res.status(404).json({ error: 'Change artifact not found' });
+      }
+
+      // SECURITY: Check if user has access to this artifact's project
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      if (!authorizedProjectIds.includes(artifact.projectId)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      res.json(artifact);
+    } catch (error) {
+      console.error('Error getting change artifact:', error);
+      res.status(500).json({ error: 'Failed to get change artifact' });
+    }
+  });
+
+  // Update Change Artifact
+  app.put('/api/change-artifacts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.userId!;
+      
+      // Check if artifact exists and user has access
+      const existingArtifact = await storage.getChangeArtifact(id);
+      if (!existingArtifact) {
+        return res.status(404).json({ error: 'Change artifact not found' });
+      }
+
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId);
+      if (!authorizedProjectIds.includes(existingArtifact.projectId)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      const validation = insertChangeArtifactSchema.partial().safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid update data", 
+          details: validation.error.errors 
+        });
+      }
+
+      const updatedArtifact = await storage.updateChangeArtifact(id, validation.data);
+      if (!updatedArtifact) {
+        return res.status(404).json({ error: 'Failed to update change artifact' });
+      }
+
+      res.json(updatedArtifact);
+    } catch (error) {
+      console.error('Error updating change artifact:', error);
+      res.status(500).json({ error: 'Failed to update change artifact' });
+    }
+  });
+
+  // Delete Change Artifact
+  app.delete('/api/change-artifacts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.userId!;
+      
+      // Check if artifact exists and user has access
+      const existingArtifact = await storage.getChangeArtifact(id);
+      if (!existingArtifact) {
+        return res.status(404).json({ error: 'Change artifact not found' });
+      }
+
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId);
+      if (!authorizedProjectIds.includes(existingArtifact.projectId)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // TODO: Also delete the file from object storage if needed
+      const deleted = await storage.deleteChangeArtifact(id);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Failed to delete change artifact' });
+      }
+
+      res.json({ message: 'Change artifact deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting change artifact:', error);
+      res.status(500).json({ error: 'Failed to delete change artifact' });
     }
   });
 
