@@ -69,12 +69,12 @@ export interface IStorage {
   deleteTask(id: string, organizationId: string): Promise<boolean>;
 
   // Stakeholders
-  getStakeholdersByProject(projectId: string): Promise<Stakeholder[]>;
-  getStakeholder(id: string): Promise<Stakeholder | undefined>;
+  getStakeholdersByProject(projectId: string, organizationId: string): Promise<Stakeholder[]>;
+  getStakeholder(id: string, organizationId: string): Promise<Stakeholder | undefined>;
   createStakeholder(stakeholder: InsertStakeholder): Promise<Stakeholder>;
-  updateStakeholder(id: string, stakeholder: Partial<InsertStakeholder>): Promise<Stakeholder | undefined>;
-  deleteStakeholder(id: string): Promise<boolean>;
-  importStakeholders(targetProjectId: string, sourceProjectId: string, stakeholderIds: string[]): Promise<{ imported: number; skipped: number }>;
+  updateStakeholder(id: string, organizationId: string, stakeholder: Partial<InsertStakeholder>): Promise<Stakeholder | undefined>;
+  deleteStakeholder(id: string, organizationId: string): Promise<boolean>;
+  importStakeholders(targetProjectId: string, sourceProjectId: string, stakeholderIds: string[], organizationId: string): Promise<{ imported: number; skipped: number }>;
 
   // RAID Logs
   getRaidLogsByProject(projectId: string): Promise<RaidLog[]>;
@@ -1260,13 +1260,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Stakeholders
-  async getStakeholdersByProject(projectId: string): Promise<Stakeholder[]> {
-    return await db.select().from(stakeholders).where(eq(stakeholders.projectId, projectId)).orderBy(desc(stakeholders.createdAt));
+  async getStakeholdersByProject(projectId: string, organizationId: string): Promise<Stakeholder[]> {
+    return await db.select().from(stakeholders)
+      .innerJoin(projects, eq(stakeholders.projectId, projects.id))
+      .where(and(eq(stakeholders.projectId, projectId), eq(projects.organizationId, organizationId)))
+      .orderBy(desc(stakeholders.createdAt))
+      .then(results => results.map(r => r.stakeholders));
   }
 
-  async getStakeholder(id: string): Promise<Stakeholder | undefined> {
-    const [stakeholder] = await db.select().from(stakeholders).where(eq(stakeholders.id, id));
-    return stakeholder || undefined;
+  async getStakeholder(id: string, organizationId: string): Promise<Stakeholder | undefined> {
+    const [result] = await db.select({ stakeholder: stakeholders })
+      .from(stakeholders)
+      .innerJoin(projects, eq(stakeholders.projectId, projects.id))
+      .where(and(eq(stakeholders.id, id), eq(projects.organizationId, organizationId)));
+    return result?.stakeholder || undefined;
   }
 
   async createStakeholder(stakeholder: InsertStakeholder): Promise<Stakeholder> {
@@ -1274,30 +1281,44 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateStakeholder(id: string, stakeholder: Partial<InsertStakeholder>): Promise<Stakeholder | undefined> {
+  async updateStakeholder(id: string, organizationId: string, stakeholder: Partial<InsertStakeholder>): Promise<Stakeholder | undefined> {
     const [updated] = await db.update(stakeholders)
       .set({ ...stakeholder, updatedAt: new Date() })
-      .where(eq(stakeholders.id, id))
+      .where(and(
+        eq(stakeholders.id, id),
+        inArray(stakeholders.projectId, 
+          db.select({ id: projects.id }).from(projects).where(eq(projects.organizationId, organizationId))
+        )
+      ))
       .returning();
     return updated || undefined;
   }
 
-  async deleteStakeholder(id: string): Promise<boolean> {
-    const result = await db.delete(stakeholders).where(eq(stakeholders.id, id));
+  async deleteStakeholder(id: string, organizationId: string): Promise<boolean> {
+    const result = await db.delete(stakeholders)
+      .where(and(
+        eq(stakeholders.id, id),
+        inArray(stakeholders.projectId, 
+          db.select({ id: projects.id }).from(projects).where(eq(projects.organizationId, organizationId))
+        )
+      ));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
-  async importStakeholders(targetProjectId: string, sourceProjectId: string, stakeholderIds: string[]): Promise<{ imported: number; skipped: number }> {
-    // Get the stakeholders to import
+  async importStakeholders(targetProjectId: string, sourceProjectId: string, stakeholderIds: string[], organizationId: string): Promise<{ imported: number; skipped: number }> {
+    // Get the stakeholders to import (ensure source project belongs to organization)
     const sourceStakeholders = await db
-      .select()
+      .select({ stakeholder: stakeholders })
       .from(stakeholders)
+      .innerJoin(projects, eq(stakeholders.projectId, projects.id))
       .where(
         and(
           eq(stakeholders.projectId, sourceProjectId),
+          eq(projects.organizationId, organizationId),
           inArray(stakeholders.id, stakeholderIds)
         )
-      );
+      )
+      .then(results => results.map(r => r.stakeholder));
 
     // Get existing stakeholders in target project to check for duplicates (by name and role)
     const existingStakeholders = await db

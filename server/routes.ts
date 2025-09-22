@@ -2372,7 +2372,7 @@ Return the refined content in JSON format:
   // Stakeholders
   app.get("/api/projects/:projectId/stakeholders", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const stakeholders = await storage.getStakeholdersByProject(req.params.projectId);
+      const stakeholders = await storage.getStakeholdersByProject(req.params.projectId, req.organizationId!);
       res.json(stakeholders);
     } catch (error) {
       console.error("Error fetching stakeholders:", error);
@@ -2382,16 +2382,23 @@ Return the refined content in JSON format:
 
   app.post("/api/projects/:projectId/stakeholders", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
+      // Verify project belongs to organization (parent/child validation)
+      const project = await storage.getProject(req.params.projectId, req.organizationId!);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      
       const validatedData = insertStakeholderSchema.parse({
         ...req.body,
-        projectId: req.params.projectId
+        projectId: req.params.projectId, // Use validated projectId from params
+        organizationId: req.organizationId! // Override client value - prevent org spoofing
       });
       const stakeholder = await storage.createStakeholder(validatedData);
       
       // Create notifications for project team members about new stakeholder
       try {
         const [project, assignments] = await Promise.all([
-          storage.getProject(req.params.projectId),
+          storage.getProject(req.params.projectId, req.organizationId!),
           storage.getInitiativeAssignments(req.params.projectId)
         ]);
         
@@ -2423,7 +2430,9 @@ Return the refined content in JSON format:
 
   app.put("/api/stakeholders/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const stakeholder = await storage.updateStakeholder(req.params.id, req.body);
+      // Strip organizationId and projectId from request body to prevent cross-tenant changes
+      const { organizationId, projectId, ...updateData } = req.body;
+      const stakeholder = await storage.updateStakeholder(req.params.id, req.organizationId!, updateData);
       if (!stakeholder) {
         return res.status(404).json({ error: "Stakeholder not found" });
       }
@@ -2436,7 +2445,7 @@ Return the refined content in JSON format:
 
   app.delete("/api/stakeholders/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const success = await storage.deleteStakeholder(req.params.id);
+      const success = await storage.deleteStakeholder(req.params.id, req.organizationId!);
       if (!success) {
         return res.status(404).json({ error: "Stakeholder not found" });
       }
@@ -2454,13 +2463,13 @@ Return the refined content in JSON format:
         return res.status(400).json({ error: "Invalid request: sourceProjectId and stakeholderIds array required" });
       }
       
-      const result = await storage.importStakeholders(req.params.projectId, sourceProjectId, stakeholderIds);
+      const result = await storage.importStakeholders(req.params.projectId, sourceProjectId, stakeholderIds, req.organizationId!);
       
       // Create notifications for project team members about imported stakeholders
       if (result.imported > 0) {
         try {
           const [project, assignments] = await Promise.all([
-            storage.getProject(req.params.projectId),
+            storage.getProject(req.params.projectId, req.organizationId!),
             storage.getInitiativeAssignments(req.params.projectId)
           ]);
           
