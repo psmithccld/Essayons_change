@@ -1840,6 +1840,119 @@ export type RegistrationRequest = z.infer<typeof registrationRequestSchema>;
 export type EmailVerificationResponse = z.infer<typeof emailVerificationResponseSchema>;
 
 // ===============================================
+// HELPDESK GPT AGENT SYSTEM
+// ===============================================
+
+// Support Tickets - for escalations to super admin
+export const supportTickets = pgTable("support_tickets", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  title: text("title").notNull(), // Issue summary
+  description: text("description").notNull(), // Detailed issue description
+  category: text("category").notNull(), // permissions, technical, feature_request, bug
+  priority: text("priority").notNull().default("medium"), // low, medium, high, urgent
+  status: text("status").notNull().default("open"), // open, in_progress, resolved, closed
+  
+  // Context data for troubleshooting
+  userContext: jsonb("user_context").default({}), // User role, permissions, current page
+  systemContext: jsonb("system_context").default({}), // Error logs, API responses, system state
+  conversationHistory: jsonb("conversation_history").default([]), // GPT conversation that led to escalation
+  
+  // Assignment and resolution
+  assignedToSuperAdmin: uuid("assigned_to_super_admin").references(() => superAdminUsers.id, { onDelete: "set null" }),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionNotes: text("resolution_notes"),
+  
+  // Email/notification tracking
+  emailSent: boolean("email_sent").notNull().default(false),
+  emailSentAt: timestamp("email_sent_at"),
+  notificationsSent: jsonb("notifications_sent").default([]), // Array of notification IDs
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("support_tickets_org_idx").on(table.organizationId),
+  userIdx: index("support_tickets_user_idx").on(table.userId),
+  statusIdx: index("support_tickets_status_idx").on(table.status),
+  priorityIdx: index("support_tickets_priority_idx").on(table.priority),
+  assignedIdx: index("support_tickets_assigned_idx").on(table.assignedToSuperAdmin),
+}));
+
+// Support Conversations - chat history with GPT agent
+export const supportConversations = pgTable("support_conversations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  
+  // Conversation metadata
+  sessionId: text("session_id").notNull(), // Unique session ID for grouping messages
+  isActive: boolean("is_active").notNull().default(true), // Is conversation still ongoing?
+  
+  // Context at conversation start
+  initialContext: jsonb("initial_context").default({}), // User state when conversation began
+  currentPage: text("current_page"), // Page user was on when starting conversation
+  userAgent: text("user_agent"), // Browser info for debugging context
+  
+  // Conversation content
+  messages: jsonb("messages").default([]), // Array of message objects {role, content, timestamp}
+  issueResolved: boolean("issue_resolved").notNull().default(false),
+  satisfactionRating: integer("satisfaction_rating"), // 1-5 rating if provided
+  
+  // Escalation tracking
+  escalatedToTicket: uuid("escalated_to_ticket").references(() => supportTickets.id, { onDelete: "set null" }),
+  escalatedAt: timestamp("escalated_at"),
+  
+  // Analytics and improvement
+  conversationDuration: integer("conversation_duration"), // Minutes of conversation
+  messagesCount: integer("messages_count").notNull().default(0),
+  issueCategory: text("issue_category"), // Detected by GPT: permissions, navigation, data, etc.
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("support_conversations_org_idx").on(table.organizationId),
+  userIdx: index("support_conversations_user_idx").on(table.userId),
+  sessionIdx: index("support_conversations_session_idx").on(table.sessionId),
+  activeIdx: index("support_conversations_active_idx").on(table.isActive),
+  resolvedIdx: index("support_conversations_resolved_idx").on(table.issueResolved),
+  escalatedIdx: index("support_conversations_escalated_idx").on(table.escalatedToTicket),
+}));
+
+// Helpdesk Insert Schemas
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  emailSentAt: true,
+  resolvedAt: true,
+});
+
+export const insertSupportConversationSchema = createInsertSchema(supportConversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  escalatedAt: true,
+});
+
+// Helpdesk Types
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+
+export type SupportConversation = typeof supportConversations.$inferSelect;
+export type InsertSupportConversation = z.infer<typeof insertSupportConversationSchema>;
+
+// GPT Message type for conversation history
+export const gptMessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string(),
+  timestamp: z.string().datetime(),
+  messageId: z.string().optional(), // Unique ID for each message
+});
+
+export type GPTMessage = z.infer<typeof gptMessageSchema>;
+
+// ===============================================
 // SUPER ADMIN SYSTEM - Platform Management
 // ===============================================
 
