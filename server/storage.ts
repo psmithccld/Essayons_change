@@ -4,6 +4,7 @@ import {
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
   organizations, organizationMemberships, organizationSettings, plans, subscriptions, invitations,
+  superAdminUsers, superAdminSessions,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type CommunicationVersion, type InsertCommunicationVersion, type Survey, type InsertSurvey,
@@ -19,7 +20,9 @@ import {
   type ChangeArtifact, type InsertChangeArtifact,
   type Organization, type InsertOrganization, type OrganizationMembership, type InsertOrganizationMembership,
   type OrganizationSettings, type InsertOrganizationSettings,
-  type Plan, type InsertPlan, type Subscription, type InsertSubscription, type Invitation, type InsertInvitation
+  type Plan, type InsertPlan, type Subscription, type InsertSubscription, type Invitation, type InsertInvitation,
+  type SuperAdminUser, type InsertSuperAdminUser, type SuperAdminSession, type InsertSuperAdminSession,
+  type SuperAdminLoginRequest, type SuperAdminRegistrationRequest
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray, ne } from "drizzle-orm";
@@ -51,6 +54,20 @@ export interface IStorage {
   verifyEmailToken(token: string): Promise<{ isValid: boolean; email?: string; isExpired?: boolean }>;
   completeEmailVerification(response: EmailVerificationResponse): Promise<{ success: boolean; user?: User; message: string }>;
   cleanupExpiredTokens(): Promise<void>;
+
+  // Super Admin Authentication - Platform Management
+  createSuperAdminUser(user: InsertSuperAdminUser): Promise<SuperAdminUser>;
+  getSuperAdminUser(id: string): Promise<SuperAdminUser | undefined>;
+  getSuperAdminUserByUsername(username: string): Promise<SuperAdminUser | undefined>;
+  getSuperAdminUserByEmail(email: string): Promise<SuperAdminUser | undefined>;
+  verifySuperAdminPassword(username: string, password: string): Promise<SuperAdminUser | null>;
+  updateSuperAdminUser(id: string, user: Partial<InsertSuperAdminUser>): Promise<SuperAdminUser | undefined>;
+  
+  // Super Admin Session Management
+  createSuperAdminSession(userId: string): Promise<SuperAdminSession>;
+  getSuperAdminSession(sessionId: string): Promise<SuperAdminSession | undefined>;
+  deleteSuperAdminSession(sessionId: string): Promise<boolean>;
+  cleanupExpiredSuperAdminSessions(): Promise<void>;
 
   // Projects - SECURITY: Organization-scoped for tenant isolation
   getProjects(userId: string, organizationId: string): Promise<Project[]>;
@@ -1141,6 +1158,149 @@ export class DatabaseStorage implements IStorage {
       await db.delete(passwordResetTokens).where(sql`expires_at < ${now}`);
     } catch (error) {
       console.error("Error cleaning up expired tokens:", error);
+    }
+  }
+
+  // Super Admin Authentication - Platform Management
+  async createSuperAdminUser(insertUser: InsertSuperAdminUser): Promise<SuperAdminUser> {
+    // Hash the password before storing
+    const hashedPassword = await bcrypt.hash(insertUser.password, SALT_ROUNDS);
+    
+    // Remove the plain password and add the hashed one
+    const { password, ...userDataWithoutPassword } = insertUser;
+    const userData = {
+      ...userDataWithoutPassword,
+      passwordHash: hashedPassword,
+      updatedAt: new Date()
+    };
+
+    const [user] = await db.insert(superAdminUsers).values(userData).returning();
+    
+    // Remove passwordHash from response for security
+    const { passwordHash, ...userWithoutHash } = user;
+    return userWithoutHash as SuperAdminUser;
+  }
+
+  async getSuperAdminUser(id: string): Promise<SuperAdminUser | undefined> {
+    const [user] = await db.select().from(superAdminUsers).where(eq(superAdminUsers.id, id));
+    if (!user) return undefined;
+    // Remove passwordHash from response for security
+    const { passwordHash, ...userWithoutHash } = user;
+    return userWithoutHash as SuperAdminUser;
+  }
+
+  async getSuperAdminUserByUsername(username: string): Promise<SuperAdminUser | undefined> {
+    const [user] = await db.select().from(superAdminUsers).where(eq(superAdminUsers.username, username));
+    if (!user) return undefined;
+    // Remove passwordHash from response for security
+    const { passwordHash, ...userWithoutHash } = user;
+    return userWithoutHash as SuperAdminUser;
+  }
+
+  async getSuperAdminUserByEmail(email: string): Promise<SuperAdminUser | undefined> {
+    const [user] = await db.select().from(superAdminUsers).where(eq(superAdminUsers.email, email));
+    if (!user) return undefined;
+    // Remove passwordHash from response for security
+    const { passwordHash, ...userWithoutHash } = user;
+    return userWithoutHash as SuperAdminUser;
+  }
+
+  // SECURITY: Internal method that includes passwordHash for authentication
+  private async getSuperAdminUserByUsernameWithPassword(username: string): Promise<SuperAdminUser & { passwordHash: string } | undefined> {
+    const [user] = await db.select().from(superAdminUsers).where(eq(superAdminUsers.username, username));
+    return user || undefined;
+  }
+
+  async verifySuperAdminPassword(username: string, password: string): Promise<SuperAdminUser | null> {
+    try {
+      const user = await this.getSuperAdminUserByUsernameWithPassword(username);
+      if (!user || !user.passwordHash) {
+        return null;
+      }
+
+      // Check if user is active
+      if (!user.isActive) {
+        return null;
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+      if (!isValidPassword) {
+        return null;
+      }
+
+      // Update last login time
+      await this.updateSuperAdminUser(user.id, { lastLoginAt: new Date() });
+
+      // Remove passwordHash from response for security
+      const { passwordHash, ...userWithoutHash } = user;
+      return userWithoutHash as SuperAdminUser;
+    } catch (error) {
+      console.error("Error verifying super admin password:", error);
+      return null;
+    }
+  }
+
+  async updateSuperAdminUser(id: string, updateData: Partial<InsertSuperAdminUser>): Promise<SuperAdminUser | undefined> {
+    const updatePayload: any = { ...updateData, updatedAt: new Date() };
+    
+    // Hash password if provided
+    if (updateData.password) {
+      updatePayload.passwordHash = await bcrypt.hash(updateData.password, SALT_ROUNDS);
+      delete updatePayload.password;
+    }
+
+    const [updated] = await db.update(superAdminUsers)
+      .set(updatePayload)
+      .where(eq(superAdminUsers.id, id))
+      .returning();
+    
+    if (!updated) return undefined;
+    
+    // Remove passwordHash from response for security
+    const { passwordHash, ...userWithoutHash } = updated;
+    return userWithoutHash as SuperAdminUser;
+  }
+
+  // Super Admin Session Management
+  async createSuperAdminSession(userId: string): Promise<SuperAdminSession> {
+    // Generate cryptographically secure session ID
+    const sessionId = crypto.randomBytes(32).toString('hex');
+    
+    // Session expires in 24 hours
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const sessionData = {
+      id: sessionId,
+      superAdminUserId: userId,
+      expiresAt
+    };
+
+    const [session] = await db.insert(superAdminSessions).values(sessionData).returning();
+    return session;
+  }
+
+  async getSuperAdminSession(sessionId: string): Promise<SuperAdminSession | undefined> {
+    const [session] = await db.select()
+      .from(superAdminSessions)
+      .where(and(
+        eq(superAdminSessions.id, sessionId),
+        sql`expires_at > NOW()`
+      ));
+    
+    return session || undefined;
+  }
+
+  async deleteSuperAdminSession(sessionId: string): Promise<boolean> {
+    const result = await db.delete(superAdminSessions).where(eq(superAdminSessions.id, sessionId));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async cleanupExpiredSuperAdminSessions(): Promise<void> {
+    try {
+      const now = new Date();
+      await db.delete(superAdminSessions).where(sql`expires_at < ${now}`);
+    } catch (error) {
+      console.error("Error cleaning up expired super admin sessions:", error);
     }
   }
 

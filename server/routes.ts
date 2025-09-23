@@ -782,6 +782,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===============================================
+  // SUPER ADMIN AUTHENTICATION ROUTES - Platform Management
+  // ===============================================
+
+  // Super Admin authentication middleware - completely separate from tenant auth
+  const requireSuperAdminAuth = async (req: Request & { superAdminUser?: any }, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-super-admin-session'] as string;
+      
+      if (!sessionId) {
+        return res.status(401).json({ error: "Super admin authentication required" });
+      }
+
+      // Verify session exists and is valid
+      const session = await storage.getSuperAdminSession(sessionId);
+      if (!session) {
+        return res.status(401).json({ error: "Invalid or expired super admin session" });
+      }
+
+      // Get super admin user
+      const user = await storage.getSuperAdminUser(session.superAdminUserId);
+      if (!user || !user.isActive) {
+        // Clean up invalid session
+        await storage.deleteSuperAdminSession(sessionId);
+        return res.status(401).json({ error: "Invalid or inactive super admin account" });
+      }
+
+      // Store user info for use in route handlers
+      req.superAdminUser = user;
+      
+      next();
+    } catch (error) {
+      console.error("Super admin authentication error:", error);
+      res.status(500).json({ error: "Authentication check failed" });
+    }
+  };
+
+  // Super Admin Login
+  app.post("/api/super-admin/auth/login", async (req: Request, res: Response) => {
+    try {
+      const { superAdminLoginSchema } = await import("@shared/schema");
+      
+      // Validate request body
+      const validationResult = superAdminLoginSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid login data", 
+          details: validationResult.error.errors 
+        });
+      }
+
+      const { username, password } = validationResult.data;
+
+      // SECURITY: Rate limiting to prevent brute force attacks
+      const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
+      const rateLimitKey = `super-admin-login:${username}:${clientIp}`;
+      
+      if (!checkRateLimit(rateLimitKey, 5, 900000)) { // 5 attempts per 15 minutes
+        console.warn(`Super admin login rate limit exceeded for username: ${username}, IP: ${clientIp}`);
+        return res.status(429).json({ 
+          error: "Too many login attempts. Please wait 15 minutes before trying again." 
+        });
+      }
+
+      // Verify super admin credentials
+      const user = await storage.verifySuperAdminPassword(username, password);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
+
+      if (!user.isActive) {
+        return res.status(401).json({ error: "Account is inactive" });
+      }
+
+      // Create super admin session
+      const session = await storage.createSuperAdminSession(user.id);
+
+      res.json({
+        user,
+        sessionId: session.id,
+        expiresAt: session.expiresAt,
+        message: "Super admin login successful"
+      });
+    } catch (error) {
+      console.error("Error during super admin login:", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  // Super Admin Auth Status
+  app.get("/api/super-admin/auth/status", requireSuperAdminAuth, async (req: Request & { superAdminUser: any }, res: Response) => {
+    try {
+      res.json({
+        user: req.superAdminUser,
+        authenticated: true,
+        role: req.superAdminUser.role
+      });
+    } catch (error) {
+      console.error("Error checking super admin auth status:", error);
+      res.status(500).json({ error: "Failed to check authentication status" });
+    }
+  });
+
+  // Super Admin Logout
+  app.post("/api/super-admin/auth/logout", async (req: Request, res: Response) => {
+    try {
+      const sessionId = req.headers['x-super-admin-session'] as string;
+      
+      if (sessionId) {
+        await storage.deleteSuperAdminSession(sessionId);
+      }
+      
+      res.json({ message: "Logged out successfully" });
+    } catch (error) {
+      console.error("Error during super admin logout:", error);
+      res.status(500).json({ error: "Logout failed" });
+    }
+  });
+
+  // Super Admin Session Cleanup (maintenance endpoint)
+  app.post("/api/super-admin/auth/cleanup-sessions", requireSuperAdminAuth, async (req: Request, res: Response) => {
+    try {
+      await storage.cleanupExpiredSuperAdminSessions();
+      res.json({ message: "Session cleanup completed" });
+    } catch (error) {
+      console.error("Error during session cleanup:", error);
+      res.status(500).json({ error: "Session cleanup failed" });
+    }
+  });
+
   // RBAC: User permissions endpoint for frontend permission gating
   app.get("/api/users/me/permissions", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
