@@ -2454,6 +2454,7 @@ export class DatabaseStorage implements IStorage {
 
   // User-specific Dashboard Analytics Implementations
   async getUserActiveInitiatives(userId: string): Promise<number> {
+    // Return count of initiatives assigned to the user (keep original behavior for "My Active Initiatives")
     const initiatives = await this.getUserInitiativesWithRoles(userId);
     return initiatives.filter(i => i.project.status !== 'completed' && i.project.status !== 'cancelled').length;
   }
@@ -2516,7 +2517,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserInitiativesByPhase(userId: string): Promise<Record<string, number>> {
-    const initiatives = await this.getUserInitiativesWithRoles(userId);
+    // Get user's authorized projects, then count ALL active initiatives in those projects for any role
+    const userProjectIds = await this.getUserAuthorizedProjectIds(userId);
+    if (userProjectIds.length === 0) {
+      return {
+        'identify_need': 0,
+        'identify_stakeholders': 0,
+        'develop_change': 0,
+        'implement_change': 0,
+        'reinforce_change': 0
+      };
+    }
+    
+    const authorizedProjects = await db.select()
+      .from(projects)
+      .where(and(
+        inArray(projects.id, userProjectIds),
+        ne(projects.status, 'completed'),
+        ne(projects.status, 'cancelled')
+      ));
+    
     const phaseCount: Record<string, number> = {
       'identify_need': 0,
       'identify_stakeholders': 0,
@@ -2525,12 +2545,10 @@ export class DatabaseStorage implements IStorage {
       'reinforce_change': 0
     };
     
-    initiatives.forEach(initiative => {
-      if (initiative.project.status !== 'completed' && initiative.project.status !== 'cancelled') {
-        const phase = initiative.project.currentPhase || 'identify_need';
-        if (phaseCount.hasOwnProperty(phase)) {
-          phaseCount[phase]++;
-        }
+    authorizedProjects.forEach(project => {
+      const phase = project.currentPhase || 'identify_need';
+      if (phaseCount.hasOwnProperty(phase)) {
+        phaseCount[phase]++;
       }
     });
     
