@@ -4,7 +4,7 @@ import {
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
   organizations, organizationMemberships, organizationSettings, plans, subscriptions, invitations,
-  superAdminUsers, superAdminSessions,
+  superAdminUsers, superAdminSessions, supportTickets, supportConversations,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type CommunicationVersion, type InsertCommunicationVersion, type Survey, type InsertSurvey,
@@ -22,7 +22,8 @@ import {
   type OrganizationSettings, type InsertOrganizationSettings,
   type Plan, type InsertPlan, type Subscription, type InsertSubscription, type Invitation, type InsertInvitation,
   type SuperAdminUser, type InsertSuperAdminUser, type SuperAdminSession, type InsertSuperAdminSession,
-  type SuperAdminLoginRequest, type SuperAdminRegistrationRequest
+  type SuperAdminLoginRequest, type SuperAdminRegistrationRequest,
+  type SupportTicket, type InsertSupportTicket, type SupportConversation, type InsertSupportConversation, type GPTMessage
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray, ne } from "drizzle-orm";
@@ -888,6 +889,63 @@ export interface IStorage {
   // Organization Settings
   getOrganizationSettings(organizationId: string): Promise<OrganizationSettings | undefined>;
   updateOrganizationSettings(organizationId: string, settings: Partial<InsertOrganizationSettings>): Promise<OrganizationSettings>;
+
+  // ===============================================
+  // HELPDESK GPT AGENT - SECURITY: Organization-scoped for tenant isolation
+  // ===============================================
+
+  // Support Tickets - escalations to super admin
+  getSupportTickets(organizationId: string): Promise<SupportTicket[]>;
+  getSupportTicketsByUser(userId: string, organizationId: string): Promise<SupportTicket[]>;
+  getSupportTicket(id: string, organizationId: string): Promise<SupportTicket | undefined>;
+  createSupportTicket(ticket: InsertSupportTicket, organizationId: string): Promise<SupportTicket>;
+  updateSupportTicket(id: string, organizationId: string, ticket: Partial<InsertSupportTicket>): Promise<SupportTicket | undefined>;
+  assignSupportTicket(id: string, superAdminUserId: string, organizationId: string): Promise<SupportTicket | undefined>;
+  resolveSupportTicket(id: string, resolutionNotes: string, organizationId: string): Promise<SupportTicket | undefined>;
+  
+  // Support Conversations - GPT chat history
+  getSupportConversations(organizationId: string): Promise<SupportConversation[]>;
+  getSupportConversationsByUser(userId: string, organizationId: string): Promise<SupportConversation[]>;
+  getSupportConversation(id: string, organizationId: string): Promise<SupportConversation | undefined>;
+  getSupportConversationBySession(sessionId: string, organizationId: string): Promise<SupportConversation | undefined>;
+  createSupportConversation(conversation: InsertSupportConversation, organizationId: string): Promise<SupportConversation>;
+  updateSupportConversation(id: string, organizationId: string, conversation: Partial<InsertSupportConversation>): Promise<SupportConversation | undefined>;
+  
+  // GPT Context gathering for intelligent support
+  getUserContext(userId: string, organizationId: string): Promise<{
+    user: User;
+    permissions: Permissions;
+    currentOrganization: Organization;
+    organizationMembership: OrganizationMembership;
+    recentProjects: Project[];
+    recentTasks: Task[];
+    recentErrors: any[]; // Recent API errors/logs
+  }>;
+  
+  // Message management for conversations  
+  addMessageToConversation(conversationId: string, message: GPTMessage, organizationId: string): Promise<SupportConversation | undefined>;
+  updateConversationStatus(conversationId: string, organizationId: string, updates: {
+    isActive?: boolean;
+    issueResolved?: boolean;
+    satisfactionRating?: number;
+    issueCategory?: string;
+    conversationDuration?: number;
+  }): Promise<SupportConversation | undefined>;
+  
+  // Escalation workflows
+  escalateConversationToTicket(conversationId: string, ticketData: InsertSupportTicket, organizationId: string): Promise<{ conversation: SupportConversation; ticket: SupportTicket; }>;
+  
+  // Analytics and insights for helpdesk improvement
+  getHelpdeskAnalytics(organizationId: string, timeRange?: { from: Date; to: Date }): Promise<{
+    totalConversations: number;
+    resolvedConversations: number;
+    escalatedTickets: number;
+    averageSatisfactionRating: number;
+    topIssueCategories: Array<{ category: string; count: number }>;
+    averageResolutionTime: number;
+    ticketsByStatus: Record<string, number>;
+    ticketsByPriority: Record<string, number>;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5317,6 +5375,417 @@ export class DatabaseStorage implements IStorage {
       activeMembers,
       seatLimit,
       available
+    };
+  }
+
+  // ===============================================
+  // HELPDESK GPT AGENT IMPLEMENTATIONS
+  // ===============================================
+
+  // Support Tickets - escalations to super admin
+  async getSupportTickets(organizationId: string): Promise<SupportTicket[]> {
+    return await db
+      .select()
+      .from(supportTickets)
+      .where(eq(supportTickets.organizationId, organizationId))
+      .orderBy(desc(supportTickets.createdAt));
+  }
+
+  async getSupportTicketsByUser(userId: string, organizationId: string): Promise<SupportTicket[]> {
+    return await db
+      .select()
+      .from(supportTickets)
+      .where(and(
+        eq(supportTickets.organizationId, organizationId),
+        eq(supportTickets.userId, userId)
+      ))
+      .orderBy(desc(supportTickets.createdAt));
+  }
+
+  async getSupportTicket(id: string, organizationId: string): Promise<SupportTicket | undefined> {
+    const [ticket] = await db
+      .select()
+      .from(supportTickets)
+      .where(and(
+        eq(supportTickets.id, id),
+        eq(supportTickets.organizationId, organizationId)
+      ));
+    return ticket;
+  }
+
+  async createSupportTicket(ticket: InsertSupportTicket, organizationId: string): Promise<SupportTicket> {
+    const [created] = await db
+      .insert(supportTickets)
+      .values({ ...ticket, organizationId })
+      .returning();
+    return created;
+  }
+
+  async updateSupportTicket(id: string, organizationId: string, ticket: Partial<InsertSupportTicket>): Promise<SupportTicket | undefined> {
+    const [updated] = await db
+      .update(supportTickets)
+      .set({ ...ticket, updatedAt: sql`now()` })
+      .where(and(
+        eq(supportTickets.id, id),
+        eq(supportTickets.organizationId, organizationId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  async assignSupportTicket(id: string, superAdminUserId: string, organizationId: string): Promise<SupportTicket | undefined> {
+    const [updated] = await db
+      .update(supportTickets)
+      .set({ 
+        assignedToSuperAdmin: superAdminUserId,
+        status: 'in_progress',
+        updatedAt: sql`now()`
+      })
+      .where(and(
+        eq(supportTickets.id, id),
+        eq(supportTickets.organizationId, organizationId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  async resolveSupportTicket(id: string, resolutionNotes: string, organizationId: string): Promise<SupportTicket | undefined> {
+    const [updated] = await db
+      .update(supportTickets)
+      .set({ 
+        status: 'resolved',
+        resolutionNotes,
+        resolvedAt: sql`now()`,
+        updatedAt: sql`now()`
+      })
+      .where(and(
+        eq(supportTickets.id, id),
+        eq(supportTickets.organizationId, organizationId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  // Support Conversations - GPT chat history
+  async getSupportConversations(organizationId: string): Promise<SupportConversation[]> {
+    return await db
+      .select()
+      .from(supportConversations)
+      .where(eq(supportConversations.organizationId, organizationId))
+      .orderBy(desc(supportConversations.createdAt));
+  }
+
+  async getSupportConversationsByUser(userId: string, organizationId: string): Promise<SupportConversation[]> {
+    return await db
+      .select()
+      .from(supportConversations)
+      .where(and(
+        eq(supportConversations.organizationId, organizationId),
+        eq(supportConversations.userId, userId)
+      ))
+      .orderBy(desc(supportConversations.createdAt));
+  }
+
+  async getSupportConversation(id: string, organizationId: string): Promise<SupportConversation | undefined> {
+    const [conversation] = await db
+      .select()
+      .from(supportConversations)
+      .where(and(
+        eq(supportConversations.id, id),
+        eq(supportConversations.organizationId, organizationId)
+      ));
+    return conversation;
+  }
+
+  async getSupportConversationBySession(sessionId: string, organizationId: string): Promise<SupportConversation | undefined> {
+    const [conversation] = await db
+      .select()
+      .from(supportConversations)
+      .where(and(
+        eq(supportConversations.sessionId, sessionId),
+        eq(supportConversations.organizationId, organizationId)
+      ));
+    return conversation;
+  }
+
+  async createSupportConversation(conversation: InsertSupportConversation, organizationId: string): Promise<SupportConversation> {
+    const [created] = await db
+      .insert(supportConversations)
+      .values({ ...conversation, organizationId })
+      .returning();
+    return created;
+  }
+
+  async updateSupportConversation(id: string, organizationId: string, conversation: Partial<InsertSupportConversation>): Promise<SupportConversation | undefined> {
+    const [updated] = await db
+      .update(supportConversations)
+      .set({ ...conversation, updatedAt: sql`now()` })
+      .where(and(
+        eq(supportConversations.id, id),
+        eq(supportConversations.organizationId, organizationId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  // GPT Context gathering for intelligent support
+  async getUserContext(userId: string, organizationId: string): Promise<{
+    user: User;
+    permissions: Permissions;
+    currentOrganization: Organization;
+    organizationMembership: OrganizationMembership;
+    recentProjects: Project[];
+    recentTasks: Task[];
+    recentErrors: any[]; // Recent API errors/logs
+  }> {
+    // Get user and role information
+    const user = await this.getUser(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const role = await this.getRole(user.roleId);
+    if (!role) {
+      throw new Error('User role not found');
+    }
+
+    // Get organization and membership
+    const organization = await this.getOrganization(organizationId);
+    if (!organization) {
+      throw new Error('Organization not found');
+    }
+
+    const [membership] = await db
+      .select()
+      .from(organizationMemberships)
+      .where(and(
+        eq(organizationMemberships.userId, userId),
+        eq(organizationMemberships.organizationId, organizationId)
+      ));
+
+    if (!membership) {
+      throw new Error('User is not a member of this organization');
+    }
+
+    // Get recent projects and tasks
+    const recentProjects = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.organizationId, organizationId))
+      .limit(5)
+      .orderBy(desc(projects.updatedAt));
+
+    const projectIds = recentProjects.map(p => p.id);
+    const recentTasks = projectIds.length > 0 ? await db
+      .select()
+      .from(tasks)
+      .where(and(
+        inArray(tasks.projectId, projectIds),
+        eq(tasks.assignedTo, userId)
+      ))
+      .limit(10)
+      .orderBy(desc(tasks.updatedAt)) : [];
+
+    return {
+      user,
+      permissions: role.permissions,
+      currentOrganization: organization,
+      organizationMembership: membership,
+      recentProjects,
+      recentTasks,
+      recentErrors: [], // TODO: Implement error log tracking
+    };
+  }
+
+  // Message management for conversations  
+  async addMessageToConversation(conversationId: string, message: GPTMessage, organizationId: string): Promise<SupportConversation | undefined> {
+    // First get the conversation to append the message
+    const conversation = await this.getSupportConversation(conversationId, organizationId);
+    if (!conversation) {
+      return undefined;
+    }
+
+    const currentMessages = Array.isArray(conversation.messages) ? conversation.messages : [];
+    const updatedMessages = [...currentMessages, message];
+
+    const [updated] = await db
+      .update(supportConversations)
+      .set({ 
+        messages: updatedMessages,
+        messagesCount: updatedMessages.length,
+        updatedAt: sql`now()`
+      })
+      .where(and(
+        eq(supportConversations.id, conversationId),
+        eq(supportConversations.organizationId, organizationId)
+      ))
+      .returning();
+
+    return updated;
+  }
+
+  async updateConversationStatus(conversationId: string, organizationId: string, updates: {
+    isActive?: boolean;
+    issueResolved?: boolean;
+    satisfactionRating?: number;
+    issueCategory?: string;
+    conversationDuration?: number;
+  }): Promise<SupportConversation | undefined> {
+    const [updated] = await db
+      .update(supportConversations)
+      .set({ ...updates, updatedAt: sql`now()` })
+      .where(and(
+        eq(supportConversations.id, conversationId),
+        eq(supportConversations.organizationId, organizationId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  // Escalation workflows
+  async escalateConversationToTicket(conversationId: string, ticketData: InsertSupportTicket, organizationId: string): Promise<{ conversation: SupportConversation; ticket: SupportTicket; }> {
+    // Create the support ticket
+    const ticket = await this.createSupportTicket(ticketData, organizationId);
+
+    // Update conversation to mark it as escalated
+    const [conversation] = await db
+      .update(supportConversations)
+      .set({ 
+        escalatedToTicket: ticket.id,
+        escalatedAt: sql`now()`,
+        updatedAt: sql`now()`
+      })
+      .where(and(
+        eq(supportConversations.id, conversationId),
+        eq(supportConversations.organizationId, organizationId)
+      ))
+      .returning();
+
+    if (!conversation) {
+      throw new Error('Failed to update conversation during escalation');
+    }
+
+    return { conversation, ticket };
+  }
+
+  // Analytics and insights for helpdesk improvement
+  async getHelpdeskAnalytics(organizationId: string, timeRange?: { from: Date; to: Date }): Promise<{
+    totalConversations: number;
+    resolvedConversations: number;
+    escalatedTickets: number;
+    averageSatisfactionRating: number;
+    topIssueCategories: Array<{ category: string; count: number }>;
+    averageResolutionTime: number;
+    ticketsByStatus: Record<string, number>;
+    ticketsByPriority: Record<string, number>;
+  }> {
+    // Base conditions for time range filtering
+    const timeConditions = timeRange ? [
+      sql`${supportConversations.createdAt} >= ${timeRange.from}`,
+      sql`${supportConversations.createdAt} <= ${timeRange.to}`
+    ] : [];
+    
+    const ticketTimeConditions = timeRange ? [
+      sql`${supportTickets.createdAt} >= ${timeRange.from}`,
+      sql`${supportTickets.createdAt} <= ${timeRange.to}`
+    ] : [];
+
+    // Get conversation stats
+    const [conversationStats] = await db
+      .select({
+        total: sql<number>`count(*)`,
+        resolved: sql<number>`count(*) filter (where ${supportConversations.issueResolved} = true)`,
+        avgSatisfaction: sql<number>`avg(${supportConversations.satisfactionRating})`
+      })
+      .from(supportConversations)
+      .where(and(
+        eq(supportConversations.organizationId, organizationId),
+        ...timeConditions
+      ));
+
+    // Get ticket stats
+    const [ticketStats] = await db
+      .select({
+        escalated: sql<number>`count(*)`,
+      })
+      .from(supportTickets)
+      .where(and(
+        eq(supportTickets.organizationId, organizationId),
+        ...ticketTimeConditions
+      ));
+
+    // Get tickets by status
+    const statusResults = await db
+      .select({
+        status: supportTickets.status,
+        count: sql<number>`count(*)`
+      })
+      .from(supportTickets)
+      .where(and(
+        eq(supportTickets.organizationId, organizationId),
+        ...ticketTimeConditions
+      ))
+      .groupBy(supportTickets.status);
+
+    // Get tickets by priority
+    const priorityResults = await db
+      .select({
+        priority: supportTickets.priority,
+        count: sql<number>`count(*)`
+      })
+      .from(supportTickets)
+      .where(and(
+        eq(supportTickets.organizationId, organizationId),
+        ...ticketTimeConditions
+      ))
+      .groupBy(supportTickets.priority);
+
+    // Get top issue categories
+    const categoryResults = await db
+      .select({
+        category: supportConversations.issueCategory,
+        count: sql<number>`count(*)`
+      })
+      .from(supportConversations)
+      .where(and(
+        eq(supportConversations.organizationId, organizationId),
+        isNull(supportConversations.issueCategory).not(),
+        ...timeConditions
+      ))
+      .groupBy(supportConversations.issueCategory)
+      .orderBy(desc(sql`count(*)`))
+      .limit(5);
+
+    // Calculate average resolution time (simplified)
+    const [resolutionTime] = await db
+      .select({
+        avgMinutes: sql<number>`avg(${supportConversations.conversationDuration})`
+      })
+      .from(supportConversations)
+      .where(and(
+        eq(supportConversations.organizationId, organizationId),
+        eq(supportConversations.issueResolved, true),
+        ...timeConditions
+      ));
+
+    return {
+      totalConversations: Number(conversationStats.total) || 0,
+      resolvedConversations: Number(conversationStats.resolved) || 0,
+      escalatedTickets: Number(ticketStats.escalated) || 0,
+      averageSatisfactionRating: Number(conversationStats.avgSatisfaction) || 0,
+      topIssueCategories: categoryResults.map(r => ({
+        category: r.category || 'Unknown',
+        count: Number(r.count) || 0
+      })),
+      averageResolutionTime: Number(resolutionTime.avgMinutes) || 0,
+      ticketsByStatus: statusResults.reduce((acc, r) => {
+        acc[r.status] = Number(r.count) || 0;
+        return acc;
+      }, {} as Record<string, number>),
+      ticketsByPriority: priorityResults.reduce((acc, r) => {
+        acc[r.priority] = Number(r.count) || 0;
+        return acc;
+      }, {} as Record<string, number>),
     };
   }
 }
