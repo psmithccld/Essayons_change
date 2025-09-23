@@ -233,12 +233,9 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Change Model Visualization */}
-        <Card className="lg:col-span-2">
+        {/* Change Process Flow - Spanning all 4 columns */}
+        <Card className="col-span-1 md:col-span-2 lg:col-span-4">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Change Process Flow</CardTitle>
@@ -251,8 +248,6 @@ export default function Dashboard() {
             <ChangeProcessFlow initiativesByPhase={userMetrics?.initiativesByPhase} />
           </CardContent>
         </Card>
-
-        
       </div>
 
       {/* Detailed Sections Grid */}
