@@ -60,55 +60,7 @@ interface UserInitiativeWithRole {
   assignedAt: string;
 }
 
-interface Activity {
-  id: string;
-  type: 'survey' | 'communication' | 'risk' | 'issue';
-  title: string;
-  project: string;
-  timeAgo: string;
-}
 
-const mockActivities: Activity[] = [
-  {
-    id: '1',
-    type: 'survey',
-    title: 'Stakeholder survey completed',
-    project: 'Digital Transformation Initiative',
-    timeAgo: '2 hours ago'
-  },
-  {
-    id: '2', 
-    type: 'communication',
-    title: 'Communication plan updated',
-    project: 'Office Relocation Project',
-    timeAgo: '5 hours ago'
-  },
-  {
-    id: '3',
-    type: 'risk',
-    title: 'Risk assessment created',
-    project: 'ERP Implementation',
-    timeAgo: '1 day ago'
-  },
-  {
-    id: '4',
-    type: 'issue',
-    title: 'Issue escalated',
-    project: 'Process Optimization',
-    timeAgo: '2 days ago'
-  }
-];
-
-
-function getActivityIcon(type: Activity['type']) {
-  switch (type) {
-    case 'survey': return <CheckCircle className="w-2 h-2 text-secondary" />;
-    case 'communication': return <Clock className="w-2 h-2 text-accent" />;
-    case 'risk': return <AlertCircle className="w-2 h-2 text-primary" />;
-    case 'issue': return <AlertTriangle className="w-2 h-2 text-destructive" />;
-    default: return <Clock className="w-2 h-2 text-muted-foreground" />;
-  }
-}
 
 function getProjectStatusColor(status: string) {
   switch (status.toLowerCase()) {
@@ -300,30 +252,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Recent Activities */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activities</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {mockActivities.map((activity) => (
-                <div key={activity.id} className="flex items-start space-x-3" data-testid={`activity-${activity.id}`}>
-                  {getActivityIcon(activity.type)}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{activity.title}</p>
-                    <p className="text-xs text-muted-foreground">{activity.project}</p>
-                    <p className="text-xs text-muted-foreground">{activity.timeAgo}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <Button variant="ghost" className="w-full mt-4" data-testid="button-view-all-activities">
-              View All Activities
-            </Button>
-          </CardContent>
-        </Card>
+        
       </div>
 
       {/* Detailed Sections Grid */}
