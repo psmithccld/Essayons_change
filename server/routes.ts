@@ -3141,38 +3141,12 @@ Return the refined content in JSON format:
 
   app.post("/api/projects/:projectId/communications", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      // Determine required permission based on communication type
-      let requiredPermission: keyof Permissions = 'canModifyCommunications';
-      if (req.body.type === 'meeting') {
-        requiredPermission = 'canScheduleMeetings';
-      }
-
-      // Check user permissions
-      const userPermissions = await storage.resolveUserPermissions(req.userId!);
-      if (!userPermissions[requiredPermission]) {
-        return res.status(403).json({ 
-          error: "Access denied", 
-          message: `Permission '${requiredPermission}' is required to create this type of communication`
-        });
-      }
-
-      // Check project access (unless user is admin with all-project permissions)
-      if (!userPermissions.canModifyAllProjects) {
-        const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
-        if (!authorizedProjectIds.includes(req.params.projectId)) {
-          return res.status(403).json({
-            error: "Access denied",
-            message: "You are not authorized to create communications for this project"
-          });
-        }
-      }
-
       const validatedData = insertCommunicationSchema.parse({
         ...req.body,
         projectId: req.params.projectId,
         createdById: req.userId!
       });
-      const communication = await storage.createCommunication(validatedData);
+      const communication = await storage.createCommunication(validatedData, req.organizationId!);
       res.status(201).json(communication);
     } catch (error) {
       console.error("Error creating communication:", error);

@@ -1225,6 +1225,12 @@ export const insertCommunicationSchema = createInsertSchema(communications).omit
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  // Handle date string coercion for meetingWhen field
+  meetingWhen: z.union([
+    z.date(),
+    z.string().transform((str) => new Date(str))
+  ]).optional()
 });
 
 export const insertCommunicationVersionSchema = createInsertSchema(communicationVersions).omit({

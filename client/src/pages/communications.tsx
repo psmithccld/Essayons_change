@@ -1066,7 +1066,7 @@ function MeetingsExecutionModule() {
       title: meetingWhat.title,
       content: meetingWhat.purpose,
       targetAudience: meetingWho.participants.map(p => p.name),
-      meetingWhen: new Date(`${meetingWhen.date}T${meetingWhen.time}`),
+      meetingWhen: `${meetingWhen.date}T${meetingWhen.time}`,
       meetingWhere: meetingWhere.locationType === 'physical' ? meetingWhere.physicalAddress : 
                    meetingWhere.locationType === 'virtual' ? meetingWhere.virtualLink :
                    `${meetingWhere.physicalAddress} / ${meetingWhere.virtualLink}`,
