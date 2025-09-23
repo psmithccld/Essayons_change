@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Calendar, User as UserIcon, AlertCircle, CheckCircle, Clock, Pause, X, ListChecks, FileText, Building, Code, Megaphone, Settings, Edit, Trash2 } from "lucide-react";
+import { Plus, Calendar, User as UserIcon, AlertCircle, CheckCircle, Clock, Pause, X, ListChecks, FileText, Building, Code, Megaphone, Settings, Edit, Trash2, Copy, Zap, Play, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
@@ -130,10 +130,18 @@ function getCategoryColor(category: string) {
 }
 
 export default function Tasks() {
-  const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
+  // Removed isNewTaskOpen state - using quick create only  
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("dueDate");
+  const [viewMode, setViewMode] = useState<string>("cards");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { currentProject, projects } = useCurrentProject();
@@ -169,7 +177,7 @@ export default function Tasks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
-      setIsNewTaskOpen(false);
+      // Quick create dialog handled separately
       setEditingTask(null);
       form.reset();
       toast({
@@ -193,7 +201,7 @@ export default function Tasks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
-      setIsNewTaskOpen(false);
+      setIsEditDialogOpen(false);
       setEditingTask(null);
       toast({
         title: "Success", 
@@ -256,7 +264,7 @@ export default function Tasks() {
       dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "",
       checklist: checklistData,
     });
-    setIsNewTaskOpen(true);
+    setIsEditDialogOpen(true);
   };
 
   const onSubmit = (data: TaskFormData) => {
@@ -362,6 +370,126 @@ export default function Tasks() {
     updateTaskMutation.mutate({ taskId, data: { status } });
   };
 
+  // Quick task creation form
+  const quickTaskForm = useForm<{name: string}>({
+    resolver: zodResolver(z.object({ name: z.string().min(1, "Task name required") })),
+    defaultValues: { name: "" }
+  });
+
+  const quickCreateMutation = useMutation({
+    mutationFn: async (data: {name: string}) => {
+      if (!currentProject?.id) throw new Error("No project selected");
+      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, {
+        name: data.name,
+        status: "pending",
+        priority: "medium",
+        assignmentType: "user"
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
+      setIsQuickCreateOpen(false);
+      quickTaskForm.reset();
+      toast({ title: "Success", description: "Task created successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create task", variant: "destructive" });
+    },
+  });
+
+  const onQuickSubmit = (data: {name: string}) => {
+    quickCreateMutation.mutate(data);
+  };
+
+  // Enhanced filtering and sorting
+  const filteredAndSortedTasks = useMemo(() => {
+    let filtered = tasks.filter(task => {
+      // Search filter
+      if (searchQuery && !task.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !task.description?.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+
+      // Status filter
+      if (statusFilter !== "all" && task.status !== statusFilter) {
+        return false;
+      }
+
+      // Priority filter
+      if (priorityFilter !== "all" && task.priority !== priorityFilter) {
+        return false;
+      }
+
+      // Assignee filter
+      if (assigneeFilter !== "all") {
+        if (assigneeFilter === "unassigned" && task.assigneeId) {
+          return false;
+        }
+        if (assigneeFilter !== "unassigned" && task.assigneeId !== assigneeFilter) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // Sort tasks
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "dueDate":
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        case "priority":
+          const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+          return priorityOrder[b.priority as keyof typeof priorityOrder] - priorityOrder[a.priority as keyof typeof priorityOrder];
+        case "status":
+          return a.status.localeCompare(b.status);
+        case "name":
+          return a.name.localeCompare(b.name);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [tasks, searchQuery, statusFilter, priorityFilter, assigneeFilter, sortBy]);
+
+  // Check if task is overdue
+  const isOverdue = (task: Task) => {
+    if (!task.dueDate || task.status === "completed") return false;
+    return new Date(task.dueDate) < new Date();
+  };
+
+  // Calculate task completion percentage
+  const getTaskProgress = (task: Task) => {
+    if (!task.checklist || !Array.isArray(task.checklist) || task.checklist.length === 0) {
+      return task.status === "completed" ? 100 : 0;
+    }
+    const checklist = task.checklist as Array<{id: string, text: string, completed: boolean}>;
+    const completed = checklist.filter(item => item.completed).length;
+    return Math.round((completed / checklist.length) * 100);
+  };
+
+  // Duplicate task function
+  const duplicateTask = (task: Task) => {
+    const duplicatedData = {
+      name: `${task.name} (Copy)`,
+      description: task.description || undefined,
+      status: "pending" as const,
+      priority: task.priority as "low" | "medium" | "high" | "critical",
+      assigneeId: task.assigneeId || undefined,
+      assigneeEmail: task.assigneeEmail || undefined,
+      startDate: task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : undefined,
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : undefined,
+      checklist: (task.checklist as Array<{id: string, text: string, completed: boolean}>) || [],
+      assignmentType: (task.assigneeId ? "user" : task.assigneeEmail ? "external" : "user") as "user" | "external",
+    };
+    createTaskMutation.mutate(duplicatedData);
+  };
+
   return (
     <div className="space-y-6" data-testid="tasks-page">
       <div className="flex items-center justify-between">
@@ -369,326 +497,154 @@ export default function Tasks() {
           <h1 className="text-2xl font-semibold text-foreground">Tasks & Projects</h1>
           <p className="text-sm text-muted-foreground">Manage project tasks and track progress</p>
         </div>
-        <Dialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen}>
-          <DialogTrigger asChild>
-            <Button disabled={!currentProject} data-testid="button-new-task">
-              <Plus className="w-4 h-4 mr-2" />
-              New Task
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingTask ? "Edit Task" : "Create New Task"}</DialogTitle>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Task Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} data-testid="input-task-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+        <div className="flex gap-2">
+          {/* Quick Create Dialog */}
+          <Dialog open={isQuickCreateOpen} onOpenChange={setIsQuickCreateOpen}>
+            <DialogTrigger asChild>
+              <Button disabled={!currentProject} variant="outline" data-testid="button-quick-task">
+                <Zap className="w-4 h-4 mr-2" />
+                Quick Task
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Quick Task Creation</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={quickTaskForm.handleSubmit(onQuickSubmit)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="quickTaskName">Task Name</Label>
+                  <Input
+                    id="quickTaskName"
+                    {...quickTaskForm.register("name")}
+                    placeholder="Enter task name..."
+                    data-testid="input-quick-task-name"
+                  />
+                  {quickTaskForm.formState.errors.name && (
+                    <p className="text-sm text-red-500">{quickTaskForm.formState.errors.name.message}</p>
                   )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} data-testid="input-task-description" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Priority</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-task-priority">
-                              <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="critical">Critical</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-task-status">
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="in_progress">In Progress</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="blocked">Blocked</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </div>
-
-                <FormField
-                  control={form.control}
-                  name="assignmentType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Assignment Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue="user">
-                        <FormControl>
-                          <SelectTrigger data-testid="select-assignment-type">
-                            <SelectValue placeholder="Choose assignment type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="user">Select from team members</SelectItem>
-                          <SelectItem value="external">Enter external email</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {form.watch("assignmentType") === "user" ? (
-                  <FormField
-                    control={form.control}
-                    name="assigneeId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Assign To Team Member</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-assignee">
-                              <SelectValue placeholder="Select team member (optional)" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="unassigned">Unassigned</SelectItem>
-                            {users.map((user: User) => (
-                              <SelectItem key={user.id} value={user.id}>
-                                {user.name} ({user.username})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ) : (
-                  <FormField
-                    control={form.control}
-                    name="assigneeEmail"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>External Email Address</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="Enter external assignee email"
-                            data-testid="input-assignee-email"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="startDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Start Date</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} data-testid="input-task-start-date" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="dueDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Due Date</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} data-testid="input-task-due-date" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Checklist Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Task Checklist</Label>
-                    <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          size="sm"
-                          data-testid="button-use-template"
-                        >
-                          <FileText className="w-4 h-4 mr-2" />
-                          Use Template
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle data-testid="text-template-dialog-title">Select Checklist Template</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          {templates.length === 0 ? (
-                            <div className="text-center py-8">
-                              <ListChecks className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                                No templates available
-                              </h3>
-                              <p className="text-gray-600 dark:text-gray-300">
-                                Create checklist templates to use them here
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto">
-                              {templates.map((template) => (
-                                <Card 
-                                  key={template.id} 
-                                  className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                                  onClick={() => applyTemplate(template)}
-                                  data-testid={`template-option-${template.id}`}
-                                >
-                                  <CardContent className="p-4">
-                                    <div className="flex items-start justify-between">
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-2">
-                                          {getCategoryIcon(template.category)}
-                                          <h3 className="font-medium" data-testid={`template-name-${template.id}`}>
-                                            {template.name}
-                                          </h3>
-                                          <Badge className={getCategoryColor(template.category)}>
-                                            {categories.find(c => c.value === template.category)?.label}
-                                          </Badge>
-                                        </div>
-                                        {template.description && (
-                                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                                            {template.description}
-                                          </p>
-                                        )}
-                                        <div className="text-xs text-gray-500">
-                                          {(template.templateItems as any[])?.length || 0} items
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={newChecklistItem}
-                      onChange={(e) => setNewChecklistItem(e.target.value)}
-                      placeholder="Add checklist item..."
-                      data-testid="input-checklist-item"
-                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addChecklistItem())}
-                    />
-                    <Button 
-                      type="button" 
-                      onClick={addChecklistItem}
-                      disabled={!newChecklistItem.trim()}
-                      data-testid="button-add-checklist-item"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  
-                  {/* Checklist Items */}
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {(form.watch("checklist") || []).map((item: any) => (
-                      <div key={item.id} className="flex items-center gap-2 p-2 bg-muted rounded">
-                        <ListChecks className="w-4 h-4 text-muted-foreground" />
-                        <span className="flex-1 text-sm">{item.text}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeChecklistItem(item.id)}
-                          data-testid={`button-remove-checklist-${item.id}`}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="flex justify-end space-x-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsNewTaskOpen(false)}
-                    data-testid="button-cancel-task"
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={createTaskMutation.isPending}
-                    data-testid="button-save-task"
-                  >
-                    {createTaskMutation.isPending ? "Creating..." : "Create Task"}
+                  <Button type="button" variant="outline" onClick={() => setIsQuickCreateOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={quickCreateMutation.isPending} data-testid="button-quick-create">
+                    {quickCreateMutation.isPending ? "Creating..." : "Create Task"}
                   </Button>
                 </div>
               </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </DialogContent>
+          </Dialog>
+          
+          {/* Edit Task Dialog */}
+          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Edit Task: {editingTask?.name}</DialogTitle>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit((data) => {
+                  if (editingTask) {
+                    updateTaskMutation.mutate({ taskId: editingTask.id, data });
+                  }
+                })} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Task Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-edit-task-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} data-testid="input-edit-task-description" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="priority"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Priority</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-edit-task-priority">
+                                <SelectValue placeholder="Select priority" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="low">Low</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="critical">Critical</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-edit-task-status">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="in_progress">In Progress</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="blocked">Blocked</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-2">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setIsEditDialogOpen(false)}
+                      data-testid="button-cancel-edit"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={updateTaskMutation.isPending}
+                      data-testid="button-save-edit"
+                    >
+                      {updateTaskMutation.isPending ? "Updating..." : "Update Task"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
 
       {/* Current Project Info */}
       {currentProject ? (
@@ -729,117 +685,114 @@ export default function Tasks() {
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="h-20 bg-muted rounded-lg"></div>
-                  </div>
+                  <div key={i} className="h-16 bg-muted rounded animate-pulse" />
                 ))}
               </div>
-            ) : tasks.length === 0 ? (
-              <div className="text-center py-12" data-testid="no-tasks-message">
-                <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">No Tasks Found</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Get started by creating your first task for this project.
-                </p>
-                <Button onClick={() => setIsNewTaskOpen(true)} data-testid="button-create-first-task">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create First Task
-                </Button>
+            ) : filteredAndSortedTasks.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No tasks found for this project.</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {tasks.map((task) => (
-                  <Card key={task.id} className="hover:shadow-md transition-shadow" data-testid={`task-${task.id}`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            {getStatusIcon(task.status)}
-                            <h3 className="font-medium text-foreground">{task.name}</h3>
-                          </div>
-                          {task.description && (
-                            <p className="text-sm text-muted-foreground mb-3">{task.description}</p>
+                {filteredAndSortedTasks.map((task) => (
+                  <Card key={task.id} className="p-4" data-testid={`card-task-${task.id}`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <h4 className="font-medium" data-testid={`text-task-name-${task.id}`}>{task.name}</h4>
+                          <Badge variant={getPriorityVariant(task.priority)} data-testid={`badge-priority-${task.id}`}>
+                            {task.priority}
+                          </Badge>
+                          <Badge variant={getStatusVariant(task.status)} data-testid={`badge-status-${task.id}`}>
+                            {task.status.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                        {task.description && (
+                          <p className="text-sm text-muted-foreground mb-3" data-testid={`text-description-${task.id}`}>
+                            {task.description}
+                          </p>
+                        )}
+                        <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                          {task.assigneeId && task.assigneeId !== 'unassigned' && (
+                            <span data-testid={`text-assignee-${task.id}`}>Assigned to: {task.assigneeId}</span>
+                          )}
+                          {task.dueDate && (
+                            <span data-testid={`text-due-date-${task.id}`}>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
                           )}
                         </div>
-                        <div className="flex flex-col space-y-2 ml-4">
-                          <div className="flex items-center space-x-2">
-                            <Badge className={getPriorityColor(task.priority)}>
-                              {task.priority}
-                            </Badge>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditTask(task)}
-                              data-testid={`button-edit-task-${task.id}`}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteTask(task.id, task.name)}
-                              data-testid={`button-delete-task-${task.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                          <Select
-                            value={task.status}
-                            onValueChange={(value) => handleStatusChange(task.id, value)}
+                      </div>
+                      <div className="flex items-center space-x-2 ml-4">
+                        {/* Quick Status Buttons */}
+                        {task.status === 'pending' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStatusChange(task.id, 'in_progress')}
+                            disabled={updateTaskMutation.isPending}
+                            data-testid={`button-start-${task.id}`}
                           >
-                            <SelectTrigger className="w-32 h-8" data-testid={`select-status-${task.id}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="in_progress">In Progress</SelectItem>
-                              <SelectItem value="completed">Completed</SelectItem>
-                              <SelectItem value="blocked">Blocked</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                            <Play className="w-3 h-3 mr-1" />
+                            Start
+                          </Button>
+                        )}
+                        {task.status === 'in_progress' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStatusChange(task.id, 'completed')}
+                            disabled={updateTaskMutation.isPending}
+                            data-testid={`button-complete-${task.id}`}
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Complete
+                          </Button>
+                        )}
+                        {task.status !== 'blocked' && task.status !== 'completed' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStatusChange(task.id, 'blocked')}
+                            disabled={updateTaskMutation.isPending}
+                            data-testid={`button-block-${task.id}`}
+                          >
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Block
+                          </Button>
+                        )}
+                        
+                        {/* Edit Task Button */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEditTask(task)}
+                          data-testid={`button-edit-${task.id}`}
+                        >
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        
+                        {/* Delete Task Button */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteTask(task.id, task.name)}
+                          disabled={deleteTaskMutation.isPending}
+                          data-testid={`button-delete-${task.id}`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                        
+                        {/* Copy Task Button */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => duplicateTask(task)}
+                          disabled={createTaskMutation.isPending}
+                          data-testid={`button-copy-${task.id}`}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
                       </div>
-                      
-                      {task.progress !== null && task.progress > 0 && (
-                        <div className="mb-3">
-                          <div className="flex items-center justify-between text-sm mb-1">
-                            <span className="text-muted-foreground">Progress</span>
-                            <span className="font-medium">{task.progress}%</span>
-                          </div>
-                          <Progress value={task.progress} className="h-2" />
-                        </div>
-                      )}
-                      
-                      {/* Task Checklist */}
-                      {task.checklist && Array.isArray(task.checklist) && task.checklist.length > 0 ? (
-                        <TaskChecklist 
-                          checklist={task.checklist as Array<{id: string, text: string, completed: boolean}>}
-                          taskId={task.id}
-                          onToggleItem={toggleChecklistItem}
-                        />
-                      ) : null}
-                      
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        {task.startDate && (
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="w-4 h-4" />
-                            <span>Start: {new Date(task.startDate).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        {task.dueDate && (
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="w-4 h-4" />
-                            <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        {task.assigneeId && (
-                          <div className="flex items-center space-x-1">
-                            <UserIcon className="w-4 h-4" />
-                            <span>Assigned</span>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
+                    </div>
                   </Card>
                 ))}
               </div>
@@ -849,4 +802,23 @@ export default function Tasks() {
       )}
     </div>
   );
+}
+
+// Helper functions for task display
+function getPriorityVariant(priority: string): "default" | "secondary" | "destructive" | "outline" {
+  switch (priority) {
+    case 'critical': return 'destructive';
+    case 'high': return 'secondary';  
+    case 'medium': return 'outline';
+    default: return 'default';
+  }
+}
+
+function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case 'completed': return 'default';
+    case 'in_progress': return 'secondary';
+    case 'blocked': return 'destructive';
+    default: return 'outline';
+  }
 }
