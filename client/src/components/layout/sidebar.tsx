@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { 
@@ -102,7 +102,7 @@ export default function Sidebar() {
   }, [dragOrder]);
 
   // Check if user has permission for a navigation item
-  const hasPermissionForItem = (item: NavigationItem): boolean => {
+  const hasPermissionForItem = useCallback((item: NavigationItem): boolean => {
     if (!item.permissions || item.permissions.length === 0) {
       return true;
     }
@@ -116,7 +116,7 @@ export default function Sidebar() {
     } else {
       return hasAnyPermission(...item.permissions);
     }
-  };
+  }, [hasAllPermissions, hasAnyPermission]);
 
   // Keyboard shortcuts for navigation
   useEffect(() => {
@@ -146,7 +146,7 @@ export default function Sidebar() {
 
     window.addEventListener('keydown', handleKeydown);
     return () => window.removeEventListener('keydown', handleKeydown);
-  }, [navigate, orderedDraggableItems, toast]);
+  }, [navigate, orderedDraggableItems, hasPermissionForItem, toast]);
 
   // Handle drag end event
   const handleDragEnd = (result: DropResult) => {

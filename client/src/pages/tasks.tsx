@@ -129,6 +129,25 @@ function getCategoryColor(category: string) {
   }
 }
 
+// Helper functions for task display
+function getPriorityVariant(priority: string): "default" | "secondary" | "destructive" | "outline" {
+  switch (priority) {
+    case 'critical': return 'destructive';
+    case 'high': return 'secondary';  
+    case 'medium': return 'outline';
+    default: return 'default';
+  }
+}
+
+function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case 'completed': return 'default';
+    case 'in_progress': return 'secondary';
+    case 'blocked': return 'destructive';
+    default: return 'outline';
+  }
+}
+
 export default function Tasks() {
   // Removed isNewTaskOpen state - using quick create only  
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -645,6 +664,7 @@ export default function Tasks() {
             </DialogContent>
           </Dialog>
         </div>
+      </div>
 
       {/* Current Project Info */}
       {currentProject ? (
@@ -802,23 +822,4 @@ export default function Tasks() {
       )}
     </div>
   );
-}
-
-// Helper functions for task display
-function getPriorityVariant(priority: string): "default" | "secondary" | "destructive" | "outline" {
-  switch (priority) {
-    case 'critical': return 'destructive';
-    case 'high': return 'secondary';  
-    case 'medium': return 'outline';
-    default: return 'default';
-  }
-}
-
-function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
-  switch (status) {
-    case 'completed': return 'default';
-    case 'in_progress': return 'secondary';
-    case 'blocked': return 'destructive';
-    default: return 'outline';
-  }
 }
