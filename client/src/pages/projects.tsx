@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,7 @@ import { z } from "zod";
 const projectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   description: z.string().min(1, "Description is required"),
-  status: z.enum(["identify_need", "identify_stakeholders", "planning", "implementation", "monitoring", "completed"]),
+  status: z.enum(["identify_need", "identify_stakeholders", "develop_change", "implement_change", "reinforce_change"]),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 });
@@ -36,27 +37,36 @@ interface Project {
 }
 
 const statusLabels = {
-  identify_need: "Identify Need",
+  identify_need: "Identify Need to Change",
   identify_stakeholders: "Identify Stakeholders", 
-  planning: "Planning",
-  implementation: "Implementation",
-  monitoring: "Monitoring",
-  completed: "Completed"
+  develop_change: "Develop the Change",
+  implement_change: "Implement the Change",
+  reinforce_change: "Reinforce the Change"
 };
 
 const statusColors = {
   identify_need: "bg-gray-100 text-gray-800",
   identify_stakeholders: "bg-blue-100 text-blue-800",
-  planning: "bg-yellow-100 text-yellow-800", 
-  implementation: "bg-purple-100 text-purple-800",
-  monitoring: "bg-orange-100 text-orange-800",
-  completed: "bg-green-100 text-green-800"
+  develop_change: "bg-yellow-100 text-yellow-800", 
+  implement_change: "bg-purple-100 text-purple-800",
+  reinforce_change: "bg-green-100 text-green-800"
 };
 
 export default function Projects() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const { toast } = useToast();
+  const [location] = useLocation();
+
+  // Auto-open dialog when navigating from header with create=true
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('create') === 'true') {
+      setIsDialogOpen(true);
+      // Clear the URL parameter
+      window.history.replaceState({}, '', '/initiatives');
+    }
+  }, [location]);
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ["/api/projects"],

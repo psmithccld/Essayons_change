@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import { insertProjectSchema, type Project, type User, type UserInitiativeAssign
 import { RouteGuard } from "@/components/auth/RouteGuard";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useLocation } from "wouter";
 
 // Priority and Category options
 const PRIORITY_OPTIONS = [
@@ -45,7 +46,9 @@ const CATEGORY_OPTIONS = [
 ] as const;
 
 // Enhanced form validation schemas
-const createInitiativeSchema = insertProjectSchema.extend({
+const createInitiativeSchema = insertProjectSchema.omit({
+  ownerId: true // Will be provided automatically in handler
+}).extend({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   deliverables: z.array(z.object({
@@ -59,7 +62,7 @@ const createInitiativeSchema = insertProjectSchema.extend({
 const editInitiativeSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
-  status: z.enum(["planning", "active", "completed", "cancelled"]),
+  status: z.enum(["identify_need", "identify_stakeholders", "develop_change", "implement_change", "reinforce_change", "cancelled"]),
   priority: z.enum(["high", "medium", "low"]).optional(),
   category: z.string().optional(),
   objectives: z.string().optional(),
@@ -140,6 +143,17 @@ function InitiativeManagementContent() {
   const [copyEndDate, setCopyEndDate] = useState<Date>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [location, setLocation] = useLocation();
+
+  // Auto-open dialog when coming from header button
+  useEffect(() => {
+    const params = new URLSearchParams(location.split('?')[1]);
+    if (params.get('create') === 'true') {
+      setIsCreateDialogOpen(true);
+      // Clear the parameter to avoid reopening on refresh
+      setLocation('/initiatives');
+    }
+  }, [location, setLocation]);
 
   // Fetch initiatives/projects
   const { data: initiatives = [], isLoading: initiativesLoading } = useQuery<EnhancedInitiative[]>({
@@ -272,7 +286,7 @@ function InitiativeManagementContent() {
     defaultValues: {
       name: "",
       description: "",
-      status: "planning",
+      status: "identify_need",
       progress: 0
     }
   });
@@ -369,6 +383,7 @@ function InitiativeManagementContent() {
   const handleCreateInitiative = (data: CreateInitiativeFormData) => {
     const processedData = {
       ...data,
+      ownerId: "550e8400-e29b-41d4-a716-446655440000", // Use demo user ID
       deliverables: deliverables.length > 0 ? deliverables : undefined
     };
     createInitiativeMutation.mutate(processedData);
@@ -765,9 +780,11 @@ function InitiativeManagementContent() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="planning">Planning</SelectItem>
-                                <SelectItem value="active">Active</SelectItem>
-                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="identify_need">Identify Need to Change</SelectItem>
+                                <SelectItem value="identify_stakeholders">Identify Stakeholders</SelectItem>
+                                <SelectItem value="develop_change">Develop the Change</SelectItem>
+                                <SelectItem value="implement_change">Implement the Change</SelectItem>
+                                <SelectItem value="reinforce_change">Reinforce the Change</SelectItem>
                                 <SelectItem value="cancelled">Cancelled</SelectItem>
                               </SelectContent>
                             </Select>
@@ -1326,9 +1343,11 @@ function InitiativeManagementContent() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="planning">Planning</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="identify_need">Identify Need to Change</SelectItem>
+                  <SelectItem value="identify_stakeholders">Identify Stakeholders</SelectItem>
+                  <SelectItem value="develop_change">Develop the Change</SelectItem>
+                  <SelectItem value="implement_change">Implement the Change</SelectItem>
+                  <SelectItem value="reinforce_change">Reinforce the Change</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
@@ -1812,9 +1831,11 @@ function InitiativeManagementContent() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="planning">Planning</SelectItem>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="identify_need">Identify Need to Change</SelectItem>
+                              <SelectItem value="identify_stakeholders">Identify Stakeholders</SelectItem>
+                              <SelectItem value="develop_change">Develop the Change</SelectItem>
+                              <SelectItem value="implement_change">Implement the Change</SelectItem>
+                              <SelectItem value="reinforce_change">Reinforce the Change</SelectItem>
                               <SelectItem value="cancelled">Cancelled</SelectItem>
                             </SelectContent>
                           </Select>

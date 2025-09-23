@@ -16,24 +16,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { insertProjectSchema, type InsertProject, type Notification } from "@shared/schema";
+import { type Notification } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuth } from "@/contexts/AuthContext";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { z } from "zod";
 import { formatDistanceToNow } from "date-fns";
 
-const projectFormSchema = insertProjectSchema.extend({
-  name: z.string().min(1, "Project name is required"),
-  description: z.string().optional(),
-  status: z.enum(["identify_need", "identify_stakeholders", "develop_change", "implement_change", "reinforce_change"]).default("identify_need"),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-});
-
-type ProjectFormData = z.infer<typeof projectFormSchema>;
 
 const userSettingsSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -58,7 +49,6 @@ type UserSettingsData = z.infer<typeof userSettingsSchema>;
 type PasswordChangeData = z.infer<typeof passwordChangeSchema>;
 
 export default function Header() {
-  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -193,46 +183,6 @@ export default function Header() {
     },
   });
 
-  const form = useForm<ProjectFormData>({
-    resolver: zodResolver(projectFormSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-      status: "identify_need",
-      progress: 0,
-      ownerId: "550e8400-e29b-41d4-a716-446655440000", // Default user UUID
-    },
-  });
-
-  const createProjectMutation = useMutation({
-    mutationFn: async (data: ProjectFormData) => {
-      const response = await apiRequest("POST", "/api/projects", data);
-      return response.json();
-    },
-    onSuccess: (newProject) => {
-      toast({
-        title: "Success",
-        description: "Project created successfully!",
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-      // Set the newly created project as current
-      setCurrentProject(newProject);
-      setIsNewProjectOpen(false);
-      form.reset();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create project",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const onSubmit = (data: ProjectFormData) => {
-    createProjectMutation.mutate(data);
-  };
 
   // User Settings Form
   const settingsForm = useForm<UserSettingsData>({
@@ -337,14 +287,15 @@ export default function Header() {
           </div>
 
           {/* New Initiative Button - Moved to left side */}
-          <Button 
-            onClick={() => setIsNewProjectOpen(true)}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-            data-testid="button-new-initiative"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            New Initiative
-          </Button>
+          <Link href="/initiatives?create=true">
+            <Button 
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              data-testid="button-new-initiative"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Initiative
+            </Button>
+          </Link>
         </div>
         
         <div className="flex items-center space-x-4">
@@ -560,129 +511,6 @@ export default function Header() {
         </div>
       </div>
 
-      {/* New Project Modal */}
-      <Dialog open={isNewProjectOpen} onOpenChange={setIsNewProjectOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Create New Initiative</DialogTitle>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Initiative Name *</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Enter initiative name..."
-                        data-testid="input-project-name"
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Describe the initiative goals and scope..."
-                        data-testid="input-project-description"
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-project-status">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="identify_need">Identify Need to Change</SelectItem>
-                        <SelectItem value="identify_stakeholders">Identify Stakeholders</SelectItem>
-                        <SelectItem value="develop_change">Develop the Change</SelectItem>
-                        <SelectItem value="implement_change">Implement the Change</SelectItem>
-                        <SelectItem value="reinforce_change">Reinforce the Change</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Start Date</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="date"
-                        data-testid="input-project-start-date"
-                        value={field.value || ''}
-                        onChange={(e) => field.onChange(e.target.value || undefined)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>End Date</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="date"
-                        data-testid="input-project-end-date"
-                        value={field.value || ''}
-                        onChange={(e) => field.onChange(e.target.value || undefined)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsNewProjectOpen(false)}
-                  data-testid="button-cancel-project"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createProjectMutation.isPending}
-                  data-testid="button-create-project"
-                >
-                  {createProjectMutation.isPending ? "Creating..." : "Create Initiative"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
 
       {/* User Settings Sheet */}
       <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>

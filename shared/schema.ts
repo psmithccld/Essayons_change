@@ -398,7 +398,7 @@ export const projects = pgTable("projects", {
   organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }), // Nullable for migration
   name: text("name").notNull(),
   description: text("description"),
-  status: text("status").notNull().default("planning"), // planning, active, completed, cancelled
+  status: text("status").notNull().default("identify_need"), // identify_need, identify_stakeholders, develop_change, implement_change, reinforce_change
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   progress: integer("progress").default(0), // 0-100
