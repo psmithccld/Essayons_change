@@ -901,6 +901,291 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== SUPER ADMIN ORGANIZATION MANAGEMENT =====
+  
+  // Get all organizations with admin details (Platform Overview)
+  app.get("/api/super-admin/organizations", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const organizations = await storage.getOrganizations();
+      
+      // Enhance with admin and membership info
+      const enhancedOrgs = await Promise.all(organizations.map(async (org) => {
+        const [members, settings] = await Promise.all([
+          storage.getOrganizationMembers(org.id),
+          storage.getOrganizationSettings(org.id)
+        ]);
+        
+        const adminMembers = members.filter(m => m.orgRole === 'admin' || m.orgRole === 'owner');
+        
+        return {
+          ...org,
+          memberCount: members.length,
+          adminCount: adminMembers.length,
+          setupComplete: settings?.isConsultationComplete || false
+        };
+      }));
+      
+      res.json(enhancedOrgs);
+    } catch (error) {
+      console.error("Error fetching organizations for super admin:", error);
+      res.status(500).json({ error: "Failed to fetch organizations" });
+    }
+  });
+
+  // Create organization with admin assignment (Platform Setup)
+  app.post("/api/super-admin/organizations", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { insertOrganizationSchema } = await import("@shared/schema");
+      
+      const validation = insertOrganizationSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid organization data", 
+          details: validation.error.errors 
+        });
+      }
+
+      // Create organization
+      const organization = await storage.createOrganization(validation.data);
+      
+      // If ownerUserId is provided, add them as owner
+      if (validation.data.ownerUserId) {
+        await storage.addUserToOrganization({
+          organizationId: organization.id,
+          userId: validation.data.ownerUserId,
+          orgRole: 'owner',
+          isActive: true
+        });
+      }
+      
+      // Create default organization settings
+      await storage.updateOrganizationSettings(organization.id, {
+        isConsultationComplete: false,
+        setupProgress: { created: true }
+      });
+      
+      console.log(`Super admin ${req.superAdminUser!.username} created organization: ${organization.name} (${organization.id})`);
+      res.status(201).json(organization);
+    } catch (error) {
+      console.error("Error creating organization:", error);
+      res.status(500).json({ error: "Failed to create organization" });
+    }
+  });
+
+  // Get specific organization details (Enhanced view for super admin)
+  app.get("/api/super-admin/organizations/:id", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      const [organization, members, settings] = await Promise.all([
+        storage.getOrganization(id),
+        storage.getOrganizationMembers(id),
+        storage.getOrganizationSettings(id)
+      ]);
+      
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Get user details for members
+      const membersWithUserInfo = await Promise.all(members.map(async (member) => {
+        const user = await storage.getUser(member.userId);
+        return {
+          ...member,
+          user: user ? { id: user.id, username: user.username, email: user.email } : null
+        };
+      }));
+      
+      res.json({
+        organization,
+        members: membersWithUserInfo,
+        settings: settings || {},
+        stats: {
+          totalMembers: members.length,
+          activeMembers: members.filter(m => m.isActive).length,
+          adminCount: members.filter(m => m.orgRole === 'admin' || m.orgRole === 'owner').length
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching organization details:", error);
+      res.status(500).json({ error: "Failed to fetch organization details" });
+    }
+  });
+
+  // Update organization (Unrestricted platform-level editing)
+  app.put("/api/super-admin/organizations/:id", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { insertOrganizationSchema } = await import("@shared/schema");
+      
+      // Partial validation since this is an update
+      const validation = insertOrganizationSchema.partial().safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid organization data", 
+          details: validation.error.errors 
+        });
+      }
+
+      const organization = await storage.updateOrganization(id, validation.data);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      console.log(`Super admin ${req.superAdminUser!.username} updated organization: ${organization.name} (${id})`);
+      res.json(organization);
+    } catch (error) {
+      console.error("Error updating organization:", error);
+      res.status(500).json({ error: "Failed to update organization" });
+    }
+  });
+
+  // Assign organization admin (Platform-level user management)
+  app.post("/api/super-admin/organizations/:id/admins", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id: organizationId } = req.params;
+      const { userId, role = 'admin' } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+      
+      if (role !== 'admin' && role !== 'owner') {
+        return res.status(400).json({ error: "Role must be 'admin' or 'owner'" });
+      }
+      
+      // Check if organization exists
+      const organization = await storage.getOrganization(organizationId);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Check if user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Check if user is already a member
+      const existingMembership = await db.select()
+        .from(organizationMemberships)
+        .where(and(
+          eq(organizationMemberships.userId, userId),
+          eq(organizationMemberships.organizationId, organizationId)
+        ));
+      
+      let membership;
+      
+      if (existingMembership.length > 0) {
+        // Update existing membership
+        membership = await storage.updateOrganizationMembership(existingMembership[0].id, {
+          orgRole: role,
+          isActive: true
+        });
+      } else {
+        // Create new membership
+        membership = await storage.addUserToOrganization({
+          organizationId,
+          userId,
+          orgRole: role,
+          isActive: true
+        });
+      }
+      
+      console.log(`Super admin ${req.superAdminUser!.username} assigned ${user.username} as ${role} to organization: ${organization.name}`);
+      res.status(201).json({ membership, user: { id: user.id, username: user.username, email: user.email } });
+    } catch (error) {
+      console.error("Error assigning organization admin:", error);
+      res.status(500).json({ error: "Failed to assign organization admin" });
+    }
+  });
+
+  // Remove organization admin/member (Platform-level user management)
+  app.delete("/api/super-admin/organizations/:id/members/:userId", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id: organizationId, userId } = req.params;
+      
+      // Check if organization exists
+      const organization = await storage.getOrganization(organizationId);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Remove user from organization
+      const removed = await storage.removeUserFromOrganization(userId, organizationId);
+      if (!removed) {
+        return res.status(404).json({ error: "User not found in organization" });
+      }
+      
+      console.log(`Super admin ${req.superAdminUser!.username} removed user ${userId} from organization: ${organization.name}`);
+      res.json({ message: "User removed from organization successfully" });
+    } catch (error) {
+      console.error("Error removing user from organization:", error);
+      res.status(500).json({ error: "Failed to remove user from organization" });
+    }
+  });
+
+  // Update organization environment settings (Platform configuration)
+  app.put("/api/super-admin/organizations/:id/settings", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id: organizationId } = req.params;
+      const { insertOrganizationSettingsSchema } = await import("@shared/schema");
+      
+      // Validate settings data
+      const validation = insertOrganizationSettingsSchema.partial().safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid settings data", 
+          details: validation.error.errors 
+        });
+      }
+      
+      // Check if organization exists
+      const organization = await storage.getOrganization(organizationId);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      const updatedSettings = await storage.updateOrganizationSettings(organizationId, validation.data);
+      
+      console.log(`Super admin ${req.superAdminUser!.username} updated settings for organization: ${organization.name}`);
+      res.json(updatedSettings);
+    } catch (error) {
+      console.error("Error updating organization settings:", error);
+      res.status(500).json({ error: "Failed to update organization settings" });
+    }
+  });
+
+  // Platform user search for admin assignment
+  app.get("/api/super-admin/users/search", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { q } = req.query;
+      
+      if (!q || typeof q !== 'string' || q.length < 2) {
+        return res.status(400).json({ error: "Search query must be at least 2 characters" });
+      }
+      
+      // Search users by username or email (basic implementation)
+      // In production, you might want more sophisticated search
+      const searchResults = await db.select({
+        id: users.id,
+        username: users.username,
+        email: users.email
+      })
+        .from(users)
+        .where(or(
+          sql`${users.username} ILIKE ${`%${q}%`}`,
+          sql`${users.email} ILIKE ${`%${q}%`}`
+        ))
+        .limit(20);
+      
+      res.json(searchResults);
+    } catch (error) {
+      console.error("Error searching users:", error);
+      res.status(500).json({ error: "Failed to search users" });
+    }
+  });
+
   // Super Admin Session Cleanup (maintenance endpoint)
   app.post("/api/super-admin/auth/cleanup-sessions", requireSuperAdminAuth, async (req: Request, res: Response) => {
     try {
