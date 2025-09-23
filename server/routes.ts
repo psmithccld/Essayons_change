@@ -1710,9 +1710,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Milestones
-  app.get("/api/projects/:projectId/milestones", async (req, res) => {
+  app.get("/api/projects/:projectId/milestones", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const milestones = await storage.getMilestonesByProject(req.params.projectId);
+      const milestones = await storage.getMilestonesByProject(req.params.projectId, req.organizationId!);
       res.json(milestones);
     } catch (error) {
       console.error("Error fetching milestones:", error);
@@ -1720,7 +1720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects/:projectId/milestones", async (req, res) => {
+  app.post("/api/projects/:projectId/milestones", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       // Convert date strings to Date objects before validation
       const processedData = {
@@ -1738,7 +1738,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/milestones/:id", async (req, res) => {
+  app.put("/api/milestones/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       // Convert date strings to Date objects before updating
       const processedData = {
@@ -1746,7 +1746,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         targetDate: req.body.targetDate ? new Date(req.body.targetDate) : undefined,
       };
       
-      const milestone = await storage.updateMilestone(req.params.id, processedData);
+      const milestone = await storage.updateMilestone(req.params.id, req.organizationId!, processedData);
       if (!milestone) {
         return res.status(404).json({ error: "Milestone not found" });
       }
@@ -1757,9 +1757,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/milestones/:id", async (req, res) => {
+  app.delete("/api/milestones/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const success = await storage.deleteMilestone(req.params.id);
+      const success = await storage.deleteMilestone(req.params.id, req.organizationId!);
       if (!success) {
         return res.status(404).json({ error: "Milestone not found" });
       }
