@@ -361,7 +361,7 @@ function UserManagementContent() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {roles.map((role: Role) => (
+                          {roles.filter(role => role.id && role.id.trim() !== '').map((role: Role) => (
                             <SelectItem key={role.id} value={role.id}>
                               {role.name}
                             </SelectItem>
@@ -491,7 +491,7 @@ function UserManagementContent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
-                {roles.map((role: Role) => (
+                {roles.filter(role => role.id && role.id.trim() !== '' && role.name && role.name.trim() !== '').map((role: Role) => (
                   <SelectItem key={role.id} value={role.name}>
                     {role.name}
                   </SelectItem>
@@ -693,7 +693,7 @@ function UserManagementContent() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {roles.map((role: Role) => (
+                        {roles.filter(role => role.id && role.id.trim() !== '').map((role: Role) => (
                           <SelectItem key={role.id} value={role.id}>
                             {role.name}
                           </SelectItem>
