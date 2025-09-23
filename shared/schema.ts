@@ -1084,8 +1084,8 @@ export const insertUserSchema = createInsertSchema(users).omit({
   roleId: z.string().uuid("Role ID must be a valid UUID"), // Ensure roleId is required and valid
   email: z.string().email("Must be a valid email address"), // Email validation
 }).refine((data) => {
-  // If password is provided, confirmPassword must match
-  if (data.password && data.password !== data.confirmPassword) {
+  // If password is provided, confirmPassword must match (only validate when both exist)
+  if (data.password && data.confirmPassword && data.password !== data.confirmPassword) {
     return false;
   }
   return true;

@@ -28,6 +28,7 @@ const createUserSchema = z.object({
   username: z.string().min(1, "Username is required"),
   email: z.string().email("Must be a valid email address"),
   roleId: z.string().uuid("Please select a role"),
+  securityGroupIds: z.array(z.string().uuid()).optional().default([]),
   isActive: z.boolean().default(true),
   password: z.string().min(8, "Password must be at least 8 characters long"),
   confirmPassword: z.string()
@@ -221,6 +222,7 @@ function UserManagementContent() {
       password: "",
       confirmPassword: "",
       roleId: "",
+      securityGroupIds: [],
       isActive: true
     }
   });
@@ -246,9 +248,29 @@ function UserManagementContent() {
   const activeUsers = users.filter((user: any) => user.isActive).length;
   const adminUsers = users.filter((user: any) => user.role?.name?.toLowerCase().includes('admin')).length;
 
-  const handleCreateUser = (data: CreateUserFormData) => {
-    const { confirmPassword, ...userData } = data;
-    createUserMutation.mutate(userData);
+  const handleCreateUser = async (data: CreateUserFormData) => {
+    const { confirmPassword, securityGroupIds, ...userData } = data;
+    
+    try {
+      // Create the user first
+      const newUser = await apiRequest("POST", "/api/users", userData);
+      
+      // If security groups were selected, assign them to the user
+      if (securityGroupIds && securityGroupIds.length > 0) {
+        for (const groupId of securityGroupIds) {
+          await apiRequest("POST", `/api/users/${newUser.id}/groups`, { groupId });
+        }
+      }
+      
+      // Refresh data and show success
+      queryClient.invalidateQueries({ queryKey: ["/api/users/with-roles"] });
+      setIsCreateDialogOpen(false);
+      createForm.reset();
+      toast({ title: "Success", description: "User created successfully with security groups" });
+      
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to create user", variant: "destructive" });
+    }
   };
 
   const handleEditUser = (user: User) => {
@@ -382,6 +404,35 @@ function UserManagementContent() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createForm.control}
+                  name="securityGroupIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Security Groups (Optional)</FormLabel>
+                      <FormControl>
+                        <Select 
+                          value={field.value?.length > 0 ? field.value[0] : "none"} 
+                          onValueChange={(value) => field.onChange(value && value !== "none" ? [value] : [])}
+                          data-testid="select-user-security-groups"
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select security groups" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No security group</SelectItem>
+                            {userGroups.filter(group => group.id && group.id.trim() !== '').map((group: UserGroup) => (
+                              <SelectItem key={group.id} value={group.id}>
+                                {group.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

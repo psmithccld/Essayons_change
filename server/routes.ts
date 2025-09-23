@@ -4061,7 +4061,7 @@ Return the refined content in JSON format:
   // ===== SECURITY MANAGEMENT CENTER API ROUTES =====
 
   // User Groups Management Routes
-  app.get("/api/user-groups", requirePermission('canSeeGroups'), async (req, res) => {
+  app.get("/api/user-groups", requireAuthAndOrg, requirePermission('canSeeGroups'), async (req, res) => {
     try {
       const groups = await storage.getUserGroups();
       res.json(groups);
