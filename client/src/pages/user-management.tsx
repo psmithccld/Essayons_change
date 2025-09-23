@@ -354,7 +354,7 @@ function UserManagementContent() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} data-testid="select-user-role">
+                      <Select onValueChange={field.onChange} value={field.value} data-testid="select-user-role">
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a role" />
