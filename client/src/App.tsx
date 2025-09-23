@@ -30,6 +30,7 @@ import { LoginPage } from "@/pages/auth/login";
 import { EmailVerifyPage } from "@/pages/auth/verify-email";
 import { Loader2 } from "lucide-react";
 import { HelpDeskButton } from "@/components/HelpDeskButton";
+import { AppBreadcrumbs } from "@/components/layout/AppBreadcrumbs";
 
 function LoadingSpinner() {
   return (
@@ -51,6 +52,7 @@ function AuthenticatedApp() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-y-auto p-6">
+          <AppBreadcrumbs />
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/projects" component={Projects} />

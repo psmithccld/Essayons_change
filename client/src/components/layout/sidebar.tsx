@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { 
@@ -58,7 +58,7 @@ const allNavigationItems: NavigationItem[] = [
 const SIDEBAR_ORDER_KEY = "sidebarOrder";
 
 export default function Sidebar() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [dragOrder, setDragOrder] = useState<string[]>([]);
   const { toast } = useToast();
   const { isLoading: permissionsLoading, hasAllPermissions, hasAnyPermission } = usePermissions();
@@ -101,23 +101,6 @@ export default function Sidebar() {
     return baseDraggableItems;
   }, [dragOrder]);
 
-  // Handle drag end event
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) {
-      return;
-    }
-
-    const items = Array.from(orderedDraggableItems);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-
-    const newOrder = items.map(item => item.id);
-    setDragOrder(newOrder);
-    
-    // Save to localStorage
-    localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(newOrder));
-  };
-
   // Check if user has permission for a navigation item
   const hasPermissionForItem = (item: NavigationItem): boolean => {
     if (!item.permissions || item.permissions.length === 0) {
@@ -133,6 +116,53 @@ export default function Sidebar() {
     } else {
       return hasAnyPermission(...item.permissions);
     }
+  };
+
+  // Keyboard shortcuts for navigation
+  useEffect(() => {
+    const handleKeydown = (e: KeyboardEvent) => {
+      // Only handle shortcuts when not typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Alt + number keys for quick navigation
+      if (e.altKey && !e.shiftKey && !e.ctrlKey) {
+        const keyNum = parseInt(e.key);
+        if (keyNum >= 1 && keyNum <= 9) {
+          e.preventDefault();
+          const items = [allNavigationItems[0], ...orderedDraggableItems]; // Include overview
+          const targetItem = items[keyNum - 1];
+          if (targetItem && hasPermissionForItem(targetItem)) {
+            navigate(targetItem.path);
+            toast({
+              title: `Navigated to ${targetItem.label}`,
+              description: `Keyboard shortcut: Alt+${keyNum}`
+            });
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [navigate, orderedDraggableItems, toast]);
+
+  // Handle drag end event
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) {
+      return;
+    }
+
+    const items = Array.from(orderedDraggableItems);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    const newOrder = items.map(item => item.id);
+    setDragOrder(newOrder);
+    
+    // Save to localStorage
+    localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(newOrder));
   };
 
   // Render a draggable navigation item
