@@ -384,7 +384,7 @@ function InitiativeManagementContent() {
     const processedData = {
       ...data,
       ownerId: "550e8400-e29b-41d4-a716-446655440000", // Use demo user ID
-      deliverables: deliverables.length > 0 ? deliverables : undefined
+      deliverables: deliverables.length > 0 ? deliverables : []
     };
     createInitiativeMutation.mutate(processedData);
   };
@@ -419,7 +419,7 @@ function InitiativeManagementContent() {
     editForm.reset({
       name: initiative.name,
       description: initiative.description || "",
-      status: initiative.status as "planning" | "active" | "completed" | "cancelled",
+      status: initiative.status as "identify_need" | "identify_stakeholders" | "develop_change" | "implement_change" | "reinforce_change" | "cancelled",
       priority: initiative.priority as "high" | "medium" | "low" || "medium",
       category: initiative.category || "",
       objectives: initiative.objectives || "",
