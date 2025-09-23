@@ -13,6 +13,7 @@ import { ObjectUploader } from "@/components/ObjectUploader";
 import { Upload, FileText, Download, Eye, Trash2, Search, Filter, Tag } from "lucide-react";
 import type { UploadResult } from "@uppy/core";
 import { apiRequest } from "@/lib/queryClient";
+import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 
 const CATEGORIES = {
   'process_documentation': 'Process Documentation',
@@ -50,9 +51,7 @@ interface ChangeArtifact {
 export default function ChangeArtifacts() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
-  // Get current project ID (assuming it's available from context or URL)
-  const currentProjectId = "38bd6f53-4a05-4653-acb9-a1627067d722"; // TODO: Get from context/router
+  const { currentProject } = useCurrentProject();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -65,14 +64,17 @@ export default function ChangeArtifacts() {
 
   // Fetch Change Artifacts for current project
   const { data: artifacts = [], isLoading } = useQuery<ChangeArtifact[]>({
-    queryKey: ['/api/projects', currentProjectId, 'change-artifacts'],
-    enabled: !!currentProjectId
+    queryKey: ['/api/projects', currentProject?.id, 'change-artifacts'],
+    enabled: !!currentProject?.id
   });
 
   // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (uploadData: any) => {
-      const response = await fetch(`/api/projects/${currentProjectId}/change-artifacts`, {
+      if (!currentProject?.id) {
+        throw new Error('No project selected');
+      }
+      const response = await fetch(`/api/projects/${currentProject.id}/change-artifacts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(uploadData)
@@ -82,7 +84,7 @@ export default function ChangeArtifacts() {
     },
     onSuccess: () => {
       toast({ title: "Document uploaded successfully" });
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProjectId, 'change-artifacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'change-artifacts'] });
       // Reset upload metadata
       setUploadMetadata({
         category: "other",
@@ -111,7 +113,7 @@ export default function ChangeArtifacts() {
     },
     onSuccess: () => {
       toast({ title: "Document deleted successfully" });
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProjectId, 'change-artifacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'change-artifacts'] });
     },
     onError: () => {
       toast({ 
@@ -123,6 +125,15 @@ export default function ChangeArtifacts() {
   });
 
   const handleGetUploadParameters = async () => {
+    if (!currentProject?.id) {
+      toast({
+        title: "Project Required",
+        description: "Please select a project first",
+        variant: "destructive"
+      });
+      throw new Error('No project selected');
+    }
+    
     try {
       const response = await fetch('/api/objects/upload', {
         method: 'POST',
