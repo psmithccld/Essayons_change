@@ -2285,7 +2285,7 @@ Return the refined content in JSON format:
   });
 
   // GPT Content Generation for P2P Emails
-  app.post("/api/gpt/generate-p2p-email-content", requireAuthAndPermission('canSendEmails'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/generate-p2p-email-content", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       // SECURITY: Input validation with Zod
       const validatedInput = generateP2PEmailContentSchema.parse(req.body);
