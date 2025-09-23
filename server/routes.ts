@@ -387,7 +387,23 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
       description = templateValidated.description;
       break;
     case 'issue':
-      templateValidated = insertIssueSchema.parse(processedData);
+      // Provide defaults for required issue-specific fields from simple form
+      const issueData = {
+        ...processedData,
+        priority: processedData.priority || "medium", // Default priority
+        impact: processedData.impact || "medium", // Default impact
+        severity: processedData.severity || "medium", // Default severity
+        // Keep required database fields
+        title: processedData.title || "Issue Item",
+        description: processedData.description || processedData.title || "Issue identified",
+      };
+      
+      // Clean assigneeId if it's empty or invalid
+      if (!issueData.assigneeId || issueData.assigneeId === "" || issueData.assigneeId === "none") {
+        delete issueData.assigneeId;
+      }
+      
+      templateValidated = insertIssueSchema.parse(issueData);
       description = templateValidated.description || templateValidated.title || 'Issue description';
       break;
     case 'deficiency':
