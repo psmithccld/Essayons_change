@@ -2081,7 +2081,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update communication engagement metrics
-  app.patch('/api/communications/:id/engagement', requireAuth, requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+  app.patch('/api/communications/:id/engagement', requireAuthAndOrg, requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params;
       const engagement = req.body;
@@ -4575,7 +4575,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/tasks/overdue', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/tasks/overdue', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4591,7 +4591,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/tasks/completion-trend', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/tasks/completion-trend', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4612,7 +4612,7 @@ Return the refined content in JSON format:
   });
 
   // C. RAID Reports
-  app.post('/api/reports/raid/items', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/raid/items', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4632,7 +4632,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/raid/high-severity-risks', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/raid/high-severity-risks', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4648,7 +4648,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/raid/open-issues', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/raid/open-issues', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4664,7 +4664,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/raid/dependencies-at-risk', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/raid/dependencies-at-risk', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4684,7 +4684,7 @@ Return the refined content in JSON format:
   });
 
   // D. Stakeholder Reports
-  app.post('/api/reports/stakeholders/directory', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/stakeholders/directory', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4700,7 +4700,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/stakeholders/cross-initiative-load', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/stakeholders/cross-initiative-load', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4716,7 +4716,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/stakeholders/engagement', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/stakeholders/engagement', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4737,7 +4737,7 @@ Return the refined content in JSON format:
   });
 
   // E. Readiness & Surveys Reports
-  app.post('/api/reports/readiness/phase-scores', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/readiness/phase-scores', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4753,7 +4753,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/surveys/responses', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/surveys/responses', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4773,7 +4773,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/surveys/sentiment-trend', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/surveys/sentiment-trend', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4793,7 +4793,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/surveys/understanding-gaps', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/surveys/understanding-gaps', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4809,7 +4809,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/surveys/post-mortem-success', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/surveys/post-mortem-success', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4825,7 +4825,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/surveys/response-rates', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/surveys/response-rates', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4846,7 +4846,7 @@ Return the refined content in JSON format:
   });
 
   // F. Cross-Cutting Reports
-  app.post('/api/reports/cross-cutting/change-health', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/cross-cutting/change-health', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -4862,7 +4862,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post('/api/reports/cross-cutting/org-readiness-heatmap', requireAuth, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/cross-cutting/org-readiness-heatmap', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5031,7 +5031,7 @@ Return the refined content in JSON format:
   });
 
   // Get single Change Artifact
-  app.get('/api/change-artifacts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/change-artifacts/:id', requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params;
       const artifact = await storage.getChangeArtifact(id);
@@ -5054,7 +5054,7 @@ Return the refined content in JSON format:
   });
 
   // Update Change Artifact
-  app.put('/api/change-artifacts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  app.put('/api/change-artifacts/:id', requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params;
       const userId = req.userId!;
@@ -5091,7 +5091,7 @@ Return the refined content in JSON format:
   });
 
   // Delete Change Artifact
-  app.delete('/api/change-artifacts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  app.delete('/api/change-artifacts/:id', requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params;
       const userId = req.userId!;

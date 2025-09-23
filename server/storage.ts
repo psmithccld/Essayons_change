@@ -103,13 +103,13 @@ export interface IStorage {
   deleteRaidLog(id: string, organizationId: string): Promise<boolean>;
 
   // Communications
-  getCommunications(): Promise<Communication[]>;
-  getPersonalEmails(): Promise<Communication[]>;
-  getCommunicationsByProject(projectId: string): Promise<Communication[]>;
-  getCommunication(id: string): Promise<Communication | undefined>;
-  createCommunication(communication: InsertCommunication): Promise<Communication>;
-  updateCommunication(id: string, communication: Partial<InsertCommunication>): Promise<Communication | undefined>;
-  deleteCommunication(id: string): Promise<boolean>;
+  getCommunications(organizationId: string): Promise<Communication[]>;
+  getPersonalEmails(organizationId: string): Promise<Communication[]>;
+  getCommunicationsByProject(projectId: string, organizationId: string): Promise<Communication[]>;
+  getCommunication(id: string, organizationId: string): Promise<Communication | undefined>;
+  createCommunication(communication: InsertCommunication, organizationId: string): Promise<Communication>;
+  updateCommunication(id: string, communication: Partial<InsertCommunication>, organizationId: string): Promise<Communication | undefined>;
+  deleteCommunication(id: string, organizationId: string): Promise<boolean>;
 
   // Repository-specific methods
   searchCommunications(params: {
@@ -125,12 +125,11 @@ export interface IStorage {
     offset?: number;
     sortBy?: 'createdAt' | 'updatedAt' | 'title' | 'engagementScore' | 'effectivenessRating';
     sortOrder?: 'asc' | 'desc';
-  }): Promise<{ communications: Communication[]; total: number; }>;
+  }, organizationId: string): Promise<{ communications: Communication[]; total: number; }>;
   getCommunicationMetrics(params: { 
     projectId?: string; 
     type?: string; 
-    authorizedProjectIds?: string[];
-  }): Promise<{
+  }, organizationId: string): Promise<{
     totalCommunications: number;
     byType: Record<string, number>;
     byStatus: Record<string, number>;
@@ -138,10 +137,10 @@ export interface IStorage {
     avgEffectivenessRating: number;
     mostUsedTags: Array<{ tag: string; count: number }>;
   }>;
-  getCommunicationVersionHistory(communicationId: string, authorizedProjectIds: string[]): Promise<CommunicationVersion[]>;
-  archiveCommunications(ids: string[], userId: string): Promise<{ archived: number; errors: string[] }>;
-  updateCommunicationEngagement(id: string, engagement: { viewCount?: number; shareCount?: number; lastViewedAt?: Date }): Promise<void>;
-  getCommunicationsByStakeholder(stakeholderId: string, projectId?: string): Promise<Communication[]>;
+  getCommunicationVersionHistory(communicationId: string, organizationId: string): Promise<CommunicationVersion[]>;
+  archiveCommunications(ids: string[], userId: string, organizationId: string): Promise<{ archived: number; errors: string[] }>;
+  updateCommunicationEngagement(id: string, engagement: { viewCount?: number; shareCount?: number; lastViewedAt?: Date }, organizationId: string): Promise<void>;
+  getCommunicationsByStakeholder(stakeholderId: string, organizationId: string, projectId?: string): Promise<Communication[]>;
 
   // Communication Strategies
   getCommunicationStrategiesByProject(projectId: string): Promise<CommunicationStrategy[]>;
@@ -1606,66 +1605,108 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Communications
-  async getCommunications(): Promise<Communication[]> {
-    return await db.select().from(communications).orderBy(desc(communications.createdAt));
+  async getCommunications(organizationId: string): Promise<Communication[]> {
+    // SECURITY: Only return communications from projects in the user's organization (BOLA prevention)
+    return await db.select({ communication: communications })
+      .from(communications)
+      .innerJoin(projects, eq(communications.projectId, projects.id))
+      .where(eq(projects.organizationId, organizationId))
+      .orderBy(desc(communications.createdAt))
+      .then(results => results.map(r => r.communication));
   }
 
-  async getPersonalEmails(): Promise<Communication[]> {
-    return await db.select().from(communications)
-      .where(eq(communications.type, 'p2p'))
-      .orderBy(desc(communications.createdAt));
+  async getPersonalEmails(organizationId: string): Promise<Communication[]> {
+    // SECURITY: Only return personal emails from projects in the user's organization (BOLA prevention)
+    return await db.select({ communication: communications })
+      .from(communications)
+      .innerJoin(projects, eq(communications.projectId, projects.id))
+      .where(and(eq(communications.type, 'p2p'), eq(projects.organizationId, organizationId)))
+      .orderBy(desc(communications.createdAt))
+      .then(results => results.map(r => r.communication));
   }
 
-  async getCommunicationsByProject(projectId: string): Promise<Communication[]> {
+  async getCommunicationsByProject(projectId: string, organizationId: string): Promise<Communication[]> {
+    // SECURITY: Validate project belongs to organization before returning communications (BOLA prevention)
+    const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId)));
+    if (!project) return []; // Project doesn't exist or doesn't belong to organization
+    
     return await db.select().from(communications).where(eq(communications.projectId, projectId)).orderBy(desc(communications.createdAt));
   }
 
-  async getCommunication(id: string): Promise<Communication | undefined> {
-    const [communication] = await db.select().from(communications).where(eq(communications.id, id));
-    return communication || undefined;
+  async getCommunication(id: string, organizationId: string): Promise<Communication | undefined> {
+    // SECURITY: Always validate organization access by joining with projects (BOLA prevention)
+    const [result] = await db.select({ communication: communications })
+      .from(communications)
+      .innerJoin(projects, eq(communications.projectId, projects.id))
+      .where(and(eq(communications.id, id), eq(projects.organizationId, organizationId)));
+    return result?.communication || undefined;
   }
 
-  async createCommunication(communication: InsertCommunication): Promise<Communication> {
+  async createCommunication(communication: InsertCommunication, organizationId: string): Promise<Communication> {
+    // SECURITY: Validate that the target project belongs to the user's organization (BOLA prevention)
+    if (communication.projectId) {
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, communication.projectId), eq(projects.organizationId, organizationId)));
+      if (!project) {
+        throw new Error('Project not found or does not belong to organization');
+      }
+    }
+    
     const [created] = await db.insert(communications).values(communication).returning();
     return created;
   }
 
-  async updateCommunication(id: string, communication: Partial<InsertCommunication>): Promise<Communication | undefined> {
-    // Get current communication for version history
-    const [current] = await db.select().from(communications).where(eq(communications.id, id));
-    if (!current) return undefined;
+  async updateCommunication(id: string, communication: Partial<InsertCommunication>, organizationId: string): Promise<Communication | undefined> {
+    // SECURITY: Always validate organization access first (BOLA prevention)
+    const currentComm = await this.getCommunication(id, organizationId);
+    if (!currentComm) return undefined;
     
     // Create version history before updating
     await db.insert(communicationVersions).values({
       communicationId: id,
-      version: current.version,
-      title: current.title,
-      content: current.content,
-      targetAudience: current.targetAudience,
-      status: current.status,
-      type: current.type,
-      tags: current.tags,
-      priority: current.priority,
-      effectivenessRating: current.effectivenessRating,
-      metadata: current.metadata,
+      version: currentComm.version,
+      title: currentComm.title,
+      content: currentComm.content,
+      targetAudience: currentComm.targetAudience,
+      status: currentComm.status,
+      type: currentComm.type,
+      tags: currentComm.tags,
+      priority: currentComm.priority,
+      effectivenessRating: currentComm.effectivenessRating,
+      metadata: currentComm.metadata,
       changeDescription: 'Communication updated',
-      editorId: communication.createdById || current.createdById
+      editorId: communication.createdById || currentComm.createdById
     });
     
-    // Update communication with incremented version
+    // Update communication with organization validation
     const [updated] = await db.update(communications)
       .set({ 
         ...communication, 
-        version: current.version + 1,
+        version: currentComm.version + 1,
         updatedAt: new Date() 
       })
-      .where(eq(communications.id, id))
+      .where(and(
+        eq(communications.id, id),
+        inArray(communications.projectId, 
+          db.select({ id: projects.id }).from(projects).where(eq(projects.organizationId, organizationId))
+        )
+      ))
       .returning();
     return updated || undefined;
   }
 
-  async deleteCommunication(id: string): Promise<boolean> {
-    const result = await db.delete(communications).where(eq(communications.id, id));
+  async deleteCommunication(id: string, organizationId: string): Promise<boolean> {
+    // SECURITY: Always validate organization access before deletion (BOLA prevention)
+    const communication = await this.getCommunication(id, organizationId);
+    if (!communication) return false;
+    
+    // Delete only if communication belongs to organization
+    const result = await db.delete(communications)
+      .where(and(
+        eq(communications.id, id),
+        inArray(communications.projectId, 
+          db.select({ id: projects.id }).from(projects).where(eq(projects.organizationId, organizationId))
+        )
+      ));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
@@ -1683,12 +1724,18 @@ export class DatabaseStorage implements IStorage {
     offset?: number;
     sortBy?: 'createdAt' | 'updatedAt' | 'title' | 'engagementScore' | 'effectivenessRating';
     sortOrder?: 'asc' | 'desc';
-  }): Promise<{ communications: Communication[]; total: number; }> {
-    let query = db.select().from(communications);
-    let countQuery = db.select({ count: count() }).from(communications);
+  }, organizationId: string): Promise<{ communications: Communication[]; total: number; }> {
+    // SECURITY: Always join with projects to enforce organization-level access (BOLA prevention)
+    let query = db.select({ communication: communications })
+      .from(communications)
+      .innerJoin(projects, eq(communications.projectId, projects.id));
+    
+    let countQuery = db.select({ count: count() })
+      .from(communications)
+      .innerJoin(projects, eq(communications.projectId, projects.id));
 
-    // Build WHERE conditions
-    const conditions: any[] = [];
+    // Build WHERE conditions - start with organization filter
+    const conditions: any[] = [eq(projects.organizationId, organizationId)];
     
     if (params.query) {
       const searchTerm = `%${params.query}%`;
@@ -1728,11 +1775,9 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Apply conditions
-    if (conditions.length > 0) {
-      const whereCondition = conditions.reduce((acc, condition) => acc ? and(acc, condition) : condition);
-      query = query.where(whereCondition);
-      countQuery = countQuery.where(whereCondition);
-    }
+    const whereCondition = conditions.reduce((acc, condition) => acc ? and(acc, condition) : condition);
+    query = query.where(whereCondition);
+    countQuery = countQuery.where(whereCondition);
 
     // Get total count
     const [{ count: totalCount }] = await countQuery;
@@ -1770,7 +1815,7 @@ export class DatabaseStorage implements IStorage {
     const results = await query;
 
     return {
-      communications: results,
+      communications: results.map(r => r.communication),
       total: totalCount
     };
   }
@@ -1778,8 +1823,7 @@ export class DatabaseStorage implements IStorage {
   async getCommunicationMetrics(params: { 
     projectId?: string; 
     type?: string; 
-    authorizedProjectIds?: string[];
-  }): Promise<{
+  }, organizationId: string): Promise<{
     totalCommunications: number;
     byType: Record<string, number>;
     byStatus: Record<string, number>;
@@ -1787,31 +1831,25 @@ export class DatabaseStorage implements IStorage {
     avgEffectivenessRating: number;
     mostUsedTags: Array<{ tag: string; count: number }>;
   }> {
-    const conditions: any[] = [];
+    // SECURITY: Always join with projects to enforce organization-level access (BOLA prevention)
+    const baseJoin = db.select().from(communications).innerJoin(projects, eq(communications.projectId, projects.id));
     
-    // SECURITY: Always filter by authorized projects when provided
-    if (params.authorizedProjectIds && params.authorizedProjectIds.length > 0) {
-      if (params.projectId) {
-        // Verify requested projectId is in authorized list
-        if (params.authorizedProjectIds.includes(params.projectId)) {
-          conditions.push(eq(communications.projectId, params.projectId));
-        } else {
-          // Return empty metrics if requested projectId is not authorized
-          return {
-            totalCommunications: 0,
-            byType: {},
-            byStatus: {},
-            avgEngagementScore: 0,
-            avgEffectivenessRating: 0,
-            mostUsedTags: []
-          };
-        }
-      } else {
-        // Filter by all authorized projects when no specific projectId requested
-        conditions.push(inArray(communications.projectId, params.authorizedProjectIds));
+    const conditions: any[] = [eq(projects.organizationId, organizationId)];
+    
+    if (params.projectId) {
+      // Validate that the specific projectId belongs to the organization
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, params.projectId), eq(projects.organizationId, organizationId)));
+      if (!project) {
+        // Return empty metrics if requested projectId doesn't belong to organization
+        return {
+          totalCommunications: 0,
+          byType: {},
+          byStatus: {},
+          avgEngagementScore: 0,
+          avgEffectivenessRating: 0,
+          mostUsedTags: []
+        };
       }
-    } else if (params.projectId) {
-      // Legacy behavior: filter by specific project when no authorization filtering
       conditions.push(eq(communications.projectId, params.projectId));
     }
     
@@ -1819,25 +1857,23 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(communications.type, params.type));
     }
     
-    const whereCondition = conditions.length > 0 
-      ? conditions.reduce((acc, condition) => acc ? and(acc, condition) : condition)
-      : undefined;
+    const whereCondition = conditions.reduce((acc, condition) => acc ? and(acc, condition) : condition);
     
     // SQL aggregation for total count
-    let totalQuery = db.select({ count: count() }).from(communications);
-    if (whereCondition) {
-      totalQuery = totalQuery.where(whereCondition);
-    }
+    const totalQuery = db.select({ count: count() })
+      .from(communications)
+      .innerJoin(projects, eq(communications.projectId, projects.id))
+      .where(whereCondition);
     const [{ count: totalCommunications }] = await totalQuery;
     
     // SQL aggregation for type counts
-    let typeQuery = db.select({
+    const typeQuery = db.select({
       type: communications.type,
       count: count()
-    }).from(communications).groupBy(communications.type);
-    if (whereCondition) {
-      typeQuery = typeQuery.where(whereCondition);
-    }
+    }).from(communications)
+      .innerJoin(projects, eq(communications.projectId, projects.id))
+      .where(whereCondition)
+      .groupBy(communications.type);
     const typeResults = await typeQuery;
     const byType: Record<string, number> = {};
     typeResults.forEach(result => {
@@ -1845,13 +1881,13 @@ export class DatabaseStorage implements IStorage {
     });
     
     // SQL aggregation for status counts
-    let statusQuery = db.select({
+    const statusQuery = db.select({
       status: communications.status,
       count: count()
-    }).from(communications).groupBy(communications.status);
-    if (whereCondition) {
-      statusQuery = statusQuery.where(whereCondition);
-    }
+    }).from(communications)
+      .innerJoin(projects, eq(communications.projectId, projects.id))
+      .where(whereCondition)
+      .groupBy(communications.status);
     const statusResults = await statusQuery;
     const byStatus: Record<string, number> = {};
     statusResults.forEach(result => {
@@ -1859,23 +1895,24 @@ export class DatabaseStorage implements IStorage {
     });
     
     // SQL aggregation for engagement and effectiveness scores
-    let scoresQuery = db.select({
+    const scoresQuery = db.select({
       avgEngagement: sql<number>`AVG(CASE WHEN ${communications.engagementScore} > 0 THEN ${communications.engagementScore} END)`,
       avgEffectiveness: sql<number>`AVG(CASE WHEN ${communications.effectivenessRating} > 0 THEN ${communications.effectivenessRating} END)`
-    }).from(communications);
-    if (whereCondition) {
-      scoresQuery = scoresQuery.where(whereCondition);
-    }
+    }).from(communications)
+      .innerJoin(projects, eq(communications.projectId, projects.id))
+      .where(whereCondition);
     const [scores] = await scoresQuery;
     
     // SQL aggregation for tag counts (PostgreSQL specific)
-    let tagsQuery = db.select({
+    const tagsQuery = db.select({
       tag: sql<string>`unnest(${communications.tags})`,
       count: sql<number>`count(*)`
-    }).from(communications).groupBy(sql`unnest(${communications.tags})`).orderBy(sql`count(*) DESC`).limit(10);
-    if (whereCondition) {
-      tagsQuery = tagsQuery.where(whereCondition);
-    }
+    }).from(communications)
+      .innerJoin(projects, eq(communications.projectId, projects.id))
+      .where(whereCondition)
+      .groupBy(sql`unnest(${communications.tags})`)
+      .orderBy(sql`count(*) DESC`)
+      .limit(10);
     const tagResults = await tagsQuery;
     const mostUsedTags = tagResults.map(result => ({
       tag: result.tag,
@@ -1892,19 +1929,15 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getCommunicationVersionHistory(communicationId: string, authorizedProjectIds: string[]): Promise<CommunicationVersion[]> {
-    // SECURITY: First verify the communication belongs to user's authorized projects
+  async getCommunicationVersionHistory(communicationId: string, organizationId: string): Promise<CommunicationVersion[]> {
+    // SECURITY: Validate communication belongs to organization via project join (BOLA prevention)
     const communication = await db.select({ projectId: communications.projectId })
       .from(communications)
-      .where(eq(communications.id, communicationId));
+      .innerJoin(projects, eq(communications.projectId, projects.id))
+      .where(and(eq(communications.id, communicationId), eq(projects.organizationId, organizationId)));
     
     if (communication.length === 0) {
-      // Communication not found
-      return [];
-    }
-    
-    if (!authorizedProjectIds.includes(communication[0].projectId)) {
-      // SECURITY: Communication belongs to unauthorized project - return empty array
+      // Communication not found or doesn't belong to organization
       return [];
     }
     
@@ -1917,11 +1950,12 @@ export class DatabaseStorage implements IStorage {
     return versions;
   }
 
-  async archiveCommunications(ids: string[], userId: string): Promise<{ archived: number; errors: string[] }> {
+  async archiveCommunications(ids: string[], userId: string, organizationId: string): Promise<{ archived: number; errors: string[] }> {
     const results = { archived: 0, errors: [] as string[] };
     
     for (const id of ids) {
       try {
+        // SECURITY: Only archive communications that belong to the user's organization (BOLA prevention)
         const [updated] = await db.update(communications)
           .set({
             isArchived: true,
@@ -1929,13 +1963,18 @@ export class DatabaseStorage implements IStorage {
             archivedById: userId,
             updatedAt: new Date()
           })
-          .where(eq(communications.id, id))
+          .where(and(
+            eq(communications.id, id),
+            inArray(communications.projectId, 
+              db.select({ id: projects.id }).from(projects).where(eq(projects.organizationId, organizationId))
+            )
+          ))
           .returning();
         
         if (updated) {
           results.archived++;
         } else {
-          results.errors.push(`Communication ${id} not found`);
+          results.errors.push(`Communication ${id} not found or not authorized`);
         }
       } catch (error) {
         results.errors.push(`Failed to archive ${id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1949,7 +1988,8 @@ export class DatabaseStorage implements IStorage {
     viewCount?: number; 
     shareCount?: number; 
     lastViewedAt?: Date 
-  }): Promise<void> {
+  }, organizationId: string): Promise<void> {
+    // SECURITY: Only update engagement for communications that belong to the user's organization (BOLA prevention)
     const updateData: any = { updatedAt: new Date() };
     
     if (engagement.viewCount !== undefined) {
@@ -1964,31 +2004,43 @@ export class DatabaseStorage implements IStorage {
 
     await db.update(communications)
       .set(updateData)
-      .where(eq(communications.id, id));
+      .where(and(
+        eq(communications.id, id),
+        inArray(communications.projectId, 
+          db.select({ id: projects.id }).from(projects).where(eq(projects.organizationId, organizationId))
+        )
+      ));
   }
 
-  async getCommunicationsByStakeholder(stakeholderId: string, projectId?: string): Promise<Communication[]> {
-    // Get stakeholder details
-    const [stakeholder] = await db.select()
+  async getCommunicationsByStakeholder(stakeholderId: string, organizationId: string, projectId?: string): Promise<Communication[]> {
+    // SECURITY: Validate stakeholder belongs to organization first (BOLA prevention)
+    const [stakeholder] = await db.select({ stakeholder: stakeholders, project: projects })
       .from(stakeholders)
-      .where(eq(stakeholders.id, stakeholderId));
+      .innerJoin(projects, eq(stakeholders.projectId, projects.id))
+      .where(and(eq(stakeholders.id, stakeholderId), eq(projects.organizationId, organizationId)));
 
     if (!stakeholder) return [];
 
-    let query = db.select()
+    // SECURITY: Only return communications from projects in the user's organization
+    let query = db.select({ communication: communications })
       .from(communications)
-      .where(sql`
-        ${communications.targetAudience} @> ${JSON.stringify([stakeholder.name])} OR
-        ${communications.targetAudience} @> ${JSON.stringify([stakeholder.role])}
-      `);
+      .innerJoin(projects, eq(communications.projectId, projects.id))
+      .where(and(
+        eq(projects.organizationId, organizationId),
+        sql`
+          ${communications.targetAudience} @> ${JSON.stringify([stakeholder.stakeholder.name])} OR
+          ${communications.targetAudience} @> ${JSON.stringify([stakeholder.stakeholder.role])}
+        `
+      ));
 
     if (projectId) {
       query = query.where(eq(communications.projectId, projectId));
-    } else if (stakeholder.projectId) {
-      query = query.where(eq(communications.projectId, stakeholder.projectId));
+    } else if (stakeholder.stakeholder.projectId) {
+      query = query.where(eq(communications.projectId, stakeholder.stakeholder.projectId));
     }
 
-    return await query.orderBy(desc(communications.createdAt));
+    const results = await query.orderBy(desc(communications.createdAt));
+    return results.map(r => r.communication);
   }
 
   // Communication Strategies
