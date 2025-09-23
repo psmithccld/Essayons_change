@@ -58,9 +58,11 @@ interface ChangeProcessFlowProps {
 
 export default function ChangeProcessFlow({ initiativesByPhase }: ChangeProcessFlowProps) {
   return (
-    <div className="relative w-full min-h-[600px] bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-lg overflow-hidden">
-      {/* Background Design */}
-      <div className="absolute inset-0">
+    <div className="relative w-full min-h-[450px] bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-lg overflow-hidden">
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="relative w-full h-full" style={{ transform: 'scale(0.75)', transformOrigin: 'center center' }}>
+          {/* Background Design */}
+          <div className="absolute inset-0">
         {/* Organizational Actions Bar */}
         <div className="absolute top-[60px] left-[80px] right-[80px] h-[50px] bg-gradient-to-r from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg">
           <h3 className="text-white font-semibold text-lg">Organizational Actions</h3>
@@ -189,6 +191,8 @@ export default function ChangeProcessFlow({ initiativesByPhase }: ChangeProcessF
         <div className="flex items-center space-x-2">
           <div className="w-4 h-4 bg-red-600 rounded-full"></div>
           <span className="text-xs text-gray-600 dark:text-gray-400">Count of assigned initiatives</span>
+        </div>
+      </div>
         </div>
       </div>
     </div>
