@@ -16,7 +16,7 @@ export const CHANGE_PHASES = [
     shortName: "Identify Need",
     icon: Lightbulb,
     color: "bg-blue-500",
-    position: { x: 180, y: 300 }
+    position: { x: 120, y: 300 }
   },
   {
     id: "identify_stakeholders",
@@ -24,7 +24,7 @@ export const CHANGE_PHASES = [
     shortName: "Stakeholders",
     icon: Users,
     color: "bg-green-500",
-    position: { x: 290, y: 300 }
+    position: { x: 280, y: 300 }
   },
   {
     id: "develop_change",
@@ -32,7 +32,7 @@ export const CHANGE_PHASES = [
     shortName: "Develop",
     icon: Building,
     color: "bg-orange-500",
-    position: { x: 400, y: 300 }
+    position: { x: 440, y: 300 }
   },
   {
     id: "implement_change",
@@ -40,7 +40,7 @@ export const CHANGE_PHASES = [
     shortName: "Implement",
     icon: Rocket,
     color: "bg-purple-500",
-    position: { x: 510, y: 300 }
+    position: { x: 600, y: 300 }
   },
   {
     id: "reinforce_change",
@@ -48,7 +48,7 @@ export const CHANGE_PHASES = [
     shortName: "Reinforce",
     icon: Star,
     color: "bg-pink-500",
-    position: { x: 620, y: 300 }
+    position: { x: 760, y: 300 }
   }
 ] as const;
 
@@ -62,12 +62,12 @@ export default function ChangeProcessFlow({ initiativesByPhase }: ChangeProcessF
       {/* Background Design */}
       <div className="absolute inset-0">
         {/* Organizational Actions Bar */}
-        <div className="absolute top-[60px] left-[120px] right-[120px] h-[50px] bg-gradient-to-r from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg">
+        <div className="absolute top-[60px] left-[40px] right-[40px] h-[50px] bg-gradient-to-r from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg">
           <h3 className="text-white font-semibold text-lg">Organizational Actions</h3>
         </div>
         
         {/* Individual Actions Bar */}
-        <div className="absolute bottom-[60px] left-[120px] right-[120px] h-[50px] bg-gradient-to-r from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg">
+        <div className="absolute bottom-[60px] left-[40px] right-[40px] h-[50px] bg-gradient-to-r from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg">
           <h3 className="text-white font-semibold text-lg">Individual Actions</h3>
         </div>
         
