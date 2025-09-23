@@ -125,6 +125,11 @@ export default function RaidLogs() {
     enabled: !!currentProject?.id,
   });
 
+  // Fetch users for assignee selection
+  const { data: users = [] } = useQuery({
+    queryKey: ['/api/users/with-roles'],
+  });
+
   const [formType, setFormType] = useState<"risk" | "action" | "issue" | "deficiency">("risk");
   
   // Get schema based on selected type
@@ -585,9 +590,21 @@ export default function RaidLogs() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Who will manage?</FormLabel>
-                          <FormControl>
-                            <Input {...field} data-testid="input-risk-manager" />
-                          </FormControl>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-risk-manager">
+                                <SelectValue placeholder="Select user or enter custom name" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {users.map((user) => (
+                                <SelectItem key={user.id} value={user.name}>
+                                  {user.name} ({user.role?.name || 'No role'})
+                                </SelectItem>
+                              ))}
+                              <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -683,6 +700,30 @@ export default function RaidLogs() {
                         )}
                       />
                     </div>
+                    <FormField
+                      control={form.control}
+                      name="assigneeId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Assigned To</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-action-assignee">
+                                <SelectValue placeholder="Select assignee" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {users.map((user) => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.name} ({user.role?.name || 'No role'})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={form.control}
                       name="notes"
@@ -813,6 +854,30 @@ export default function RaidLogs() {
                     />
                     <FormField
                       control={form.control}
+                      name="assigneeId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Assigned To</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-issue-assignee">
+                                <SelectValue placeholder="Select assignee" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {users.map((user) => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.name} ({user.role?.name || 'No role'})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
                       name="rootCause"
                       render={({ field }) => (
                         <FormItem>
@@ -903,6 +968,30 @@ export default function RaidLogs() {
                           <FormControl>
                             <Input type="date" {...field} data-testid="input-deficiency-target-date" />
                           </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="assigneeId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Assigned To</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-deficiency-assignee">
+                                <SelectValue placeholder="Select assignee" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {users.map((user) => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.name} ({user.role?.name || 'No role'})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
