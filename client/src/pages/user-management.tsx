@@ -217,6 +217,7 @@ function UserManagementContent() {
     defaultValues: {
       name: "",
       username: "",
+      email: "",
       password: "",
       confirmPassword: "",
       roleId: "",
@@ -317,6 +318,19 @@ function UserManagementContent() {
                       <FormLabel>Username</FormLabel>
                       <FormControl>
                         <Input placeholder="john.doe" {...field} data-testid="input-user-username" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="john.doe@company.com" {...field} data-testid="input-user-email" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
