@@ -72,7 +72,7 @@ export interface IStorage {
   // Projects - SECURITY: Organization-scoped for tenant isolation
   getProjects(userId: string, organizationId: string): Promise<Project[]>;
   getProject(id: string, organizationId: string): Promise<Project | undefined>;
-  createProject(project: InsertProject): Promise<Project>;
+  createProject(project: InsertProject, organizationId: string): Promise<Project>;
   updateProject(id: string, organizationId: string, project: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: string, organizationId: string): Promise<boolean>;
   
@@ -83,14 +83,14 @@ export interface IStorage {
   // Tasks
   getTasksByProject(projectId: string, organizationId: string): Promise<Task[]>;
   getTask(id: string, organizationId: string): Promise<Task | undefined>;
-  createTask(task: InsertTask): Promise<Task>;
+  createTask(task: InsertTask, organizationId: string): Promise<Task>;
   updateTask(id: string, organizationId: string, task: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: string, organizationId: string): Promise<boolean>;
 
   // Stakeholders
   getStakeholdersByProject(projectId: string, organizationId: string): Promise<Stakeholder[]>;
   getStakeholder(id: string, organizationId: string): Promise<Stakeholder | undefined>;
-  createStakeholder(stakeholder: InsertStakeholder): Promise<Stakeholder>;
+  createStakeholder(stakeholder: InsertStakeholder, organizationId: string): Promise<Stakeholder>;
   updateStakeholder(id: string, organizationId: string, stakeholder: Partial<InsertStakeholder>): Promise<Stakeholder | undefined>;
   deleteStakeholder(id: string, organizationId: string): Promise<boolean>;
   importStakeholders(targetProjectId: string, sourceProjectId: string, stakeholderIds: string[], organizationId: string): Promise<{ imported: number; skipped: number }>;
@@ -98,7 +98,7 @@ export interface IStorage {
   // RAID Logs
   getRaidLogsByProject(projectId: string, organizationId: string): Promise<RaidLog[]>;
   getRaidLog(id: string, organizationId: string): Promise<RaidLog | undefined>;
-  createRaidLog(raidLog: InsertRaidLog): Promise<RaidLog>;
+  createRaidLog(raidLog: InsertRaidLog, organizationId: string): Promise<RaidLog>;
   updateRaidLog(id: string, organizationId: string, raidLog: Partial<InsertRaidLog>): Promise<RaidLog | undefined>;
   deleteRaidLog(id: string, organizationId: string): Promise<boolean>;
 
@@ -143,12 +143,12 @@ export interface IStorage {
   getCommunicationsByStakeholder(stakeholderId: string, organizationId: string, projectId?: string): Promise<Communication[]>;
 
   // Communication Strategies
-  getCommunicationStrategiesByProject(projectId: string): Promise<CommunicationStrategy[]>;
-  getCommunicationStrategy(id: string): Promise<CommunicationStrategy | undefined>;
-  getCommunicationStrategyByPhase(projectId: string, phase: string): Promise<CommunicationStrategy | undefined>;
-  createCommunicationStrategy(strategy: InsertCommunicationStrategy): Promise<CommunicationStrategy>;
-  updateCommunicationStrategy(id: string, strategy: Partial<InsertCommunicationStrategy>): Promise<CommunicationStrategy | undefined>;
-  deleteCommunicationStrategy(id: string): Promise<boolean>;
+  getCommunicationStrategiesByProject(projectId: string, organizationId: string): Promise<CommunicationStrategy[]>;
+  getCommunicationStrategy(id: string, organizationId: string): Promise<CommunicationStrategy | undefined>;
+  getCommunicationStrategyByPhase(projectId: string, phase: string, organizationId: string): Promise<CommunicationStrategy | undefined>;
+  createCommunicationStrategy(strategy: InsertCommunicationStrategy, organizationId: string): Promise<CommunicationStrategy>;
+  updateCommunicationStrategy(id: string, organizationId: string, strategy: Partial<InsertCommunicationStrategy>): Promise<CommunicationStrategy | undefined>;
+  deleteCommunicationStrategy(id: string, organizationId: string): Promise<boolean>;
 
   // Communication Templates
   getCommunicationTemplates(): Promise<CommunicationTemplate[]>;
@@ -161,26 +161,26 @@ export interface IStorage {
   incrementTemplateUsage(id: string): Promise<void>;
 
   // Surveys
-  getSurveysByProject(projectId: string): Promise<Survey[]>;
-  getSurvey(id: string): Promise<Survey | undefined>;
-  createSurvey(survey: InsertSurvey): Promise<Survey>;
-  updateSurvey(id: string, survey: Partial<InsertSurvey>): Promise<Survey | undefined>;
-  deleteSurvey(id: string): Promise<boolean>;
+  getSurveysByProject(projectId: string, organizationId: string): Promise<Survey[]>;
+  getSurvey(id: string, organizationId: string): Promise<Survey | undefined>;
+  createSurvey(survey: InsertSurvey, organizationId: string): Promise<Survey>;
+  updateSurvey(id: string, organizationId: string, survey: Partial<InsertSurvey>): Promise<Survey | undefined>;
+  deleteSurvey(id: string, organizationId: string): Promise<boolean>;
 
   // Survey Responses
-  getResponsesBySurvey(surveyId: string): Promise<SurveyResponse[]>;
-  createSurveyResponse(response: InsertSurveyResponse): Promise<SurveyResponse>;
+  getResponsesBySurvey(surveyId: string, organizationId: string): Promise<SurveyResponse[]>;
+  createSurveyResponse(response: InsertSurveyResponse, organizationId: string): Promise<SurveyResponse>;
 
   // GPT Interactions
   getGptInteractionsByUser(userId: string): Promise<GptInteraction[]>;
   createGptInteraction(interaction: InsertGptInteraction): Promise<GptInteraction>;
 
   // Milestones
-  getMilestonesByProject(projectId: string): Promise<Milestone[]>;
-  getMilestone(id: string): Promise<Milestone | undefined>;
-  createMilestone(milestone: InsertMilestone): Promise<Milestone>;
-  updateMilestone(id: string, milestone: Partial<InsertMilestone>): Promise<Milestone | undefined>;
-  deleteMilestone(id: string): Promise<boolean>;
+  getMilestonesByProject(projectId: string, organizationId: string): Promise<Milestone[]>;
+  getMilestone(id: string, organizationId: string): Promise<Milestone | undefined>;
+  createMilestone(milestone: InsertMilestone, organizationId: string): Promise<Milestone>;
+  updateMilestone(id: string, organizationId: string, milestone: Partial<InsertMilestone>): Promise<Milestone | undefined>;
+  deleteMilestone(id: string, organizationId: string): Promise<boolean>;
 
   // Checklist Templates
   getChecklistTemplates(): Promise<ChecklistTemplate[]>;
@@ -1378,8 +1378,16 @@ export class DatabaseStorage implements IStorage {
     return project || undefined;
   }
 
-  async createProject(project: InsertProject): Promise<Project> {
-    const [created] = await db.insert(projects).values(project).returning();
+  async createProject(project: InsertProject, organizationId: string): Promise<Project> {
+    // SECURITY: Validate organization exists and enforce organization ownership (BOLA prevention)
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId));
+    if (!org) {
+      throw new Error('Organization not found or access denied');
+    }
+    
+    // Ensure project is created in the correct organization
+    const projectData = { ...project, organizationId };
+    const [created] = await db.insert(projects).values(projectData).returning();
     return created;
   }
 
@@ -1414,8 +1422,18 @@ export class DatabaseStorage implements IStorage {
     return result?.task || undefined;
   }
 
-  async createTask(task: InsertTask): Promise<Task> {
-    const [created] = await db.insert(tasks).values(task).returning();
+  async createTask(task: InsertTask, organizationId: string): Promise<Task> {
+    // SECURITY: Validate that the target project belongs to the user's organization (BOLA prevention)
+    if (task.projectId) {
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, task.projectId), eq(projects.organizationId, organizationId)));
+      if (!project) {
+        throw new Error('Project not found or does not belong to organization');
+      }
+    }
+    
+    // SECURITY: Force organizationId to prevent client spoofing - get from validated project
+    const taskData = { ...task, organizationId };
+    const [created] = await db.insert(tasks).values(taskData).returning();
     return created;
   }
 
@@ -1460,8 +1478,18 @@ export class DatabaseStorage implements IStorage {
     return result?.stakeholder || undefined;
   }
 
-  async createStakeholder(stakeholder: InsertStakeholder): Promise<Stakeholder> {
-    const [created] = await db.insert(stakeholders).values(stakeholder).returning();
+  async createStakeholder(stakeholder: InsertStakeholder, organizationId: string): Promise<Stakeholder> {
+    // SECURITY: Validate that the target project belongs to the user's organization (BOLA prevention)
+    if (stakeholder.projectId) {
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, stakeholder.projectId), eq(projects.organizationId, organizationId)));
+      if (!project) {
+        throw new Error('Project not found or does not belong to organization');
+      }
+    }
+    
+    // SECURITY: Force organizationId to prevent client spoofing - get from validated project
+    const stakeholderData = { ...stakeholder, organizationId };
+    const [created] = await db.insert(stakeholders).values(stakeholderData).returning();
     return created;
   }
 
@@ -1561,8 +1589,18 @@ export class DatabaseStorage implements IStorage {
     return result?.raid_logs || undefined;
   }
 
-  async createRaidLog(raidLog: InsertRaidLog): Promise<RaidLog> {
-    const [created] = await db.insert(raidLogs).values(raidLog).returning();
+  async createRaidLog(raidLog: InsertRaidLog, organizationId: string): Promise<RaidLog> {
+    // SECURITY: Validate that the target project belongs to the user's organization (BOLA prevention)
+    if (raidLog.projectId) {
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, raidLog.projectId), eq(projects.organizationId, organizationId)));
+      if (!project) {
+        throw new Error('Project not found or does not belong to organization');
+      }
+    }
+    
+    // SECURITY: Force organizationId to prevent client spoofing - get from validated project
+    const raidLogData = { ...raidLog, organizationId };
+    const [created] = await db.insert(raidLogs).values(raidLogData).returning();
     return created;
   }
 
@@ -2044,16 +2082,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Communication Strategies
-  async getCommunicationStrategiesByProject(projectId: string): Promise<CommunicationStrategy[]> {
+  async getCommunicationStrategiesByProject(projectId: string, organizationId: string): Promise<CommunicationStrategy[]> {
+    // SECURITY: Validate project ownership before returning strategies (BOLA prevention)
+    const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId)));
+    if (!project) {
+      return []; // Return empty array if project not found or doesn't belong to organization
+    }
+    
     return await db.select().from(communicationStrategy).where(eq(communicationStrategy.projectId, projectId)).orderBy(desc(communicationStrategy.createdAt));
   }
 
-  async getCommunicationStrategy(id: string): Promise<CommunicationStrategy | undefined> {
-    const [strategy] = await db.select().from(communicationStrategy).where(eq(communicationStrategy.id, id));
-    return strategy || undefined;
+  async getCommunicationStrategy(id: string, organizationId: string): Promise<CommunicationStrategy | undefined> {
+    // SECURITY: Validate organization ownership via project join (BOLA prevention)
+    const [result] = await db.select().from(communicationStrategy)
+      .innerJoin(projects, eq(communicationStrategy.projectId, projects.id))
+      .where(and(
+        eq(communicationStrategy.id, id),
+        eq(projects.organizationId, organizationId)
+      ));
+    return result?.communication_strategy || undefined;
   }
 
-  async getCommunicationStrategyByPhase(projectId: string, phase: string): Promise<CommunicationStrategy | undefined> {
+  async getCommunicationStrategyByPhase(projectId: string, phase: string, organizationId: string): Promise<CommunicationStrategy | undefined> {
+    // SECURITY: Validate project ownership before returning strategy (BOLA prevention)
+    const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId)));
+    if (!project) {
+      return undefined; // Return undefined if project not found or doesn't belong to organization
+    }
+    
     const [strategy] = await db.select()
       .from(communicationStrategy)
       .where(and(
@@ -2064,58 +2120,160 @@ export class DatabaseStorage implements IStorage {
     return strategy || undefined;
   }
 
-  async createCommunicationStrategy(strategy: InsertCommunicationStrategy): Promise<CommunicationStrategy> {
-    const [created] = await db.insert(communicationStrategy).values(strategy).returning();
+  async createCommunicationStrategy(strategy: InsertCommunicationStrategy, organizationId: string): Promise<CommunicationStrategy> {
+    // SECURITY: Validate that the target project belongs to the user's organization (BOLA prevention)
+    if (strategy.projectId) {
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, strategy.projectId), eq(projects.organizationId, organizationId)));
+      if (!project) {
+        throw new Error('Project not found or does not belong to organization');
+      }
+    }
+    
+    // SECURITY: Force organizationId to prevent client spoofing - get from validated project
+    const strategyData = { ...strategy, organizationId };
+    const [created] = await db.insert(communicationStrategy).values(strategyData).returning();
     return created;
   }
 
-  async updateCommunicationStrategy(id: string, strategy: Partial<InsertCommunicationStrategy>): Promise<CommunicationStrategy | undefined> {
+  async updateCommunicationStrategy(id: string, organizationId: string, strategy: Partial<InsertCommunicationStrategy>): Promise<CommunicationStrategy | undefined> {
+    // SECURITY: Validate organization ownership via project join before update (BOLA prevention)
+    const orgProjectIds = await db.select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.organizationId, organizationId))
+      .then(results => results.map(p => p.id));
+    
+    if (orgProjectIds.length === 0) return undefined;
+    
     const [updated] = await db.update(communicationStrategy)
       .set({ ...strategy, updatedAt: new Date() })
-      .where(eq(communicationStrategy.id, id))
+      .where(and(
+        eq(communicationStrategy.id, id),
+        inArray(communicationStrategy.projectId, orgProjectIds)
+      ))
       .returning();
     return updated || undefined;
   }
 
-  async deleteCommunicationStrategy(id: string): Promise<boolean> {
-    const result = await db.delete(communicationStrategy).where(eq(communicationStrategy.id, id));
+  async deleteCommunicationStrategy(id: string, organizationId: string): Promise<boolean> {
+    // SECURITY: Validate organization ownership via project join before delete (BOLA prevention)
+    const orgProjectIds = await db.select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.organizationId, organizationId))
+      .then(results => results.map(p => p.id));
+    
+    if (orgProjectIds.length === 0) return false;
+    
+    const result = await db.delete(communicationStrategy)
+      .where(and(
+        eq(communicationStrategy.id, id),
+        inArray(communicationStrategy.projectId, orgProjectIds)
+      ));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
   // Surveys
-  async getSurveysByProject(projectId: string): Promise<Survey[]> {
+  async getSurveysByProject(projectId: string, organizationId: string): Promise<Survey[]> {
+    // SECURITY: Validate project ownership before returning surveys (BOLA prevention)
+    const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId)));
+    if (!project) {
+      return []; // Return empty array if project not found or doesn't belong to organization
+    }
+    
     return await db.select().from(surveys).where(eq(surveys.projectId, projectId)).orderBy(desc(surveys.createdAt));
   }
 
-  async getSurvey(id: string): Promise<Survey | undefined> {
-    const [survey] = await db.select().from(surveys).where(eq(surveys.id, id));
-    return survey || undefined;
+  async getSurvey(id: string, organizationId: string): Promise<Survey | undefined> {
+    // SECURITY: Validate organization ownership via project join (BOLA prevention)
+    const [result] = await db.select().from(surveys)
+      .innerJoin(projects, eq(surveys.projectId, projects.id))
+      .where(and(
+        eq(surveys.id, id),
+        eq(projects.organizationId, organizationId)
+      ));
+    return result?.surveys || undefined;
   }
 
-  async createSurvey(survey: InsertSurvey): Promise<Survey> {
-    const [created] = await db.insert(surveys).values(survey).returning();
+  async createSurvey(survey: InsertSurvey, organizationId: string): Promise<Survey> {
+    // SECURITY: Validate that the target project belongs to the user's organization (BOLA prevention)
+    if (survey.projectId) {
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, survey.projectId), eq(projects.organizationId, organizationId)));
+      if (!project) {
+        throw new Error('Project not found or does not belong to organization');
+      }
+    }
+    
+    // SECURITY: Force organizationId to prevent client spoofing - get from validated project
+    const surveyData = { ...survey, organizationId };
+    const [created] = await db.insert(surveys).values(surveyData).returning();
     return created;
   }
 
-  async updateSurvey(id: string, survey: Partial<InsertSurvey>): Promise<Survey | undefined> {
+  async updateSurvey(id: string, organizationId: string, survey: Partial<InsertSurvey>): Promise<Survey | undefined> {
+    // SECURITY: Validate organization ownership via project join before update (BOLA prevention)
+    const orgProjectIds = await db.select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.organizationId, organizationId))
+      .then(results => results.map(p => p.id));
+    
+    if (orgProjectIds.length === 0) return undefined;
+    
     const [updated] = await db.update(surveys)
       .set({ ...survey, updatedAt: new Date() })
-      .where(eq(surveys.id, id))
+      .where(and(
+        eq(surveys.id, id),
+        inArray(surveys.projectId, orgProjectIds)
+      ))
       .returning();
     return updated || undefined;
   }
 
-  async deleteSurvey(id: string): Promise<boolean> {
-    const result = await db.delete(surveys).where(eq(surveys.id, id));
+  async deleteSurvey(id: string, organizationId: string): Promise<boolean> {
+    // SECURITY: Validate organization ownership via project join before delete (BOLA prevention)
+    const orgProjectIds = await db.select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.organizationId, organizationId))
+      .then(results => results.map(p => p.id));
+    
+    if (orgProjectIds.length === 0) return false;
+    
+    const result = await db.delete(surveys)
+      .where(and(
+        eq(surveys.id, id),
+        inArray(surveys.projectId, orgProjectIds)
+      ));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
   // Survey Responses
-  async getResponsesBySurvey(surveyId: string): Promise<SurveyResponse[]> {
+  async getResponsesBySurvey(surveyId: string, organizationId: string): Promise<SurveyResponse[]> {
+    // SECURITY: Validate organization ownership via survey -> project join (BOLA prevention)
+    const [surveyCheck] = await db.select().from(surveys)
+      .innerJoin(projects, eq(surveys.projectId, projects.id))
+      .where(and(
+        eq(surveys.id, surveyId),
+        eq(projects.organizationId, organizationId)
+      ));
+    
+    if (!surveyCheck) {
+      return []; // Return empty array if survey not found or doesn't belong to organization
+    }
+    
     return await db.select().from(surveyResponses).where(eq(surveyResponses.surveyId, surveyId));
   }
 
-  async createSurveyResponse(response: InsertSurveyResponse): Promise<SurveyResponse> {
+  async createSurveyResponse(response: InsertSurveyResponse, organizationId: string): Promise<SurveyResponse> {
+    // SECURITY: Validate that the target survey belongs to the user's organization (BOLA prevention)
+    const [surveyCheck] = await db.select().from(surveys)
+      .innerJoin(projects, eq(surveys.projectId, projects.id))
+      .where(and(
+        eq(surveys.id, response.surveyId),
+        eq(projects.organizationId, organizationId)
+      ));
+    
+    if (!surveyCheck) {
+      throw new Error('Survey not found or does not belong to organization');
+    }
+    
     const [created] = await db.insert(surveyResponses).values(response).returning();
     return created;
   }
@@ -2257,7 +2415,7 @@ export class DatabaseStorage implements IStorage {
         .from(surveyResponses)
         .where(and(
           eq(surveyResponses.surveyId, survey.id),
-          eq(surveyResponses.userId, userId)
+          eq(surveyResponses.respondentId, userId)
         ));
       
       if (existingResponse.length === 0) {
@@ -2568,30 +2726,75 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Milestones
-  async getMilestonesByProject(projectId: string): Promise<Milestone[]> {
+  async getMilestonesByProject(projectId: string, organizationId: string): Promise<Milestone[]> {
+    // SECURITY: Validate project ownership before returning milestones (BOLA prevention)
+    const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId)));
+    if (!project) {
+      return []; // Return empty array if project not found or doesn't belong to organization
+    }
+    
     return await db.select().from(milestones).where(eq(milestones.projectId, projectId)).orderBy(milestones.targetDate);
   }
 
-  async getMilestone(id: string): Promise<Milestone | undefined> {
-    const [milestone] = await db.select().from(milestones).where(eq(milestones.id, id));
-    return milestone || undefined;
+  async getMilestone(id: string, organizationId: string): Promise<Milestone | undefined> {
+    // SECURITY: Validate organization ownership via project join (BOLA prevention)
+    const [result] = await db.select().from(milestones)
+      .innerJoin(projects, eq(milestones.projectId, projects.id))
+      .where(and(
+        eq(milestones.id, id),
+        eq(projects.organizationId, organizationId)
+      ));
+    return result?.milestones || undefined;
   }
 
-  async createMilestone(milestone: InsertMilestone): Promise<Milestone> {
-    const [created] = await db.insert(milestones).values(milestone).returning();
+  async createMilestone(milestone: InsertMilestone, organizationId: string): Promise<Milestone> {
+    // SECURITY: Validate that the target project belongs to the user's organization (BOLA prevention)
+    if (milestone.projectId) {
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, milestone.projectId), eq(projects.organizationId, organizationId)));
+      if (!project) {
+        throw new Error('Project not found or does not belong to organization');
+      }
+    }
+    
+    // SECURITY: Force organizationId to prevent client spoofing - get from validated project
+    const milestoneData = { ...milestone, organizationId };
+    const [created] = await db.insert(milestones).values(milestoneData).returning();
     return created;
   }
 
-  async updateMilestone(id: string, milestone: Partial<InsertMilestone>): Promise<Milestone | undefined> {
+  async updateMilestone(id: string, organizationId: string, milestone: Partial<InsertMilestone>): Promise<Milestone | undefined> {
+    // SECURITY: Validate organization ownership via project join before update (BOLA prevention)
+    const orgProjectIds = await db.select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.organizationId, organizationId))
+      .then(results => results.map(p => p.id));
+    
+    if (orgProjectIds.length === 0) return undefined;
+    
     const [updated] = await db.update(milestones)
       .set({ ...milestone, updatedAt: new Date() })
-      .where(eq(milestones.id, id))
+      .where(and(
+        eq(milestones.id, id),
+        inArray(milestones.projectId, orgProjectIds)
+      ))
       .returning();
     return updated || undefined;
   }
 
-  async deleteMilestone(id: string): Promise<boolean> {
-    const result = await db.delete(milestones).where(eq(milestones.id, id));
+  async deleteMilestone(id: string, organizationId: string): Promise<boolean> {
+    // SECURITY: Validate organization ownership via project join before delete (BOLA prevention)
+    const orgProjectIds = await db.select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.organizationId, organizationId))
+      .then(results => results.map(p => p.id));
+    
+    if (orgProjectIds.length === 0) return false;
+    
+    const result = await db.delete(milestones)
+      .where(and(
+        eq(milestones.id, id),
+        inArray(milestones.projectId, orgProjectIds)
+      ));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 

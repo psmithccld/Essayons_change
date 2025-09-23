@@ -1377,7 +1377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const validatedData = insertProjectSchema.parse(processedData);
-      const project = await storage.createProject(validatedData);
+      const project = await storage.createProject(validatedData, req.organizationId!);
       res.status(201).json(project);
     } catch (error) {
       console.error("Error creating project:", error);
@@ -1497,7 +1497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       delete (copiedProjectData as any).updatedAt;
 
       const validatedData = insertProjectSchema.parse(copiedProjectData);
-      const copiedProject = await storage.createProject(validatedData);
+      const copiedProject = await storage.createProject(validatedData, req.organizationId!);
 
       // Copy assignments if requested
       if (copyAssignments) {
@@ -1535,7 +1535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Copy tasks if requested
       if (copyTasks) {
         try {
-          const tasks = await storage.getTasksByProject(req.params.id);
+          const tasks = await storage.getTasksByProject(req.params.id, req.organizationId!);
           for (const task of tasks) {
             const copiedTaskData = {
               ...task,
@@ -1550,7 +1550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             delete (copiedTaskData as any).createdAt;
             delete (copiedTaskData as any).updatedAt;
             
-            await storage.createTask(copiedTaskData);
+            await storage.createTask(copiedTaskData, req.organizationId!);
           }
         } catch (taskError) {
           console.error("Error copying tasks:", taskError);
@@ -1702,7 +1702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const validatedData = insertMilestoneSchema.parse(processedData);
-      const milestone = await storage.createMilestone(validatedData);
+      const milestone = await storage.createMilestone(validatedData, req.organizationId!);
       res.status(201).json(milestone);
     } catch (error) {
       console.error("Error creating milestone:", error);
@@ -2819,7 +2819,7 @@ Return the refined content in JSON format:
         projectId: req.params.projectId, // Use validated projectId from params
         organizationId: req.organizationId! // Override client value - prevent org spoofing
       });
-      const stakeholder = await storage.createStakeholder(validatedData);
+      const stakeholder = await storage.createStakeholder(validatedData, req.organizationId!);
       
       // Create notifications for project team members about new stakeholder
       try {
@@ -2967,7 +2967,7 @@ Return the refined content in JSON format:
       
       const validatedData = buildRaidInsertFromTemplate(processedBody.type, baseData);
       
-      const raidLog = await storage.createRaidLog(validatedData);
+      const raidLog = await storage.createRaidLog(validatedData, req.organizationId!);
       
       // Create notifications for RAID log creation
       try {
@@ -3240,7 +3240,7 @@ Return the refined content in JSON format:
         projectId: req.params.projectId,
         createdById: req.userId!
       });
-      const strategy = await storage.createCommunicationStrategy(validatedData);
+      const strategy = await storage.createCommunicationStrategy(validatedData, req.organizationId!);
       res.status(201).json(strategy);
     } catch (error) {
       console.error("Error creating communication strategy:", error);
@@ -3295,7 +3295,7 @@ Return the refined content in JSON format:
         projectId: req.params.projectId,
         createdById: req.userId!
       });
-      const survey = await storage.createSurvey(validatedData);
+      const survey = await storage.createSurvey(validatedData, req.organizationId!);
       res.status(201).json(survey);
     } catch (error) {
       console.error("Error creating survey:", error);
