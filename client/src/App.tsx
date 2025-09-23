@@ -29,6 +29,7 @@ import OrganizationSettings from "@/pages/organization-settings";
 import { LoginPage } from "@/pages/auth/login";
 import { EmailVerifyPage } from "@/pages/auth/verify-email";
 import { Loader2 } from "lucide-react";
+import { HelpDeskButton } from "@/components/HelpDeskButton";
 
 function LoadingSpinner() {
   return (
@@ -73,6 +74,9 @@ function AuthenticatedApp() {
             <Route component={NotFound} />
           </Switch>
         </main>
+        
+        {/* Global Helpdesk Support Button */}
+        <HelpDeskButton />
       </div>
     </div>
   );
