@@ -1838,3 +1838,71 @@ export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSc
 // Authentication request types
 export type RegistrationRequest = z.infer<typeof registrationRequestSchema>;
 export type EmailVerificationResponse = z.infer<typeof emailVerificationResponseSchema>;
+
+// ===============================================
+// SUPER ADMIN SYSTEM - Platform Management
+// ===============================================
+
+// Super Admin Users - completely separate from tenant users
+export const superAdminUsers = pgTable("super_admin_users", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  name: text("name").notNull(),
+  role: text("role").notNull().default("admin"), // admin, super_admin, platform_manager
+  isActive: boolean("is_active").notNull().default(true),
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  usernameIdx: index("super_admin_users_username_idx").on(table.username),
+  emailIdx: index("super_admin_users_email_idx").on(table.email),
+}));
+
+// Super Admin Sessions - separate session management
+export const superAdminSessions = pgTable("super_admin_sessions", {
+  id: text("id").primaryKey(), // Session ID
+  superAdminUserId: uuid("super_admin_user_id").references(() => superAdminUsers.id, { onDelete: "cascade" }).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("super_admin_sessions_user_idx").on(table.superAdminUserId),
+  expiresIdx: index("super_admin_sessions_expires_idx").on(table.expiresAt),
+}));
+
+// Super Admin Insert Schemas
+export const insertSuperAdminUserSchema = createInsertSchema(superAdminUsers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true,
+});
+
+export const insertSuperAdminSessionSchema = createInsertSchema(superAdminSessions).omit({
+  createdAt: true,
+});
+
+// Super Admin Types
+export type SuperAdminUser = typeof superAdminUsers.$inferSelect;
+export type InsertSuperAdminUser = z.infer<typeof insertSuperAdminUserSchema>;
+
+export type SuperAdminSession = typeof superAdminSessions.$inferSelect;
+export type InsertSuperAdminSession = z.infer<typeof insertSuperAdminSessionSchema>;
+
+// Super Admin authentication schemas
+export const superAdminLoginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export const superAdminRegistrationSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  name: z.string().min(1, "Name is required"),
+  role: z.enum(["admin", "super_admin", "platform_manager"]).default("admin"),
+});
+
+export type SuperAdminLoginRequest = z.infer<typeof superAdminLoginSchema>;
+export type SuperAdminRegistrationRequest = z.infer<typeof superAdminRegistrationSchema>;
