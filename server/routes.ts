@@ -431,7 +431,7 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Roles
-  app.get("/api/roles", requirePermission('canSeeRoles'), async (req, res) => {
+  app.get("/api/roles", requireAuthAndOrg, requirePermission('canSeeRoles'), async (req, res) => {
     try {
       const roles = await storage.getRoles();
       res.json(roles);
@@ -2119,7 +2119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GPT Content Generation for Flyers
-  app.post("/api/gpt/generate-flyer-content", requirePermission('canModifyCommunications'), async (req, res) => {
+  app.post("/api/gpt/generate-flyer-content", requireAuthAndOrg, requirePermission('canModifyCommunications'), async (req, res) => {
     try {
       const { projectName, changeDescription, targetAudience, keyMessages, template } = req.body;
       
@@ -2142,7 +2142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GPT Content Refinement for Flyers
-  app.post("/api/gpt/refine-flyer-content", requirePermission('canModifyCommunications'), async (req, res) => {
+  app.post("/api/gpt/refine-flyer-content", requireAuthAndOrg, requirePermission('canModifyCommunications'), async (req, res) => {
     try {
       const { currentContent, refinementRequest, context } = req.body;
       
@@ -2184,7 +2184,7 @@ Return the refined content in JSON format:
   });
 
   // GPT Content Generation for Group Emails
-  app.post("/api/gpt/generate-group-email-content", requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/generate-group-email-content", requireAuthAndOrg, requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       // SECURITY: Input validation with Zod
       const validatedInput = generateGroupEmailContentSchema.parse(req.body);
@@ -2209,7 +2209,7 @@ Return the refined content in JSON format:
   });
 
   // GPT Content Refinement for Group Emails
-  app.post("/api/gpt/refine-group-email-content", requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/refine-group-email-content", requireAuthAndOrg, requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       // SECURITY: Input validation with Zod
       const validatedInput = refineGroupEmailContentSchema.parse(req.body);
@@ -3210,7 +3210,7 @@ Return the refined content in JSON format:
   });
 
   // Communication Strategies
-  app.get("/api/projects/:projectId/communication-strategies", requirePermission('canSeeCommunications'), async (req, res) => {
+  app.get("/api/projects/:projectId/communication-strategies", requireAuthAndOrg, requirePermission('canSeeCommunications'), async (req, res) => {
     try {
       const strategies = await storage.getCommunicationStrategiesByProject(req.params.projectId);
       res.json(strategies);
@@ -3220,7 +3220,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.get("/api/projects/:projectId/communication-strategies/phase/:phase", requirePermission('canSeeCommunications'), async (req, res) => {
+  app.get("/api/projects/:projectId/communication-strategies/phase/:phase", requireAuthAndOrg, requirePermission('canSeeCommunications'), async (req, res) => {
     try {
       const strategy = await storage.getCommunicationStrategyByPhase(req.params.projectId, req.params.phase);
       if (!strategy) {
@@ -3248,7 +3248,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.put("/api/communication-strategies/:id", requirePermission('canEditCommunications'), async (req, res) => {
+  app.put("/api/communication-strategies/:id", requireAuthAndOrg, requirePermission('canEditCommunications'), async (req, res) => {
     try {
       const updateSchema = insertCommunicationStrategySchema.omit({ projectId: true, createdById: true }).partial();
       const validatedData = updateSchema.parse(req.body);
@@ -3616,7 +3616,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/gpt/phase-guidance", requirePermission('canSeeCommunications'), async (req, res) => {
+  app.post("/api/gpt/phase-guidance", requireAuthAndOrg, requirePermission('canSeeCommunications'), async (req, res) => {
     try {
       const { projectId, phase, projectName, description, currentPhase } = req.body;
       
@@ -3750,7 +3750,7 @@ Return the refined content in JSON format:
   });
 
   // Enhanced Role Management Routes
-  app.post("/api/roles", requirePermission('canModifyRoles'), async (req, res) => {
+  app.post("/api/roles", requireAuthAndOrg, requirePermission('canModifyRoles'), async (req, res) => {
     try {
       const validatedData = insertRoleSchema.parse(req.body);
       const role = await storage.createRole(validatedData);
@@ -3761,7 +3761,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.put("/api/roles/:id", requirePermission('canEditRoles'), async (req, res) => {
+  app.put("/api/roles/:id", requireAuthAndOrg, requirePermission('canEditRoles'), async (req, res) => {
     try {
       // SECURITY: Validate input data with Zod
       const validatedData = insertRoleSchema.partial().parse(req.body);
@@ -3777,7 +3777,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.delete("/api/roles/:id", requirePermission('canDeleteRoles'), async (req, res) => {
+  app.delete("/api/roles/:id", requireAuthAndOrg, requirePermission('canDeleteRoles'), async (req, res) => {
     try {
       const success = await storage.deleteRole(req.params.id);
       if (!success) {
@@ -3791,7 +3791,7 @@ Return the refined content in JSON format:
   });
 
   // User-Initiative Assignment Routes
-  app.get("/api/users/:userId/initiatives", requirePermission('canSeeUsers'), async (req, res) => {
+  app.get("/api/users/:userId/initiatives", requireAuthAndOrg, requirePermission('canSeeUsers'), async (req, res) => {
     try {
       const assignments = await storage.getUserInitiativeAssignments(req.params.userId);
       res.json(assignments);
@@ -3849,7 +3849,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/assignments", requirePermission('canEditAllProjects'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/assignments", requireAuthAndOrg, requirePermission('canEditAllProjects'), async (req: AuthenticatedRequest, res) => {
     try {
       // Server sets assignedById from authenticated user
       const assignmentData = {
@@ -3885,7 +3885,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.put("/api/assignments/:id", requirePermission('canEditAllProjects'), async (req, res) => {
+  app.put("/api/assignments/:id", requireAuthAndOrg, requirePermission('canEditAllProjects'), async (req, res) => {
     try {
       // SECURITY: Validate input data with Zod
       const validatedData = insertUserInitiativeAssignmentSchema.partial().parse(req.body);
@@ -3901,7 +3901,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.delete("/api/assignments/:id", requirePermission('canEditAllProjects'), async (req, res) => {
+  app.delete("/api/assignments/:id", requireAuthAndOrg, requirePermission('canEditAllProjects'), async (req, res) => {
     try {
       const { userId, projectId } = req.body;
       if (!userId || !projectId) {
@@ -3919,7 +3919,7 @@ Return the refined content in JSON format:
   });
 
   // Alternative DELETE route for cleaner frontend patterns
-  app.delete("/api/assignments/remove", requirePermission('canEditAllProjects'), async (req, res) => {
+  app.delete("/api/assignments/remove", requireAuthAndOrg, requirePermission('canEditAllProjects'), async (req, res) => {
     try {
       const { userId, projectId } = req.body;
       if (!userId || !projectId) {
@@ -3937,7 +3937,7 @@ Return the refined content in JSON format:
   });
 
   // Enhanced User Management Routes
-  app.get("/api/users/with-roles", requirePermission('canSeeUsers'), async (req, res) => {
+  app.get("/api/users/with-roles", requireAuthAndOrg, requirePermission('canSeeUsers'), async (req, res) => {
     try {
       const usersWithRoles = await storage.getUsersWithRoles();
       res.json(usersWithRoles);
@@ -3947,7 +3947,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/users", requirePermission('canModifyUsers'), async (req, res) => {
+  app.post("/api/users", requireAuthAndOrg, requirePermission('canModifyUsers'), async (req, res) => {
     try {
       const validatedData = insertUserSchema.parse(req.body);
       const user = await storage.createUser(validatedData);
@@ -3960,7 +3960,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.put("/api/users/:id", requirePermission('canEditUsers'), async (req, res) => {
+  app.put("/api/users/:id", requireAuthAndOrg, requirePermission('canEditUsers'), async (req, res) => {
     try {
       // SECURITY: Validate input data with Zod, exclude password field
       const validatedData = insertUserSchema.partial().omit({ password: true }).parse(req.body);
@@ -3978,7 +3978,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.put("/api/users/:id/role", requirePermission('canEditUsers'), async (req, res) => {
+  app.put("/api/users/:id/role", requireAuthAndOrg, requirePermission('canEditUsers'), async (req, res) => {
     try {
       const { roleId } = req.body;
       if (!roleId) {
@@ -3998,7 +3998,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.delete("/api/users/:id", requirePermission('canDeleteUsers'), async (req, res) => {
+  app.delete("/api/users/:id", requireAuthAndOrg, requirePermission('canDeleteUsers'), async (req, res) => {
     try {
       // Check if user has dependencies (assigned tasks, initiatives, etc.)
       const userInitiatives = await storage.getUserInitiativeAssignments(req.params.id);
@@ -4023,7 +4023,7 @@ Return the refined content in JSON format:
   });
 
 
-  app.get("/api/users/by-role/:roleId", requirePermission('canSeeUsers'), async (req, res) => {
+  app.get("/api/users/by-role/:roleId", requireAuthAndOrg, requirePermission('canSeeUsers'), async (req, res) => {
     try {
       const users = await storage.getUsersByRole(req.params.roleId);
       // Users already have passwordHash removed by storage layer
@@ -4035,7 +4035,7 @@ Return the refined content in JSON format:
   });
 
   // Permission Check Routes
-  app.get("/api/users/:userId/permissions", requirePermission('canSeeUsers'), async (req, res) => {
+  app.get("/api/users/:userId/permissions", requireAuthAndOrg, requirePermission('canSeeUsers'), async (req, res) => {
     try {
       const permissions = await storage.getUserPermissions(req.params.userId);
       res.json(permissions);
