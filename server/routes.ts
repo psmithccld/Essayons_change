@@ -3306,9 +3306,9 @@ Return the refined content in JSON format:
   });
 
   // Surveys
-  app.get("/api/projects/:projectId/surveys", async (req, res) => {
+  app.get("/api/projects/:projectId/surveys", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const surveys = await storage.getSurveysByProject(req.params.projectId);
+      const surveys = await storage.getSurveysByProject(req.params.projectId, req.organizationId!);
       res.json(surveys);
     } catch (error) {
       console.error("Error fetching surveys:", error);
@@ -3316,7 +3316,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/projects/:projectId/surveys", requireAuthAndPermission('canModifySurveys'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/projects/:projectId/surveys", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertSurveySchema.parse({
         ...req.body,
@@ -3331,13 +3331,13 @@ Return the refined content in JSON format:
     }
   });
 
-  app.put("/api/surveys/:id", async (req, res) => {
+  app.put("/api/surveys/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       // Validate the update data using a partial schema (omit required fields like projectId and createdById)
       const updateSchema = baseSurveySchema.omit({ projectId: true, createdById: true }).partial();
       const validatedData = updateSchema.parse(req.body);
       
-      const survey = await storage.updateSurvey(req.params.id, validatedData);
+      const survey = await storage.updateSurvey(req.params.id, req.organizationId!, validatedData);
       if (!survey) {
         return res.status(404).json({ error: "Survey not found" });
       }
@@ -3348,9 +3348,9 @@ Return the refined content in JSON format:
     }
   });
 
-  app.delete("/api/surveys/:id", async (req, res) => {
+  app.delete("/api/surveys/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const success = await storage.deleteSurvey(req.params.id);
+      const success = await storage.deleteSurvey(req.params.id, req.organizationId!);
       if (!success) {
         return res.status(404).json({ error: "Survey not found" });
       }
