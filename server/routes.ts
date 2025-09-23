@@ -1345,7 +1345,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.userId!;
       const projects = await storage.getProjects(userId, req.organizationId!);
-      res.json(projects);
+      
+      // Add assignment counts to each project for dashboard display
+      const projectsWithAssignments = await Promise.all(
+        projects.map(async (project) => {
+          const assignments = await storage.getInitiativeAssignments(project.id);
+          return {
+            ...project,
+            assignments: assignments // Include full assignment data for the frontend
+          };
+        })
+      );
+      
+      res.json(projectsWithAssignments);
     } catch (error) {
       console.error("Error fetching projects:", error);
       res.status(500).json({ error: "Failed to fetch projects" });
