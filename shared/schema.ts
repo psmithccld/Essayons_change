@@ -1141,6 +1141,11 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  // Transform number budget from frontend to string for database decimal field
+  budget: z.union([z.string(), z.number()]).transform(val => 
+    typeof val === 'number' ? val.toString() : val
+  ).optional()
 });
 
 export const insertTaskSchema = createInsertSchema(tasks).omit({
