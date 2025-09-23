@@ -5191,6 +5191,285 @@ Return the refined content in JSON format:
     }
   });
 
+  // ===============================================
+  // HELPDESK GPT AGENT API ROUTES
+  // ===============================================
+
+  const { gptContextBuilder } = await import('./services/gptContextBuilder');
+
+  // GPT Context Builder - GET /api/helpdesk/context
+  app.get("/api/helpdesk/context", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const organizationId = req.organizationId!;
+      const sessionId = req.sessionID;
+      
+      const currentPage = req.query.page as string;
+      const userAgent = req.get('User-Agent');
+      const errorContext = req.query.error as string;
+      const userAction = req.query.action as string;
+
+      const context = await gptContextBuilder.buildContext(
+        userId,
+        organizationId,
+        sessionId,
+        {
+          page: currentPage || 'unknown',
+          userAgent: userAgent || 'unknown',
+          errorContext,
+          userAction
+        }
+      );
+
+      res.json(context);
+    } catch (error) {
+      console.error("Error building GPT context:", error);
+      res.status(500).json({ error: "Failed to build context" });
+    }
+  });
+
+  // Format Context for GPT - GET /api/helpdesk/context/formatted
+  app.get("/api/helpdesk/context/formatted", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const organizationId = req.organizationId!;
+      const sessionId = req.sessionID;
+      
+      const context = await gptContextBuilder.buildContext(userId, organizationId, sessionId);
+      const formattedContext = gptContextBuilder.formatContextForGPT(context);
+
+      res.json({ formattedContext });
+    } catch (error) {
+      console.error("Error formatting GPT context:", error);
+      res.status(500).json({ error: "Failed to format context" });
+    }
+  });
+
+  // Support Tickets by User - GET /api/helpdesk/tickets/my
+  app.get("/api/helpdesk/tickets/my", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const organizationId = req.organizationId!;
+      const tickets = await storage.getSupportTicketsByUser(userId, organizationId);
+      res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching user support tickets:", error);
+      res.status(500).json({ error: "Failed to fetch user support tickets" });
+    }
+  });
+
+  // Get Support Ticket - GET /api/helpdesk/tickets/:id
+  app.get("/api/helpdesk/tickets/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const organizationId = req.organizationId!;
+      const ticket = await storage.getSupportTicket(req.params.id, organizationId);
+      
+      if (!ticket) {
+        return res.status(404).json({ error: "Support ticket not found" });
+      }
+      
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error fetching support ticket:", error);
+      res.status(500).json({ error: "Failed to fetch support ticket" });
+    }
+  });
+
+  // Create Support Ticket - POST /api/helpdesk/tickets
+  app.post("/api/helpdesk/tickets", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { insertSupportTicketSchema } = await import('@shared/schema');
+      
+      const validationResult = insertSupportTicketSchema.safeParse({
+        ...req.body,
+        userId: req.userId!,
+        organizationId: req.organizationId!
+      });
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid ticket data", 
+          details: validationResult.error.errors 
+        });
+      }
+
+      const ticket = await storage.createSupportTicket(validationResult.data, req.organizationId!);
+      res.status(201).json(ticket);
+    } catch (error) {
+      console.error("Error creating support ticket:", error);
+      res.status(500).json({ error: "Failed to create support ticket" });
+    }
+  });
+
+  // Support Conversations by User - GET /api/helpdesk/conversations/my
+  app.get("/api/helpdesk/conversations/my", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const organizationId = req.organizationId!;
+      const conversations = await storage.getSupportConversationsByUser(userId, organizationId);
+      res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching user support conversations:", error);
+      res.status(500).json({ error: "Failed to fetch user support conversations" });
+    }
+  });
+
+  // Get Support Conversation - GET /api/helpdesk/conversations/:id
+  app.get("/api/helpdesk/conversations/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const organizationId = req.organizationId!;
+      const conversation = await storage.getSupportConversation(req.params.id, organizationId);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Support conversation not found" });
+      }
+      
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error fetching support conversation:", error);
+      res.status(500).json({ error: "Failed to fetch support conversation" });
+    }
+  });
+
+  // Get Support Conversation by Session - GET /api/helpdesk/conversations/session/:sessionId
+  app.get("/api/helpdesk/conversations/session/:sessionId", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const organizationId = req.organizationId!;
+      const conversation = await storage.getSupportConversationBySession(req.params.sessionId, organizationId);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Support conversation not found" });
+      }
+      
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error fetching support conversation:", error);
+      res.status(500).json({ error: "Failed to fetch support conversation" });
+    }
+  });
+
+  // Create Support Conversation - POST /api/helpdesk/conversations
+  app.post("/api/helpdesk/conversations", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { insertSupportConversationSchema } = await import('@shared/schema');
+      
+      const validationResult = insertSupportConversationSchema.safeParse({
+        ...req.body,
+        userId: req.userId!,
+        organizationId: req.organizationId!,
+        sessionId: req.sessionID
+      });
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid conversation data", 
+          details: validationResult.error.errors 
+        });
+      }
+
+      const conversation = await storage.createSupportConversation(validationResult.data, req.organizationId!);
+      res.status(201).json(conversation);
+    } catch (error) {
+      console.error("Error creating support conversation:", error);
+      res.status(500).json({ error: "Failed to create support conversation" });
+    }
+  });
+
+  // Update Support Conversation - PUT /api/helpdesk/conversations/:id
+  app.put("/api/helpdesk/conversations/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const organizationId = req.organizationId!;
+      const conversation = await storage.updateSupportConversation(req.params.id, organizationId, req.body);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Support conversation not found" });
+      }
+      
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error updating support conversation:", error);
+      res.status(500).json({ error: "Failed to update support conversation" });
+    }
+  });
+
+  // Add Message to Conversation - POST /api/helpdesk/conversations/:id/messages
+  app.post("/api/helpdesk/conversations/:id/messages", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const organizationId = req.organizationId!;
+      const { role, content } = req.body;
+      
+      if (!role || !content) {
+        return res.status(400).json({ error: "Role and content are required" });
+      }
+
+      const message = {
+        role,
+        content,
+        timestamp: new Date()
+      };
+
+      const conversation = await storage.addMessageToConversation(req.params.id, message, organizationId);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Support conversation not found" });
+      }
+      
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error adding message to conversation:", error);
+      res.status(500).json({ error: "Failed to add message to conversation" });
+    }
+  });
+
+  // Update Conversation Status - POST /api/helpdesk/conversations/:id/status
+  app.post("/api/helpdesk/conversations/:id/status", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const organizationId = req.organizationId!;
+      const updates = req.body;
+
+      const conversation = await storage.updateConversationStatus(req.params.id, organizationId, updates);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Support conversation not found" });
+      }
+      
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error updating conversation status:", error);
+      res.status(500).json({ error: "Failed to update conversation status" });
+    }
+  });
+
+  // Escalate Conversation to Ticket - POST /api/helpdesk/conversations/:id/escalate
+  app.post("/api/helpdesk/conversations/:id/escalate", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { insertSupportTicketSchema } = await import('@shared/schema');
+      const organizationId = req.organizationId!;
+      
+      const ticketData = {
+        ...req.body,
+        userId: req.userId!,
+        organizationId
+      };
+
+      const validationResult = insertSupportTicketSchema.safeParse(ticketData);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid escalation ticket data", 
+          details: validationResult.error.errors 
+        });
+      }
+
+      const result = await storage.escalateConversationToTicket(req.params.id, validationResult.data, organizationId);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error escalating conversation to ticket:", error);
+      res.status(500).json({ error: "Failed to escalate conversation to ticket" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
@@ -5273,4 +5552,3 @@ const sendMeetingInviteSchema = z.object({
   }),
   dryRun: z.boolean().default(false)
 });
-
