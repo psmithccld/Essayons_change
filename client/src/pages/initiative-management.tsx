@@ -2253,7 +2253,7 @@ function InitiativeManagementContent() {
                               </FormControl>
                               <SelectContent>
                                 {usersWithRoles.filter(user => 
-                                  !assignments.some(assignment => assignment.user.id === user.id)
+                                  !assignments.some(assignment => assignment.userId === user.id)
                                 ).map((user) => (
                                   <SelectItem key={user.id} value={user.id}>
                                     {user.name} ({user.role?.name})
@@ -2325,7 +2325,7 @@ function InitiativeManagementContent() {
               <TableBody>
                 {assignments.map((assignment) => (
                   <TableRow key={assignment.id} data-testid={`row-assignment-${assignment.id}`}>
-                    <TableCell className="font-medium">{assignment.user.name}</TableCell>
+                    <TableCell className="font-medium">{assignment.userName}</TableCell>
                     <TableCell>
                       <Badge variant="outline">User Role</Badge>
                     </TableCell>
@@ -2348,13 +2348,13 @@ function InitiativeManagementContent() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Remove Assignment</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Are you sure you want to remove {assignment.user.name} from this initiative?
+                              Are you sure you want to remove {assignment.userName} from this initiative?
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction
-                              onClick={() => handleRemoveAssignment(assignment.user.id, assignment.projectId)}
+                              onClick={() => handleRemoveAssignment(assignment.userId, assignment.projectId)}
                               className="bg-red-600 hover:bg-red-700"
                             >
                               Remove

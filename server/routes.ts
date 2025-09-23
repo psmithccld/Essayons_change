@@ -3842,7 +3842,20 @@ Return the refined content in JSON format:
   app.get("/api/projects/:projectId/assignments", async (req, res) => {
     try {
       const assignments = await storage.getInitiativeAssignments(req.params.projectId);
-      res.json(assignments);
+      
+      // Fetch user data for each assignment
+      const assignmentsWithUsers = await Promise.all(
+        assignments.map(async (assignment) => {
+          const user = await storage.getUser(assignment.userId);
+          return {
+            ...assignment,
+            userName: user?.name || 'Unknown User',
+            userEmail: user?.email || ''
+          };
+        })
+      );
+      
+      res.json(assignmentsWithUsers);
     } catch (error) {
       console.error("Error fetching initiative assignments:", error);
       res.status(500).json({ error: "Failed to fetch initiative assignments" });
