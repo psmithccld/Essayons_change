@@ -178,18 +178,43 @@ export function HelpDeskChat({ isOpen, onClose }: HelpDeskChatProps) {
           content: messageContent,
         });
         
-        // Simulate GPT typing for first message consistency
+        // Generate intelligent GPT response for first message
         setIsTyping(true);
-        setTimeout(async () => {
-          setIsTyping(false);
-          
-          // Add assistant response (mock for now)
-          await addMessageMutation.mutateAsync({
-            conversationId: newConversation.id,
-            role: "assistant",
-            content: "Thank you for contacting support! I'm analyzing your request and will provide assistance shortly. This is a placeholder response - GPT integration will be implemented in Phase 5.",
+        try {
+          const gptResponse = await fetch("/api/helpdesk/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              message: messageContent,
+              conversationId: newConversation.id,
+              conversationHistory: []
+            }),
           });
-        }, 2000);
+
+          if (gptResponse.ok) {
+            const gptResult = await gptResponse.json();
+            setIsTyping(false);
+            
+            // Add intelligent assistant response
+            await addMessageMutation.mutateAsync({
+              conversationId: newConversation.id,
+              role: "assistant", 
+              content: gptResult.response,
+            });
+          } else {
+            setIsTyping(false);
+            // Fallback response on error
+            await addMessageMutation.mutateAsync({
+              conversationId: newConversation.id,
+              role: "assistant",
+              content: "I'm ready to help! I can assist with technical issues, navigation questions, and general guidance. How can I support you today?",
+            });
+          }
+        } catch (error) {
+          console.error("Failed to get GPT response:", error);
+          setIsTyping(false);
+        }
         
         return;
       } catch (error) {
@@ -205,20 +230,52 @@ export function HelpDeskChat({ isOpen, onClose }: HelpDeskChatProps) {
       content: messageContent,
     });
 
-    // Simulate GPT typing
+    // Generate intelligent GPT response
     setIsTyping(true);
-    
-    // TODO: Phase 5 - Add actual GPT integration here
-    setTimeout(async () => {
-      setIsTyping(false);
-      
-      // Add assistant response (mock for now)
-      await addMessageMutation.mutateAsync({
-        conversationId,
-        role: "assistant",
-        content: "Thank you for your message. I'm analyzing your issue and will provide assistance shortly. This is a placeholder response - GPT integration will be implemented in Phase 5.",
+    try {
+      const gptResponse = await fetch("/api/helpdesk/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", 
+        body: JSON.stringify({
+          message: messageContent,
+          conversationId,
+          conversationHistory: conversation?.messages || []
+        }),
       });
-    }, 2000);
+
+      if (gptResponse.ok) {
+        const gptResult = await gptResponse.json();
+        setIsTyping(false);
+        
+        // Add intelligent assistant response
+        await addMessageMutation.mutateAsync({
+          conversationId,
+          role: "assistant",
+          content: gptResult.response,
+        });
+
+        // Handle escalation if recommended
+        if (gptResult.escalationRecommended) {
+          toast({
+            title: "Escalation Available",
+            description: gptResult.escalationReason || "This issue may require additional support. Would you like me to create a support ticket?",
+            duration: 8000,
+          });
+        }
+      } else {
+        setIsTyping(false);
+        // Fallback response on error
+        await addMessageMutation.mutateAsync({
+          conversationId,
+          role: "assistant",
+          content: "I understand your question. Let me help you with that. Could you provide a bit more detail about what specifically you're experiencing?",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to get GPT response:", error);
+      setIsTyping(false);
+    }
   };
 
   const scrollToBottom = () => {

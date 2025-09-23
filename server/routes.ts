@@ -5196,6 +5196,41 @@ Return the refined content in JSON format:
   // ===============================================
 
   const { gptContextBuilder } = await import('./services/gptContextBuilder');
+  const { helpdeskGPT } = await import('./services/helpdeskGPT');
+
+  // Helpdesk GPT Intelligence - POST /api/helpdesk/chat
+  app.post("/api/helpdesk/chat", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const organizationId = req.organizationId!;
+      const sessionId = req.sessionID;
+      
+      const { message, conversationId, conversationHistory } = req.body;
+      
+      if (!message || !conversationId) {
+        return res.status(400).json({ 
+          error: "Message and conversationId are required" 
+        });
+      }
+
+      const gptResponse = await helpdeskGPT.generateResponse({
+        message,
+        conversationId,
+        userId,
+        organizationId,
+        sessionId,
+        conversationHistory: conversationHistory || []
+      });
+
+      res.json(gptResponse);
+    } catch (error) {
+      console.error("Error generating helpdesk response:", error);
+      res.status(500).json({ 
+        error: "Failed to generate response",
+        fallback: "I'm experiencing a technical issue. Would you like me to escalate this to our support team?"
+      });
+    }
+  });
 
   // GPT Context Builder - GET /api/helpdesk/context
   app.get("/api/helpdesk/context", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
