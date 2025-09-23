@@ -669,6 +669,64 @@ export default function Surveys() {
                                 </FormItem>
                               )}
                             />
+
+                            {/* Multiple Choice Options */}
+                            {form.watch(`questions.${index}.type`) === 'multiple_choice' && (
+                              <div className="space-y-3">
+                                <FormLabel>Answer Options</FormLabel>
+                                <div className="space-y-2">
+                                  {form.watch(`questions.${index}.options`)?.map((option, optionIndex) => (
+                                    <div key={optionIndex} className="flex items-center space-x-2">
+                                      <FormField
+                                        control={form.control}
+                                        name={`questions.${index}.options.${optionIndex}`}
+                                        render={({ field }) => (
+                                          <FormItem className="flex-1">
+                                            <FormControl>
+                                              <Input 
+                                                {...field} 
+                                                placeholder={`Option ${optionIndex + 1}`}
+                                                data-testid={`input-option-${index}-${optionIndex}`}
+                                              />
+                                            </FormControl>
+                                            <FormMessage />
+                                          </FormItem>
+                                        )}
+                                      />
+                                      {form.watch(`questions.${index}.options`)?.length > 2 && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            const currentOptions = form.getValues(`questions.${index}.options`) || [];
+                                            const newOptions = currentOptions.filter((_, i) => i !== optionIndex);
+                                            form.setValue(`questions.${index}.options`, newOptions);
+                                          }}
+                                          data-testid={`button-remove-option-${index}-${optionIndex}`}
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const currentOptions = form.getValues(`questions.${index}.options`) || [];
+                                      const newOptions = [...currentOptions, `Option ${currentOptions.length + 1}`];
+                                      form.setValue(`questions.${index}.options`, newOptions);
+                                    }}
+                                    data-testid={`button-add-option-${index}`}
+                                  >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add Option
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </Card>
                       ))}
