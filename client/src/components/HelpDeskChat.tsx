@@ -16,9 +16,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Send, Bot, User, X, AlertCircle } from "lucide-react";
+import { Loader2, Send, Bot, User, X, AlertCircle, ArrowUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { EscalationConfirmationDialog } from "./EscalationConfirmationDialog";
 
 interface HelpDeskChatProps {
   isOpen: boolean;
@@ -55,6 +56,14 @@ type MessageForm = z.infer<typeof messageSchema>;
 export function HelpDeskChat({ isOpen, onClose }: HelpDeskChatProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [showEscalationDialog, setShowEscalationDialog] = useState(false);
+  const [lastGptResponse, setLastGptResponse] = useState<{
+    response: string;
+    category: string;
+    escalationRecommended: boolean;
+    escalationReason?: string;
+    confidence: string;
+  } | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -63,6 +72,53 @@ export function HelpDeskChat({ isOpen, onClose }: HelpDeskChatProps) {
     resolver: zodResolver(messageSchema),
     defaultValues: {
       message: "",
+    },
+  });
+
+  // Escalation mutation
+  const escalationMutation = useMutation({
+    mutationFn: async (escalationData: {
+      conversationId: string;
+      userMessage: string;
+      assistantResponse: string;
+      escalationReason?: string;
+      category: string;
+      priority: string;
+      userConfirmed: boolean;
+    }) => {
+      return apiRequest("/api/helpdesk/escalate", {
+        method: "POST",
+        body: escalationData,
+      });
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/helpdesk/conversations"] });
+      setShowEscalationDialog(false);
+      setLastGptResponse(null);
+      
+      if (result.success) {
+        toast({
+          title: "✅ Issue Escalated Successfully",
+          description: `Support ticket ${result.ticket?.id} has been created. Our technical team has been notified${result.emailSent ? " via email" : ""}.`,
+          duration: 8000,
+        });
+      } else {
+        toast({
+          title: "⚠️ Escalation Created with Warnings",
+          description: result.error || "The support ticket was created but there may have been issues with email notification.",
+          variant: "destructive",
+          duration: 8000,
+        });
+      }
+    },
+    onError: (error) => {
+      console.error("Escalation failed:", error);
+      toast({
+        title: "❌ Escalation Failed",
+        description: "Unable to create support ticket. Please try again or contact support directly.",
+        variant: "destructive",
+        duration: 8000,
+      });
     },
   });
 
@@ -255,12 +311,15 @@ export function HelpDeskChat({ isOpen, onClose }: HelpDeskChatProps) {
           content: gptResult.response,
         });
 
+        // Store GPT response for potential escalation
+        setLastGptResponse(gptResult);
+
         // Handle escalation if recommended
         if (gptResult.escalationRecommended) {
           toast({
-            title: "Escalation Available",
-            description: gptResult.escalationReason || "This issue may require additional support. Would you like me to create a support ticket?",
-            duration: 8000,
+            title: "Escalation Recommended",
+            description: `${gptResult.escalationReason || "This issue may require additional support."} Click the escalate button to create a support ticket.`,
+            duration: 10000,
           });
         }
       } else {
@@ -414,6 +473,22 @@ export function HelpDeskChat({ isOpen, onClose }: HelpDeskChatProps) {
                   </div>
                 </div>
               )}
+
+              {/* Escalation Button */}
+              {lastGptResponse && conversationId && (
+                <div className="flex justify-center mt-4">
+                  <Button
+                    onClick={() => setShowEscalationDialog(true)}
+                    variant="outline"
+                    size="sm"
+                    className="border-orange-500 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                    data-testid="button-escalate-issue"
+                  >
+                    <ArrowUp className="h-4 w-4 mr-2" />
+                    Need Additional Help?
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </ScrollArea>
@@ -445,6 +520,37 @@ export function HelpDeskChat({ isOpen, onClose }: HelpDeskChatProps) {
             <p className="text-sm text-red-500 mt-1">{form.formState.errors.message.message}</p>
           )}
         </div>
+
+        {/* Escalation Confirmation Dialog */}
+        {lastGptResponse && (
+          <EscalationConfirmationDialog
+            isOpen={showEscalationDialog}
+            onClose={() => setShowEscalationDialog(false)}
+            onConfirm={() => {
+              const lastUserMessage = conversation?.messages
+                ?.filter(m => m.role === "user")
+                ?.slice(-1)[0]?.content || "User requested escalation";
+              
+              escalationMutation.mutate({
+                conversationId: conversationId!,
+                userMessage: lastUserMessage,
+                assistantResponse: lastGptResponse.response,
+                escalationReason: lastGptResponse.escalationReason,
+                category: lastGptResponse.category,
+                priority: lastGptResponse.escalationRecommended ? "high" : "medium",
+                userConfirmed: true,
+              });
+            }}
+            escalationData={{
+              category: lastGptResponse.category,
+              reason: lastGptResponse.escalationReason || "Additional support requested",
+              userMessage: conversation?.messages?.filter(m => m.role === "user")?.slice(-1)[0]?.content || "",
+              assistantResponse: lastGptResponse.response,
+              priority: lastGptResponse.escalationRecommended ? "high" : "medium",
+            }}
+            isLoading={escalationMutation.isPending}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

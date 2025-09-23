@@ -5197,6 +5197,51 @@ Return the refined content in JSON format:
 
   const { gptContextBuilder } = await import('./services/gptContextBuilder');
   const { helpdeskGPT } = await import('./services/helpdeskGPT');
+  const { escalationService } = await import('./services/escalationService');
+
+  // Escalation Workflow - POST /api/helpdesk/escalate
+  app.post("/api/helpdesk/escalate", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const organizationId = req.organizationId!;
+      const sessionId = req.sessionID;
+      
+      // Import Zod schema
+      const { escalationRequestSchema } = await import('./schemas/escalationSchemas');
+      
+      // Validate request body
+      const validationResult = escalationRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid escalation request", 
+          details: validationResult.error.errors 
+        });
+      }
+      
+      const validatedData = validationResult.data;
+
+      const escalationResult = await escalationService.processEscalation({
+        conversationId: validatedData.conversationId,
+        userId,
+        organizationId,
+        sessionId,
+        userMessage: validatedData.userMessage,
+        assistantResponse: validatedData.assistantResponse,
+        escalationReason: validatedData.escalationReason || "User requested escalation",
+        category: validatedData.category,
+        priority: validatedData.priority,
+        userConfirmed: validatedData.userConfirmed,
+      });
+
+      res.json(escalationResult);
+    } catch (error) {
+      console.error("Error processing escalation:", error);
+      res.status(500).json({ 
+        error: "Failed to process escalation",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
 
   // Helpdesk GPT Intelligence - POST /api/helpdesk/chat
   app.post("/api/helpdesk/chat", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
