@@ -76,6 +76,8 @@ export default function Stakeholders() {
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedStakeholders, setSelectedStakeholders] = useState<string[]>([]);
   const [gptTips, setGptTips] = useState<any>(null);
+  const [useUserSelection, setUseUserSelection] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
   const { toast } = useToast();
   const { currentProject, projects } = useCurrentProject();
   const queryClient = useQueryClient();
@@ -90,6 +92,11 @@ export default function Stakeholders() {
     enabled: !!selectedProject && selectedProject !== currentProject?.id,
   });
 
+  // Fetch users for stakeholder selection
+  const { data: users = [] } = useQuery({
+    queryKey: ['/api/users/with-roles'],
+  });
+
   const form = useForm<StakeholderFormData>({
     resolver: zodResolver(stakeholderFormSchema),
     defaultValues: {
@@ -98,6 +105,34 @@ export default function Stakeholders() {
       engagementLevel: "medium",
     },
   });
+
+  // Handle user selection and field prepopulation
+  const handleUserSelection = (userId: string) => {
+    setSelectedUserId(userId);
+    if (userId) {
+      const selectedUser = users.find(user => user.id === userId);
+      if (selectedUser) {
+        // Prepopulate fields based on selected user
+        form.setValue('name', selectedUser.name);
+        form.setValue('email', selectedUser.email || '');
+        form.setValue('role', selectedUser.role?.name || selectedUser.role || '');
+        // Note: department could come from user profile if available
+      }
+    }
+  };
+
+  const handleModeToggle = (useSelection: boolean) => {
+    setUseUserSelection(useSelection);
+    if (!useSelection) {
+      // Clear user selection when switching to manual mode
+      setSelectedUserId('');
+      form.reset({
+        influenceLevel: "medium",
+        supportLevel: "neutral",
+        engagementLevel: "medium",
+      });
+    }
+  };
 
   const createStakeholderMutation = useMutation({
     mutationFn: async (stakeholderData: StakeholderFormData) => {
@@ -419,6 +454,60 @@ export default function Stakeholders() {
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  {/* User Selection Mode Toggle */}
+                  <div className="flex items-center space-x-4 p-3 bg-muted/30 rounded-lg">
+                    <label className="text-sm font-medium">Input Method:</label>
+                    <div className="flex space-x-2">
+                      <Button
+                        type="button"
+                        variant={!useUserSelection ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleModeToggle(false)}
+                        data-testid="button-manual-entry"
+                      >
+                        Manual Entry
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={useUserSelection ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleModeToggle(true)}
+                        data-testid="button-select-user"
+                      >
+                        Select from Users
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* User Selection Field */}
+                  {useUserSelection && (
+                    <FormField
+                      control={form.control}
+                      name="name" // We'll use name field for validation but populate from user selection
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>Select User</FormLabel>
+                          <Select value={selectedUserId} onValueChange={handleUserSelection}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-stakeholder-user">
+                                <SelectValue placeholder="Choose a user to add as stakeholder" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {users.map((user) => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.name} - {user.role?.name || 'No role'} ({user.email})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {/* Manual Entry Fields or Read-only populated fields */}
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -427,7 +516,12 @@ export default function Stakeholders() {
                         <FormItem>
                           <FormLabel>Name</FormLabel>
                           <FormControl>
-                            <Input {...field} data-testid="input-stakeholder-name" />
+                            <Input 
+                              {...field} 
+                              disabled={useUserSelection}
+                              placeholder={useUserSelection ? "Will be populated from selected user" : "Enter name"}
+                              data-testid="input-stakeholder-name" 
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -441,7 +535,12 @@ export default function Stakeholders() {
                         <FormItem>
                           <FormLabel>Role/Position</FormLabel>
                           <FormControl>
-                            <Input {...field} data-testid="input-stakeholder-role" />
+                            <Input 
+                              {...field} 
+                              disabled={useUserSelection}
+                              placeholder={useUserSelection ? "Will be populated from selected user" : "Enter role"}
+                              data-testid="input-stakeholder-role" 
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -457,7 +556,11 @@ export default function Stakeholders() {
                         <FormItem>
                           <FormLabel>Department</FormLabel>
                           <FormControl>
-                            <Input {...field} data-testid="input-stakeholder-department" />
+                            <Input 
+                              {...field} 
+                              placeholder={useUserSelection ? "Enter department (not auto-populated)" : "Enter department"}
+                              data-testid="input-stakeholder-department" 
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -471,7 +574,13 @@ export default function Stakeholders() {
                         <FormItem>
                           <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input type="email" {...field} data-testid="input-stakeholder-email" />
+                            <Input 
+                              type="email" 
+                              {...field} 
+                              disabled={useUserSelection}
+                              placeholder={useUserSelection ? "Will be populated from selected user" : "Enter email"}
+                              data-testid="input-stakeholder-email" 
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
