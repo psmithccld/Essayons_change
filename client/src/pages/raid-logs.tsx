@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { Plus, AlertTriangle, CheckCircle, AlertCircle, Link as LinkIcon, Calend
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
+import { usePageContext, useDataSnapshot } from "@/contexts/CoachContext";
 import type { Project, RaidLog } from "@shared/schema";
 
 // Template-specific form schemas matching Excel templates
@@ -132,6 +133,41 @@ export default function RaidLogs() {
   const { data: users = [] } = useQuery({
     queryKey: ['/api/users/with-roles'],
   });
+
+  // Register page context for AI Coach
+  usePageContext("raid-logs", {
+    raidLogId: editingLog?.id,
+  });
+
+  // Provide RAID log data snapshot for AI Coach context
+  const raidSnapshot = useMemo(() => ({
+    topRisks: raidLogs.length > 0 ? raidLogs
+      .filter(log => log.type === 'risk')
+      .sort((a, b) => {
+        // Sort by severity (critical > high > medium > low)
+        const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+        return (severityOrder[b.severity as keyof typeof severityOrder] || 0) - 
+               (severityOrder[a.severity as keyof typeof severityOrder] || 0);
+      })
+      .slice(0, 5)
+      .map(log => ({
+        id: log.id,
+        title: log.title,
+        severity: log.severity as "low" | "medium" | "high" | "critical",
+        category: (() => {
+          // Map RAID log types to context schema categories
+          switch (log.type) {
+            case 'risk': return 'risk' as const;
+            case 'issue': return 'issue' as const;
+            case 'action': return 'dependency' as const; // Map action to dependency  
+            case 'deficiency': return 'issue' as const; // Map deficiency to issue
+            default: return 'risk' as const;
+          }
+        })(),
+      })) : undefined,
+  }), [raidLogs]);
+  
+  useDataSnapshot(raidSnapshot);
 
   const [formType, setFormType] = useState<"risk" | "action" | "issue" | "deficiency">("risk");
   

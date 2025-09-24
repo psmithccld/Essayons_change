@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { Plus, Users, Mail, Phone, Building, TrendingUp, TrendingDown, Minus, Me
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
+import { usePageContext, useDataSnapshot } from "@/contexts/CoachContext";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Project, Stakeholder } from "@shared/schema";
 
@@ -98,6 +99,23 @@ export default function Stakeholders() {
   const { data: users = [] } = useQuery({
     queryKey: ['/api/users/with-roles'],
   });
+
+  // Register page context for AI Coach
+  usePageContext("stakeholders", {
+    stakeholderId: selectedStakeholders.length === 1 ? selectedStakeholders[0] : undefined,
+  });
+
+  // Provide stakeholder data snapshot for AI Coach context
+  const stakeholderSnapshot = useMemo(() => ({
+    stakeholderSummary: stakeholders.length > 0 ? {
+      totalCount: stakeholders.length,
+      resistantCount: stakeholders.filter(s => s.supportLevel === 'resistant').length,
+      supportiveCount: stakeholders.filter(s => s.supportLevel === 'supportive').length,
+      highInfluenceCount: stakeholders.filter(s => s.influenceLevel === 'high').length,
+    } : undefined,
+  }), [stakeholders]);
+  
+  useDataSnapshot(stakeholderSnapshot);
 
   const form = useForm<StakeholderFormData>({
     resolver: zodResolver(stakeholderFormSchema),

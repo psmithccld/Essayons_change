@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { Plus, ClipboardCheck, Calendar, Users, BarChart3, Trash2, Bot, BookOpen
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
+import { usePageContext, useDataSnapshot } from "@/contexts/CoachContext";
 import { PREBUILT_SURVEYS, getPrebuiltSurveyById, type PrebuiltSurveyTemplate } from "@/lib/prebuilt-surveys";
 import type { Project, Survey, SurveyResponse, Stakeholder } from "@shared/schema";
 
@@ -83,6 +84,51 @@ export default function Surveys() {
     queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
     enabled: !!currentProject?.id,
   });
+
+  // Register page context for AI Coach
+  usePageContext("surveys", {
+    surveyId: selectedSurvey || undefined,
+  });
+
+  // Provide survey data snapshot for AI Coach context
+  const surveySnapshot = useMemo(() => ({
+    latestSurveyPulse: surveys.length > 0 && responses.length > 0 ? (() => {
+      // Calculate readiness score from scale questions  
+      const allAnswers: number[] = [];
+      
+      responses.forEach(response => {
+        if (response.responses && typeof response.responses === 'object') {
+          const survey = surveys.find(s => s.id === response.surveyId);
+          if (survey?.questions) {
+            Object.entries(response.responses as Record<string, any>).forEach(([questionId, answer]) => {
+              const question = survey.questions.find((q: any) => q.id === questionId);
+              if (question?.type === 'scale') {
+                const numericAnswer = parseInt(String(answer));
+                if (!isNaN(numericAnswer)) {
+                  allAnswers.push(numericAnswer);
+                }
+              }
+            });
+          }
+        }
+      });
+      
+      const avgScore = allAnswers.length > 0 
+        ? allAnswers.reduce((sum, score) => sum + score, 0) / allAnswers.length
+        : 0;
+      
+      // Convert to percentage (assuming 1-5 scale, adjust as needed)
+      const readinessScore = Math.round((avgScore / 5) * 100);
+      
+      return {
+        readinessScore,
+        responseCount: responses.length,
+        sentiment: readinessScore >= 70 ? "positive" : readinessScore >= 50 ? "neutral" : "negative" as "positive" | "neutral" | "negative"
+      };
+    })() : undefined,
+  }), [surveys, responses]);
+  
+  useDataSnapshot(surveySnapshot);
 
   const form = useForm<SurveyFormData>({
     resolver: zodResolver(surveyFormSchema),
