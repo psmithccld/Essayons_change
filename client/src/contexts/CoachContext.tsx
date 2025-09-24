@@ -44,17 +44,17 @@ const getPageNameFromPath = (pathname: string): CoachContextPage => {
 export function CoachContextProvider({ children }: CoachContextProviderProps) {
   const [location] = useLocation();
   const { currentProject } = useCurrentProject();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   
   // Context state
   const [contextPayload, setContextPayload] = useState<CoachContextPayload>({
     pathname: location,
     pageName: getPageNameFromPath(location),
     userId: user?.id,
-    currentOrganizationId: user?.organizationId,
+    currentOrganizationId: undefined, // Not available in current auth structure
     currentProjectId: currentProject?.id,
     currentProjectName: currentProject?.name,
-    userRole: user?.role,
+    userRole: role?.name,
     selections: undefined,
     snapshot: undefined,
   });
@@ -80,15 +80,15 @@ export function CoachContextProvider({ children }: CoachContextProviderProps) {
     }));
   }, [currentProject]);
 
-  // Update auth context when user changes
+  // Update auth context when user or role changes
   useEffect(() => {
     setContextPayload(prev => ({
       ...prev,
       userId: user?.id,
-      currentOrganizationId: user?.organizationId,
-      userRole: user?.role,
+      currentOrganizationId: undefined, // Not available in current auth structure
+      userRole: role?.name,
     }));
-  }, [user]);
+  }, [user, role]);
 
   // Update page-specific context (called by individual pages)
   const updatePageContext = useCallback((pageName: CoachContextPage, selections?: CoachContextSelections) => {

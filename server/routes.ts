@@ -30,7 +30,8 @@ import {
   insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
   insertUserGroupSchema, insertUserGroupMembershipSchema, insertUserPermissionSchema, insertNotificationSchema, insertChangeArtifactSchema,
   insertOrganizationSettingsSchema,
-  type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification
+  coachContextPayloadSchema,
+  type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload
 } from "@shared/schema";
 import * as openaiService from "./openai";
 import { sendTaskAssignmentNotification, sendBulkGroupEmail, sendP2PEmail } from "./services/emailService";
@@ -3739,6 +3740,159 @@ Return the refined content in JSON format:
     } catch (error) {
       console.error("Error generating stakeholder tips:", error);
       res.status(500).json({ error: "Failed to generate stakeholder tips" });
+    }
+  });
+
+  // Context-Aware AI Coach Chat Endpoint
+  app.post("/api/coach/chat", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      // SECURITY: Input validation with Zod
+      const chatRequestSchema = z.object({
+        message: z.string().min(1, "Message is required"),
+        contextPayload: coachContextPayloadSchema.optional()
+      });
+      
+      const { message, contextPayload } = chatRequestSchema.parse(req.body);
+      
+      // Rate limiting for AI coaching
+      if (!checkRateLimit(req.userId!, 10, 300000)) { // 10 requests per 5 minutes
+        return res.status(429).json({ error: "AI coaching rate limit exceeded. Please wait before requesting more coaching assistance." });
+      }
+      
+      // Build enriched context for better coaching
+      const userId = req.userId!;
+      const organizationId = req.organizationId!;
+      
+      // Get current project data if available
+      let projectContext = "";
+      if (contextPayload?.currentProjectId) {
+        try {
+          const project = await storage.getProjectById(contextPayload.currentProjectId, organizationId);
+          if (project) {
+            projectContext = `\n\n**CURRENT PROJECT CONTEXT:**
+- Project: ${project.name}
+- Phase: ${project.currentPhase || 'Not specified'}
+- Status: ${project.status}
+- Objectives: ${project.objectives || 'Not specified'}`;
+          }
+        } catch (error) {
+          console.log("Could not fetch project context:", error);
+        }
+      }
+      
+      // Get page-specific data based on context
+      let pageContext = "";
+      if (contextPayload?.pageName && contextPayload?.currentProjectId) {
+        try {
+          switch (contextPayload.pageName) {
+            case "stakeholders":
+              const stakeholders = await storage.getStakeholdersByProject(contextPayload.currentProjectId, organizationId);
+              const resistantCount = stakeholders.filter(s => s.sentiment === 'resistant').length;
+              const supportiveCount = stakeholders.filter(s => s.sentiment === 'supportive').length;
+              pageContext = `\n\n**STAKEHOLDER INSIGHTS:**
+- Total Stakeholders: ${stakeholders.length}
+- Resistant: ${resistantCount}, Supportive: ${supportiveCount}
+- Currently viewing: Stakeholders page`;
+              break;
+              
+            case "raid-logs":
+              const raidLogs = await storage.getRaidLogsByProject(contextPayload.currentProjectId, organizationId);
+              const criticalRisks = raidLogs.filter(r => r.severity === 'critical' && r.category === 'risk').length;
+              const openIssues = raidLogs.filter(r => r.category === 'issue' && r.status !== 'closed').length;
+              pageContext = `\n\n**RISK & ISSUE INSIGHTS:**
+- Total RAID Items: ${raidLogs.length}
+- Critical Risks: ${criticalRisks}, Open Issues: ${openIssues}
+- Currently viewing: RAID Logs page`;
+              break;
+              
+            case "surveys":
+              const surveys = await storage.getSurveys(organizationId);
+              const projectSurveys = surveys.filter(s => s.projectId === contextPayload.currentProjectId);
+              pageContext = `\n\n**SURVEY INSIGHTS:**
+- Total Surveys: ${projectSurveys.length}
+- Currently viewing: Surveys page`;
+              break;
+          }
+        } catch (error) {
+          console.log("Could not fetch page-specific context:", error);
+        }
+      }
+      
+      // Build coaching prompt with context awareness
+      const coachingPrompt = `You are an expert Change Management Coach with deep knowledge of organizational change, stakeholder engagement, communication strategies, and change methodologies.
+
+**USER MESSAGE:** ${message}
+
+**CONTEXT AWARENESS:**
+- User is currently on: ${contextPayload?.pageName || 'Unknown page'}
+- User role: ${contextPayload?.userRole || 'Unknown'}${projectContext}${pageContext}
+
+**CHANGE MANAGEMENT EXPERTISE:**
+You have expertise in:
+- ADKAR methodology (Awareness, Desire, Knowledge, Ability, Reinforcement)
+- Kotter's 8-step change process
+- Stakeholder analysis and engagement strategies
+- Communication planning and resistance management
+- Change readiness assessment and measurement
+- Risk mitigation in change initiatives
+
+**COACHING GUIDELINES:**
+1. Provide specific, actionable advice based on the user's current context
+2. Reference the current page/data they're viewing when relevant
+3. Ask clarifying questions to better understand their specific challenge
+4. Suggest concrete next steps they can take immediately
+5. Draw from change management best practices and frameworks
+6. Be encouraging but realistic about change challenges
+
+**RESPONSE FORMAT:**
+- Be conversational and supportive
+- Provide specific recommendations, not generic advice
+- Include relevant change management concepts when helpful
+- Keep responses focused and actionable (aim for 2-3 paragraphs)
+
+Please provide coaching guidance based on their question and current context.`;
+
+      // Call OpenAI for coaching response
+      const { openai } = await import("./openai");
+      const response = await openai.chat.completions.create({
+        model: "gpt-4", // Using GPT-4 for better coaching quality
+        messages: [{ role: "user", content: coachingPrompt }],
+        temperature: 0.7, // Slightly creative for coaching
+        max_tokens: 800,
+      });
+
+      const coachingResponse = response.choices[0].message.content || "I'm sorry, I couldn't generate a response at this time.";
+
+      // Save coaching interaction
+      if (contextPayload?.currentProjectId) {
+        try {
+          await storage.createGptInteraction({
+            projectId: contextPayload.currentProjectId,
+            userId: userId,
+            type: "context_aware_coaching",
+            prompt: message,
+            response: coachingResponse,
+            metadata: { 
+              page: contextPayload.pageName,
+              hasContext: !!contextPayload
+            }
+          });
+        } catch (error) {
+          console.log("Could not save coaching interaction:", error);
+        }
+      }
+
+      res.json({ 
+        response: coachingResponse,
+        contextUsed: {
+          page: contextPayload?.pageName,
+          project: contextPayload?.currentProjectName,
+          hasEnrichedData: !!(projectContext || pageContext)
+        }
+      });
+    } catch (error) {
+      console.error("Error in context-aware coaching:", error);
+      res.status(500).json({ error: "Failed to provide coaching assistance" });
     }
   });
 
