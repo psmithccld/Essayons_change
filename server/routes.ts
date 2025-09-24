@@ -421,8 +421,19 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
       const deficiencyData = {
         ...processedData,
         category: processedData.category || "General", // Default category
-        resolutionStatus: processedData.resolutionStatus || "pending" // Default status
+        resolutionStatus: processedData.resolutionStatus || "pending", // Default status
+        severity: processedData.severity || "medium", // Default severity
+        impact: processedData.impact || "medium", // Default impact
+        // Keep required database fields
+        title: processedData.title || "Deficiency Item",
+        description: processedData.description || processedData.title || "Deficiency identified",
       };
+      
+      // Clean assigneeId if it's empty or invalid
+      if (!deficiencyData.assigneeId || deficiencyData.assigneeId === "" || deficiencyData.assigneeId === "none") {
+        delete deficiencyData.assigneeId;
+      }
+      
       templateValidated = insertDeficiencySchema.parse(deficiencyData);
       description = templateValidated.description || templateValidated.title || 'Deficiency description';
       break;

@@ -606,7 +606,7 @@ export function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItem
                     <SelectItem value="risk">Risk</SelectItem>
                     <SelectItem value="action">Action</SelectItem>
                     <SelectItem value="issue">Issue</SelectItem>
-                    <SelectItem value="dependency">Dependency</SelectItem>
+                    <SelectItem value="dependency">Deficiency</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
