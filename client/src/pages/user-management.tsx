@@ -44,7 +44,24 @@ const editUserSchema = z.object({
   email: z.string().email("Must be a valid email address"),
   department: z.string().optional(),
   roleId: z.string().uuid("Please select a role"),
-  isActive: z.boolean()
+  isActive: z.boolean(),
+  resetPassword: z.boolean().default(false),
+  password: z.string().optional(),
+  confirmPassword: z.string().optional()
+}).refine((data) => {
+  // Only validate passwords if resetPassword is true
+  if (data.resetPassword) {
+    if (!data.password || data.password.length < 8) {
+      return false;
+    }
+    if (data.password !== data.confirmPassword) {
+      return false;
+    }
+  }
+  return true;
+}, {
+  message: "Password must be at least 8 characters and passwords must match",
+  path: ["password"]
 });
 
 type CreateUserFormData = z.infer<typeof createUserSchema>;
@@ -285,7 +302,10 @@ function UserManagementContent() {
       email: user.email,
       department: user.department || "",
       roleId: user.roleId,
-      isActive: user.isActive
+      isActive: user.isActive,
+      resetPassword: false,
+      password: "",
+      confirmPassword: ""
     });
   };
 
@@ -835,6 +855,57 @@ function UserManagementContent() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={editForm.control}
+                name="resetPassword"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>Reset Password</FormLabel>
+                      <div className="text-sm text-muted-foreground">
+                        Enable to set a new password for this user
+                      </div>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-reset-password"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              {editForm.watch("resetPassword") && (
+                <>
+                  <FormField
+                    control={editForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>New Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Enter new password" {...field} data-testid="input-new-password" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm New Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Confirm new password" {...field} data-testid="input-confirm-new-password" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
               <div className="flex justify-end space-x-2">
                 <Button 
                   type="button" 

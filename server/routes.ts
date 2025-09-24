@@ -3979,19 +3979,84 @@ Return the refined content in JSON format:
 
   app.put("/api/users/:id", requireAuthAndOrg, requirePermission('canEditUsers'), async (req, res) => {
     try {
-      // SECURITY: Validate input data with Zod, exclude password field
-      const validatedData = insertUserSchema.partial().omit({ password: true }).parse(req.body);
+      // Log request but redact sensitive fields
+      const { password, confirmPassword, ...safeBody } = req.body;
+      console.log("PUT /api/users/:id - Request body:", JSON.stringify(safeBody, null, 2));
+      
+      // Handle password reset separately from other user data
+      const { resetPassword, password, confirmPassword, ...otherData } = req.body;
+      
+      console.log("PUT /api/users/:id - Other data (sanitized):", JSON.stringify(otherData, null, 2));
+      console.log("PUT /api/users/:id - Reset password:", resetPassword);
+      
+      // Create a schema for updating users (partial, excluding password fields)
+      const updateUserSchema = z.object({
+        name: z.string().min(1, "Name is required").optional(),
+        username: z.string().min(1, "Username is required").optional(),
+        email: z.string().email("Must be a valid email address").optional(),
+        department: z.string().optional(),
+        roleId: z.string().uuid("Please select a role").optional(),
+        isActive: z.boolean().optional()
+      });
+      
+      let validatedData;
+      try {
+        validatedData = updateUserSchema.parse(otherData);
+        console.log("PUT /api/users/:id - Validated data:", JSON.stringify(validatedData, null, 2));
+      } catch (validationError) {
+        console.error("PUT /api/users/:id - Validation error:", validationError);
+        return res.status(400).json({ error: "Invalid user data", details: validationError });
+      }
+      
+      // If password reset is requested, handle it separately
+      if (resetPassword) {
+        console.log("PUT /api/users/:id - Processing password reset");
+        
+        // Require both password fields when reset is requested
+        if (!password || !confirmPassword) {
+          console.error("PUT /api/users/:id - Missing password fields");
+          return res.status(400).json({ error: "Both password and confirm password are required when resetting password" });
+        }
+        
+        // Validate password requirements
+        if (password.length < 8) {
+          console.error("PUT /api/users/:id - Password too short");
+          return res.status(400).json({ error: "Password must be at least 8 characters long" });
+        }
+        
+        if (password !== confirmPassword) {
+          console.error("PUT /api/users/:id - Passwords don't match");
+          return res.status(400).json({ error: "Passwords do not match" });
+        }
+        
+        // Hash the new password
+        const bcrypt = await import("bcrypt");
+        const saltRounds = 12;
+        const passwordHash = await bcrypt.hash(password, saltRounds);
+        
+        // Include passwordHash in the update
+        validatedData.passwordHash = passwordHash;
+        console.log("PUT /api/users/:id - Password hash added to validated data");
+      }
+      
+      // Log update data but redact passwordHash for security
+      const { passwordHash, ...safeUpdateData } = validatedData;
+      console.log("PUT /api/users/:id - Calling storage.updateUser with:", JSON.stringify({ ...safeUpdateData, passwordHash: passwordHash ? '[REDACTED]' : undefined }, null, 2));
       
       const user = await storage.updateUser(req.params.id, validatedData);
       if (!user) {
+        console.error("PUT /api/users/:id - User not found:", req.params.id);
         return res.status(404).json({ error: "User not found" });
       }
+      
+      console.log("PUT /api/users/:id - User updated successfully");
       
       // User already has passwordHash removed by storage layer
       res.json(user);
     } catch (error) {
-      console.error("Error updating user:", error);
-      res.status(400).json({ error: "Failed to update user" });
+      console.error("PUT /api/users/:id - Error updating user:", error);
+      console.error("PUT /api/users/:id - Error stack:", error.stack);
+      res.status(400).json({ error: "Failed to update user", details: error.message });
     }
   });
 

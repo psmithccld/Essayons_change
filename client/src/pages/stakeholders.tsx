@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { Plus, Users, Mail, Phone, Building, TrendingUp, TrendingDown, Minus, Me
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { Project, Stakeholder } from "@shared/schema";
 
 const stakeholderFormSchema = z.object({
@@ -80,6 +81,7 @@ export default function Stakeholders() {
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const { toast } = useToast();
   const { currentProject, projects } = useCurrentProject();
+  const { user: currentUser } = usePermissions();
   const queryClient = useQueryClient();
 
   const { data: stakeholders = [], isLoading } = useQuery<Stakeholder[]>({
@@ -103,8 +105,16 @@ export default function Stakeholders() {
       influenceLevel: "medium",
       supportLevel: "neutral",
       engagementLevel: "medium",
+      department: currentUser?.department || "",
     },
   });
+
+  // Update department when currentUser changes (for cases where currentUser loads after form initialization)
+  useEffect(() => {
+    if (currentUser?.department && !form.getValues('department')) {
+      form.setValue('department', currentUser.department);
+    }
+  }, [currentUser?.department, form]);
 
   // Handle user selection and field prepopulation
   const handleUserSelection = (userId: string) => {
@@ -116,7 +126,7 @@ export default function Stakeholders() {
         form.setValue('name', selectedUser.name);
         form.setValue('email', selectedUser.email || '');
         form.setValue('role', selectedUser.role?.name || selectedUser.role || '');
-        // Note: department could come from user profile if available
+        form.setValue('department', selectedUser.department || '');
       }
     }
   };
@@ -130,6 +140,7 @@ export default function Stakeholders() {
         influenceLevel: "medium",
         supportLevel: "neutral",
         engagementLevel: "medium",
+        department: currentUser?.department || "",
       });
     }
   };
@@ -143,7 +154,13 @@ export default function Stakeholders() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'stakeholders'] });
       setIsNewStakeholderOpen(false);
-      form.reset();
+      // Reset form but preserve department for subsequent entries
+      form.reset({
+        influenceLevel: "medium",
+        supportLevel: "neutral",
+        engagementLevel: "medium",
+        department: currentUser?.department || "",
+      });
       toast({
         title: "Success",
         description: "Stakeholder added successfully",
