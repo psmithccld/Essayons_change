@@ -324,16 +324,8 @@ export default function RaidLogs() {
   };
 
   const onSubmit = (data: RaidLogFormData) => {
-    // Convert string dates to Date objects for backend
+    // Keep dates as strings for backend validation - backend will handle conversion
     const processedData = { ...data };
-    
-    // Handle date conversions
-    if ('dueDate' in processedData && processedData.dueDate) {
-      (processedData as any).dueDate = new Date(processedData.dueDate);
-    }
-    if ('targetResolutionDate' in processedData && processedData.targetResolutionDate) {
-      (processedData as any).targetResolutionDate = new Date(processedData.targetResolutionDate);
-    }
     
     // Clean empty assigneeId values
     if ('assigneeId' in processedData && processedData.assigneeId === '') {
