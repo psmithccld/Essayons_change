@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Bot, Send, Lightbulb, MessageSquare, Clock, Minimize2, Maximize2, X } f
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
+import { Link } from "wouter";
 import type { Project, Stakeholder, RaidLog } from "@shared/schema";
 
 interface ChatMessage {
@@ -31,6 +32,9 @@ export default function GptCoach() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isChatMinimized, setIsChatMinimized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [chatSize, setChatSize] = useState({ width: 384, height: 384 }); // width in pixels, height in pixels
+  const [lastExpandedSize, setLastExpandedSize] = useState({ width: 384, height: 384 });
+  const chatWindowRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { currentProject } = useCurrentProject();
 
@@ -131,12 +135,37 @@ export default function GptCoach() {
   };
 
   const minimizeChat = () => {
+    if (!isChatMinimized) {
+      setLastExpandedSize(chatSize);
+    }
     setIsChatMinimized(true);
   };
 
   const maximizeChat = () => {
     setIsChatMinimized(false);
+    setChatSize(lastExpandedSize);
   };
+
+  // Sync state with user-driven resizes using ResizeObserver
+  useEffect(() => {
+    if (!chatWindowRef.current || isChatMinimized) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        setChatSize({ width, height });
+        if (!isChatMinimized) {
+          setLastExpandedSize({ width, height });
+        }
+      }
+    });
+
+    resizeObserver.observe(chatWindowRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [isChatMinimized]);
 
   return (
     <div className="space-y-6" data-testid="gpt-coach-page">
@@ -171,9 +200,11 @@ export default function GptCoach() {
                   <p className="text-sm text-muted-foreground mb-2">
                     Available on the Readiness Surveys page
                   </p>
-                  <Button size="sm" variant="outline" onClick={() => window.location.href = '/surveys'}>
-                    Go to Surveys
-                  </Button>
+                  <Link to="/surveys">
+                    <Button size="sm" variant="outline" data-testid="button-go-surveys">
+                      Go to Surveys
+                    </Button>
+                  </Link>
                 </div>
                 <div className="p-4 border rounded-lg">
                   <h3 className="font-medium mb-2 flex items-center space-x-2">
@@ -183,9 +214,11 @@ export default function GptCoach() {
                   <p className="text-sm text-muted-foreground mb-2">
                     Available on the RAID Logs page
                   </p>
-                  <Button size="sm" variant="outline" onClick={() => window.location.href = '/raid-logs'}>
-                    Go to RAID Logs
-                  </Button>
+                  <Link to="/raid-logs">
+                    <Button size="sm" variant="outline" data-testid="button-go-raid-logs">
+                      Go to RAID Logs
+                    </Button>
+                  </Link>
                 </div>
                 <div className="p-4 border rounded-lg">
                   <h3 className="font-medium mb-2 flex items-center space-x-2">
@@ -195,9 +228,11 @@ export default function GptCoach() {
                   <p className="text-sm text-muted-foreground mb-2">
                     Available on the Stakeholders page
                   </p>
-                  <Button size="sm" variant="outline" onClick={() => window.location.href = '/stakeholders'}>
-                    Go to Stakeholders
-                  </Button>
+                  <Link to="/stakeholders">
+                    <Button size="sm" variant="outline" data-testid="button-go-stakeholders">
+                      Go to Stakeholders
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </CardContent>
@@ -229,7 +264,7 @@ export default function GptCoach() {
                       key={session.id} 
                       className="cursor-pointer hover:bg-muted/50 transition-colors" 
                       onClick={() => openChat(session.id)}
-                      data-testid={`chat-${session.id}`}
+                      data-testid={`chat-history-${session.id}`}
                     >
                       <CardContent className="p-3">
                         <div className="flex items-start space-x-2">
@@ -308,7 +343,7 @@ export default function GptCoach() {
               <Button
                 onClick={handleSendMessage}
                 disabled={!customPrompt.trim() || isLoading}
-                data-testid="button-send-prompt"
+                data-testid="button-send-message"
               >
                 <Send className="w-4 h-4" />
               </Button>
@@ -319,9 +354,21 @@ export default function GptCoach() {
 
       {/* Floating Chat Window */}
       {isChatOpen && getCurrentChat() && (
-        <div className={`fixed bottom-20 right-4 w-96 bg-background border rounded-lg shadow-lg z-20 transition-all ${
-          isChatMinimized ? 'h-12' : 'h-96'
-        }`}>
+        <div 
+          ref={chatWindowRef}
+          className={`fixed bottom-20 right-4 bg-background border rounded-lg shadow-lg z-20 transition-all flex flex-col overflow-auto ${
+            isChatMinimized ? 'resize-none' : 'resize'
+          }`}
+          style={{
+            width: `${chatSize.width}px`,
+            height: isChatMinimized ? '48px' : `${chatSize.height}px`,
+            minWidth: '300px',
+            minHeight: '200px',
+            maxWidth: '600px',
+            maxHeight: '500px'
+          }}
+          data-testid="floating-chat-window"
+        >
           {/* Chat Header */}
           <div className="flex items-center justify-between p-3 border-b bg-muted/50 rounded-t-lg">
             <div className="flex items-center space-x-2">
@@ -334,6 +381,7 @@ export default function GptCoach() {
                 variant="ghost"
                 onClick={isChatMinimized ? maximizeChat : minimizeChat}
                 className="h-6 w-6 p-0"
+                data-testid="button-toggle-chat-size"
               >
                 {isChatMinimized ? <Maximize2 className="w-3 h-3" /> : <Minimize2 className="w-3 h-3" />}
               </Button>
@@ -342,6 +390,7 @@ export default function GptCoach() {
                 variant="ghost"
                 onClick={closeChat}
                 className="h-6 w-6 p-0"
+                data-testid="button-close-chat"
               >
                 <X className="w-3 h-3" />
               </Button>
@@ -350,7 +399,7 @@ export default function GptCoach() {
 
           {/* Chat Content */}
           {!isChatMinimized && (
-            <div className="flex flex-col h-80">
+            <div className="flex flex-col flex-1 overflow-hidden">
               <div className="flex-1 p-3 overflow-y-auto space-y-3">
                 {getCurrentChat()?.messages.map((message) => (
                   <div
