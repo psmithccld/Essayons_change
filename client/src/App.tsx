@@ -14,6 +14,7 @@ import RaidLogs from "@/pages/raid-logs";
 import Communications from "@/pages/communications";
 import Stakeholders from "@/pages/stakeholders";
 import Surveys from "@/pages/surveys";
+import SurveyTake from "@/pages/survey-take";
 import GptCoach from "@/pages/gpt-coach";
 import ProcessMapping from "@/pages/process-mapping";
 import ChangeArtifacts from "@/pages/change-artifacts";
@@ -63,6 +64,7 @@ function AuthenticatedApp() {
             <Route path="/communications" component={Communications} />
             <Route path="/stakeholders" component={Stakeholders} />
             <Route path="/surveys" component={Surveys} />
+            <Route path="/surveys/take/:surveyId" component={SurveyTake} />
             <Route path="/gpt-coach" component={GptCoach} />
             <Route path="/user-management" component={UserManagement} />
             <Route path="/initiatives" component={InitiativeManagement} />

@@ -3307,6 +3307,33 @@ Return the refined content in JSON format:
         createdById: req.userId!
       });
       const survey = await storage.createSurvey(validatedData, req.organizationId!);
+
+      // Send survey invitations if stakeholders are specified and survey is active
+      if (survey.status === 'active' && survey.targetStakeholders && survey.targetStakeholders.length > 0) {
+        try {
+          const { sendBulkSurveyInvitations } = await import('./services/surveyNotificationService.js');
+          const allStakeholders = await storage.getStakeholdersByProject(survey.projectId, req.organizationId!);
+          const stakeholders = allStakeholders.filter(s => survey.targetStakeholders!.includes(s.id));
+          const project = await storage.getProject(survey.projectId, req.organizationId!);
+          
+          const baseUrl = process.env.APP_BASE_URL || 'http://localhost:5000';
+          
+          // Send notifications asynchronously
+          sendBulkSurveyInvitations(
+            survey,
+            stakeholders,
+            baseUrl,
+            project?.name
+          ).catch(error => {
+            console.error('Failed to send survey invitations:', error);
+          });
+          
+        } catch (notificationError) {
+          console.error('Survey notification error:', notificationError);
+          // Don't fail the survey creation if notifications fail
+        }
+      }
+
       res.status(201).json(survey);
     } catch (error) {
       console.error("Error creating survey:", error);
@@ -3344,10 +3371,124 @@ Return the refined content in JSON format:
     }
   });
 
-  // Survey Responses
-  app.get("/api/surveys/:surveyId/responses", async (req, res) => {
+  // Get individual survey
+  app.get("/api/surveys/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const responses = await storage.getResponsesBySurvey(req.params.surveyId);
+      const survey = await storage.getSurvey(req.params.id, req.organizationId!);
+      if (!survey) {
+        return res.status(404).json({ error: "Survey not found" });
+      }
+      res.json(survey);
+    } catch (error) {
+      console.error("Error fetching survey:", error);
+      res.status(500).json({ error: "Failed to fetch survey" });
+    }
+  });
+
+  // Survey status management
+  app.patch("/api/surveys/:id/status", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { status } = req.body;
+      const validStatuses = ['draft', 'active', 'paused', 'completed'];
+      
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Invalid status. Must be one of: draft, active, paused, completed" });
+      }
+
+      const survey = await storage.updateSurvey(req.params.id, req.organizationId!, { status });
+      
+      if (!survey) {
+        return res.status(404).json({ error: "Survey not found" });
+      }
+
+      // Send notifications if survey is being activated
+      if (status === 'active' && survey.targetStakeholders && survey.targetStakeholders.length > 0) {
+        try {
+          const { sendBulkSurveyInvitations } = await import('./services/surveyNotificationService.js');
+          const allStakeholders = await storage.getStakeholdersByProject(survey.projectId, req.organizationId!);
+          const stakeholders = allStakeholders.filter(s => survey.targetStakeholders!.includes(s.id));
+          const project = await storage.getProject(survey.projectId, req.organizationId!);
+          
+          const baseUrl = process.env.APP_BASE_URL || 'http://localhost:5000';
+          
+          sendBulkSurveyInvitations(
+            survey,
+            stakeholders,
+            baseUrl,
+            project?.name
+          ).catch(error => {
+            console.error('Failed to send survey invitations:', error);
+          });
+        } catch (notificationError) {
+          console.error('Survey notification error:', notificationError);
+        }
+      }
+
+      res.json(survey);
+    } catch (error) {
+      console.error("Error updating survey status:", error);
+      res.status(500).json({ error: "Failed to update survey status" });
+    }
+  });
+
+  // Send survey reminders
+  app.post("/api/surveys/:id/reminders", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      console.log(`Looking for survey with ID: ${req.params.id}, org: ${req.organizationId}`);
+      const survey = await storage.getSurvey(req.params.id, req.organizationId!);
+      console.log(`Found survey:`, survey ? { id: survey.id, status: survey.status, title: survey.title } : null);
+      
+      if (!survey) {
+        return res.status(404).json({ error: "Survey not found" });
+      }
+      
+      if (survey.status !== 'active') {
+        return res.status(400).json({ error: `Survey is not active. Current status: ${survey.status}` });
+      }
+
+      const { sendBulkSurveyReminders } = await import('./services/surveyNotificationService.js');
+      // Get all stakeholders for the project and filter by target stakeholder IDs
+      const allStakeholders = await storage.getStakeholdersByProject(survey.projectId, req.organizationId!);
+      const targetStakeholderIds = survey.targetStakeholders || [];
+      const stakeholders = allStakeholders.filter(s => targetStakeholderIds.includes(s.id));
+      const project = await storage.getProject(survey.projectId, req.organizationId!);
+      
+      // Filter stakeholders who haven't responded yet
+      const responses = await storage.getResponsesBySurvey(survey.id);
+      const respondentEmails = responses.map(r => r.respondentEmail);
+      const stakeholdersToRemind = stakeholders.filter(s => 
+        s.email && !respondentEmails.includes(s.email)
+      );
+
+      const baseUrl = process.env.APP_BASE_URL || 'http://localhost:5000';
+      
+      const results = await sendBulkSurveyReminders(
+        survey,
+        stakeholdersToRemind,
+        baseUrl,
+        project?.name
+      );
+
+      res.json({
+        message: `Sent ${results.sent} reminders`,
+        ...results
+      });
+    } catch (error) {
+      console.error("Error sending survey reminders:", error);
+      res.status(500).json({ error: "Failed to send reminders" });
+    }
+  });
+
+  // Survey Responses
+  app.get("/api/surveys/:surveyId/responses", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      // Validate survey exists and user has access
+      const survey = await storage.getSurvey(req.params.surveyId, req.organizationId!);
+      if (!survey) {
+        return res.status(404).json({ error: "Survey not found" });
+      }
+      
+      const responses = await storage.getResponsesBySurvey(req.params.surveyId, req.organizationId!);
       res.json(responses);
     } catch (error) {
       console.error("Error fetching survey responses:", error);
@@ -3355,13 +3496,28 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/surveys/:surveyId/responses", async (req, res) => {
+  app.post("/api/surveys/:surveyId/responses", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
+      // Validate survey exists and is active
+      const survey = await storage.getSurvey(req.params.surveyId, req.organizationId!);
+      if (!survey) {
+        return res.status(404).json({ error: "Survey not found" });
+      }
+      
+      if (survey.status !== 'active') {
+        return res.status(400).json({ error: `Survey is not accepting responses. Current status: ${survey.status}` });
+      }
+
+      // Get authenticated user's email for response tracking
+      const user = await storage.getUser(req.userId!);
+      const respondentEmail = user?.email || 'anonymous@example.com';
+
       const validatedData = insertSurveyResponseSchema.parse({
         ...req.body,
-        surveyId: req.params.surveyId
+        surveyId: req.params.surveyId,
+        respondentEmail
       });
-      const response = await storage.createSurveyResponse(validatedData);
+      const response = await storage.createSurveyResponse(validatedData, req.organizationId!);
       res.status(201).json(response);
     } catch (error) {
       console.error("Error creating survey response:", error);

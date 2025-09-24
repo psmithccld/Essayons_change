@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, ClipboardCheck, Calendar, Users, BarChart3, Trash2, Bot, BookOpen, UserCheck } from "lucide-react";
+import { Plus, ClipboardCheck, Calendar, Users, BarChart3, Trash2, Bot, BookOpen, UserCheck, Play, Pause, Send, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
@@ -210,8 +210,87 @@ export default function Surveys() {
     },
   });
 
+  // Survey status mutation
+  const updateSurveyStatusMutation = useMutation({
+    mutationFn: async ({ surveyId, status }: { surveyId: string; status: string }) => {
+      const response = await apiRequest("PATCH", `/api/surveys/${surveyId}/status`, { status });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'surveys'] });
+      toast({
+        title: "Success",
+        description: "Survey status updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update survey status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Send reminders mutation
+  const sendRemindersMutation = useMutation({
+    mutationFn: async (surveyId: string) => {
+      const response = await apiRequest("POST", `/api/surveys/${surveyId}/reminders`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Success",
+        description: `Sent ${data.sent} reminder${data.sent !== 1 ? 's' : ''} successfully`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to send reminders",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete survey mutation
+  const deleteSurveyMutation = useMutation({
+    mutationFn: async (surveyId: string) => {
+      const response = await apiRequest("DELETE", `/api/surveys/${surveyId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'surveys'] });
+      toast({
+        title: "Success",
+        description: "Survey deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete survey",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: SurveyFormData) => {
     createSurveyMutation.mutate(data);
+  };
+
+  const updateSurveyStatus = (surveyId: string, status: string) => {
+    updateSurveyStatusMutation.mutate({ surveyId, status });
+  };
+
+  const sendReminders = (surveyId: string) => {
+    sendRemindersMutation.mutate(surveyId);
+  };
+
+  const deleteSurvey = (surveyId: string) => {
+    if (confirm("Are you sure you want to delete this survey? This action cannot be undone.")) {
+      deleteSurveyMutation.mutate(surveyId);
+    }
   };
 
   const handleAnalyze = () => {
@@ -596,6 +675,60 @@ export default function Surveys() {
                     />
                   </div>
 
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center">
+                        <UserCheck className="w-4 h-4 mr-2" />
+                        Target Stakeholders
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <FormField
+                        control={form.control}
+                        name="targetStakeholders"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Select stakeholders to survey</FormLabel>
+                            <FormControl>
+                              <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {stakeholders.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground">No stakeholders available. Please add stakeholders to your project first.</p>
+                                ) : (
+                                  stakeholders.map((stakeholder) => (
+                                    <div key={stakeholder.id} className="flex items-center space-x-2">
+                                      <Checkbox
+                                        checked={field.value?.includes(stakeholder.id) || false}
+                                        onCheckedChange={(checked) => {
+                                          const currentValue = field.value || [];
+                                          if (checked) {
+                                            field.onChange([...currentValue, stakeholder.id]);
+                                          } else {
+                                            field.onChange(currentValue.filter(id => id !== stakeholder.id));
+                                          }
+                                        }}
+                                        data-testid={`checkbox-stakeholder-${stakeholder.id}`}
+                                      />
+                                      <div className="flex-1">
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-sm font-medium">{stakeholder.name}</span>
+                                          <Badge variant="outline" className="text-xs">{stakeholder.role}</Badge>
+                                        </div>
+                                        {stakeholder.email && (
+                                          <p className="text-xs text-muted-foreground">{stakeholder.email}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </CardContent>
+                  </Card>
+
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-lg font-medium">Questions</h4>
@@ -828,7 +961,7 @@ export default function Surveys() {
                                 )}
                               </div>
                               
-                              <div className="flex items-center space-x-2">
+                              <div className="flex flex-wrap items-center gap-2">
                                 <Button 
                                   size="sm" 
                                   variant="outline"
@@ -838,10 +971,74 @@ export default function Surveys() {
                                   <BarChart3 className="w-3 h-3 mr-1" />
                                   View Responses
                                 </Button>
+                                
                                 {survey.status === 'draft' && (
-                                  <Button size="sm" data-testid={`button-activate-${survey.id}`}>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => updateSurveyStatus(survey.id, 'active')}
+                                    data-testid={`button-activate-${survey.id}`}
+                                  >
+                                    <Play className="w-3 h-3 mr-1" />
                                     Activate
                                   </Button>
+                                )}
+                                
+                                {survey.status === 'active' && (
+                                  <>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => updateSurveyStatus(survey.id, 'paused')}
+                                      data-testid={`button-pause-${survey.id}`}
+                                    >
+                                      <Pause className="w-3 h-3 mr-1" />
+                                      Pause
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => sendReminders(survey.id)}
+                                      data-testid={`button-remind-${survey.id}`}
+                                    >
+                                      <Send className="w-3 h-3 mr-1" />
+                                      Send Reminders
+                                    </Button>
+                                  </>
+                                )}
+                                
+                                {survey.status === 'paused' && (
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => updateSurveyStatus(survey.id, 'active')}
+                                    data-testid={`button-resume-${survey.id}`}
+                                  >
+                                    <Play className="w-3 h-3 mr-1" />
+                                    Resume
+                                  </Button>
+                                )}
+                                
+                                {survey.status !== 'completed' && (
+                                  <>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => updateSurveyStatus(survey.id, 'completed')}
+                                      data-testid={`button-complete-${survey.id}`}
+                                    >
+                                      <CheckCircle className="w-3 h-3 mr-1" />
+                                      Complete
+                                    </Button>
+                                    
+                                    <Button 
+                                      size="sm" 
+                                      variant="destructive"
+                                      onClick={() => deleteSurvey(survey.id)}
+                                      data-testid={`button-delete-${survey.id}`}
+                                    >
+                                      <Trash2 className="w-3 h-3 mr-1" />
+                                      Delete
+                                    </Button>
+                                  </>
                                 )}
                               </div>
                             </div>
