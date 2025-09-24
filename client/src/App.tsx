@@ -33,6 +33,7 @@ import { EmailVerifyPage } from "@/pages/auth/verify-email";
 import { Loader2 } from "lucide-react";
 import { HelpDeskButton } from "@/components/HelpDeskButton";
 import { AppBreadcrumbs } from "@/components/layout/AppBreadcrumbs";
+import PersistentAICoach from "@/components/PersistentAICoach";
 
 function LoadingSpinner() {
   return (
@@ -82,6 +83,9 @@ function AuthenticatedApp() {
         
         {/* Global Helpdesk Support Button */}
         <HelpDeskButton />
+        
+        {/* Persistent AI Coach - Available on all screens */}
+        <PersistentAICoach />
       </div>
     </div>
   );
