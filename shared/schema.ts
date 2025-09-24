@@ -170,6 +170,7 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"), // Made optional for pending users
   name: text("name").notNull(),
   email: text("email").notNull().unique(), // Added email for verification
+  department: text("department"), // Department for stakeholder auto-population
   roleId: uuid("role_id").references(() => roles.id, { onDelete: "restrict" }).notNull(),
   currentOrganizationId: uuid("current_organization_id").references(() => organizations.id, { onDelete: "set null" }),
   isActive: boolean("is_active").notNull().default(true),
