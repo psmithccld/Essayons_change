@@ -17,7 +17,7 @@ export function useBreadcrumbs(): BreadcrumbItem[] {
     "/projects": { title: "Projects" },
     "/tasks": { title: "Tasks & To Do", requiresProject: true },
     "/checklist-templates": { title: "Checklist Templates", requiresProject: true },
-    "/gantt": { title: "Gantt Charts", requiresProject: true },
+    "/gantt": { title: "Initiative Timeline", requiresProject: true },
     "/raid-logs": { title: "RAID Logs", requiresProject: true },
     "/reports": { title: "Reports", requiresProject: true },
     "/communications": { title: "Communications", requiresProject: true },
