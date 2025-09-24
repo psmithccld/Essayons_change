@@ -470,7 +470,7 @@ export default function Header() {
             <DropdownMenuContent align="end" className="w-56">
               {hasAnyPermission('canSeeUsers') && (
                 <DropdownMenuItem asChild>
-                  <Link href="/users" className="flex items-center w-full" data-testid="nav-user-management">
+                  <Link href="/user-management" className="flex items-center w-full" data-testid="nav-user-management">
                     <User className="w-4 h-4 mr-2" />
                     User Management
                   </Link>

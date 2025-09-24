@@ -52,7 +52,6 @@ const allNavigationItems: NavigationItem[] = [
   { id: "gpt-coach", icon: Bot, label: "GPT Coach", path: "/gpt-coach" },
   { id: "fishbone", icon: Fish, label: "Change Process Flow", path: "/change-process-flow" },
   { id: "process-mapping", icon: GitBranch, label: "Development Maps", path: "/process-mapping", permissions: ["canSeeAllProjects", "canModifyProjects"], requireAll: false },
-  { id: "user-management", icon: Users, label: "User Management", path: "/user-management", permissions: ["canSeeUsers"] },
   { id: "organization", icon: Settings, label: "Organization Settings", path: "/organization", permissions: ["canModifyOrganizationSettings"] }
 ];
 
