@@ -27,6 +27,7 @@ const createUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   username: z.string().min(1, "Username is required"),
   email: z.string().email("Must be a valid email address"),
+  department: z.string().optional(),
   roleId: z.string().uuid("Please select a role"),
   securityGroupIds: z.array(z.string().uuid()).optional().default([]),
   isActive: z.boolean().default(true),
@@ -40,6 +41,8 @@ const createUserSchema = z.object({
 const editUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   username: z.string().min(1, "Username is required"),
+  email: z.string().email("Must be a valid email address"),
+  department: z.string().optional(),
   roleId: z.string().uuid("Please select a role"),
   isActive: z.boolean()
 });
@@ -219,6 +222,7 @@ function UserManagementContent() {
       name: "",
       username: "",
       email: "",
+      department: "",
       password: "",
       confirmPassword: "",
       roleId: "",
@@ -278,6 +282,8 @@ function UserManagementContent() {
     editForm.reset({
       name: user.name,
       username: user.username,
+      email: user.email,
+      department: user.department || "",
       roleId: user.roleId,
       isActive: user.isActive
     });
@@ -353,6 +359,19 @@ function UserManagementContent() {
                       <FormLabel>Email</FormLabel>
                       <FormControl>
                         <Input type="email" placeholder="john.doe@company.com" {...field} data-testid="input-user-email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createForm.control}
+                  name="department"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department</FormLabel>
+                      <FormControl>
+                        <Input placeholder="IT, HR, Finance, etc." {...field} data-testid="input-user-department" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -740,6 +759,32 @@ function UserManagementContent() {
                     <FormLabel>Username</FormLabel>
                     <FormControl>
                       <Input {...field} data-testid="input-edit-user-username" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="john.doe@company.com" {...field} data-testid="input-edit-user-email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="department"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Department</FormLabel>
+                    <FormControl>
+                      <Input placeholder="IT, HR, Finance, etc." {...field} data-testid="input-edit-user-department" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
