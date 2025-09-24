@@ -126,7 +126,7 @@ export default function Stakeholders() {
         form.setValue('name', selectedUser.name);
         form.setValue('email', selectedUser.email || '');
         form.setValue('role', selectedUser.role?.name || selectedUser.role || '');
-        form.setValue('department', selectedUser.department || '');
+        form.setValue('department', selectedUser.department || currentUser?.department || '');
       }
     }
   };

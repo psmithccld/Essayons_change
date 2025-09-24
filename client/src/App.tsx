@@ -64,7 +64,7 @@ function AuthenticatedApp() {
             <Route path="/stakeholders" component={Stakeholders} />
             <Route path="/surveys" component={Surveys} />
             <Route path="/gpt-coach" component={GptCoach} />
-            <Route path="/users" component={UserManagement} />
+            <Route path="/user-management" component={UserManagement} />
             <Route path="/initiatives" component={InitiativeManagement} />
             <Route path="/security" component={SecurityManagement} />
             <Route path="/organization" component={OrganizationSettings} />

@@ -3979,12 +3979,11 @@ Return the refined content in JSON format:
 
   app.put("/api/users/:id", requireAuthAndOrg, requirePermission('canEditUsers'), async (req, res) => {
     try {
-      // Log request but redact sensitive fields
-      const { password, confirmPassword, ...safeBody } = req.body;
-      console.log("PUT /api/users/:id - Request body:", JSON.stringify(safeBody, null, 2));
-      
       // Handle password reset separately from other user data
       const { resetPassword, password, confirmPassword, ...otherData } = req.body;
+      
+      // Log request but redact sensitive fields
+      console.log("PUT /api/users/:id - Request body:", JSON.stringify(otherData, null, 2));
       
       console.log("PUT /api/users/:id - Other data (sanitized):", JSON.stringify(otherData, null, 2));
       console.log("PUT /api/users/:id - Reset password:", resetPassword);
