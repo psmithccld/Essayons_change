@@ -693,7 +693,7 @@ export default function Surveys() {
                                           </FormItem>
                                         )}
                                       />
-                                      {form.watch(`questions.${index}.options`)?.length > 2 && (
+                                      {(form.watch(`questions.${index}.options`)?.length || 0) > 2 && (
                                         <Button
                                           type="button"
                                           variant="ghost"
