@@ -179,67 +179,9 @@ export default function GptCoach() {
         </div>
       </div>
 
-      {/* Main Content - Quick Actions Moved to Other Pages */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Information */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>AI Assistant Overview</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-muted-foreground">
-                The GPT Change Coach has been integrated throughout the application to provide contextual assistance where you need it most:
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium mb-2 flex items-center space-x-2">
-                    <MessageSquare className="w-4 h-4 text-blue-500" />
-                    <span>Readiness Analysis</span>
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Available on the Readiness Surveys page
-                  </p>
-                  <Link to="/surveys">
-                    <Button size="sm" variant="outline" data-testid="button-go-surveys">
-                      Go to Surveys
-                    </Button>
-                  </Link>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium mb-2 flex items-center space-x-2">
-                    <MessageSquare className="w-4 h-4 text-red-500" />
-                    <span>Risk Strategies</span>
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Available on the RAID Logs page
-                  </p>
-                  <Link to="/raid-logs">
-                    <Button size="sm" variant="outline" data-testid="button-go-raid-logs">
-                      Go to RAID Logs
-                    </Button>
-                  </Link>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium mb-2 flex items-center space-x-2">
-                    <MessageSquare className="w-4 h-4 text-green-500" />
-                    <span>Stakeholder Tips</span>
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Available on the Stakeholders page
-                  </p>
-                  <Link to="/stakeholders">
-                    <Button size="sm" variant="outline" data-testid="button-go-stakeholders">
-                      Go to Stakeholders
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column - Chat History */}
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto">
+        {/* Chat History */}
         <div className="space-y-6">
           <Card>
             <CardHeader>

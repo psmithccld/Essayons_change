@@ -2031,3 +2031,93 @@ export const superAdminRegistrationSchema = z.object({
 
 export type SuperAdminLoginRequest = z.infer<typeof superAdminLoginSchema>;
 export type SuperAdminRegistrationRequest = z.infer<typeof superAdminRegistrationSchema>;
+
+// AI Coach Context Types for context-aware responses
+export const coachContextPageSchema = z.enum([
+  "dashboard",
+  "projects", 
+  "tasks",
+  "stakeholders",
+  "raid-logs", 
+  "communications",
+  "surveys",
+  "gpt-coach",
+  "gantt",
+  "process-mapping"
+]);
+
+export const coachContextSelectionsSchema = z.object({
+  stakeholderId: z.string().optional(),
+  raidLogId: z.string().optional(), 
+  taskId: z.string().optional(),
+  surveyId: z.string().optional(),
+  communicationId: z.string().optional(),
+  processMapId: z.string().optional(),
+});
+
+export const coachContextSnapshotSchema = z.object({
+  // Project summary (aligned with projects.currentPhase)
+  currentPhase: z.string().optional(),
+  projectObjectives: z.string().optional(),
+  
+  // Key insights (limited to top items)
+  topRisks: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    severity: z.enum(["low", "medium", "high", "critical"]),
+    category: z.enum(["risk", "assumption", "issue", "dependency"]),
+  })).max(5).optional(),
+  
+  stakeholderSummary: z.object({
+    totalCount: z.number(),
+    resistantCount: z.number(),
+    supportiveCount: z.number(),
+    highInfluenceCount: z.number(),
+  }).optional(),
+  
+  upcomingMilestones: z.array(z.object({
+    title: z.string(),
+    dueDate: z.string(), // ISO 8601 format
+    status: z.string(),
+  })).max(3).optional(),
+  
+  latestSurveyPulse: z.object({
+    readinessScore: z.number(),
+    responseCount: z.number(),
+    sentiment: z.enum(["positive", "neutral", "negative"]),
+  }).optional(),
+  
+  taskSummary: z.object({
+    totalCount: z.number(),
+    completedCount: z.number(),
+    overdueCount: z.number(),
+  }).optional(),
+});
+
+export const coachContextPayloadSchema = z.object({
+  // Current location
+  pathname: z.string(),
+  pageName: coachContextPageSchema,
+  
+  // User and tenant context
+  userId: z.string().optional(),
+  currentOrganizationId: z.string().optional(),
+  currentProjectId: z.string().optional(),
+  currentProjectName: z.string().optional(),
+  userRole: z.string().optional(),
+  
+  // Page-specific selections
+  selections: coachContextSelectionsSchema.optional(),
+  
+  // Relevant data snapshot
+  snapshot: coachContextSnapshotSchema.optional(),
+}).refine(data => {
+  // Keep payload size reasonable (~4KB limit)
+  const serialized = JSON.stringify(data);
+  return serialized.length < 4096;
+}, "Context payload too large");
+
+export type CoachContextPage = z.infer<typeof coachContextPageSchema>;
+export type CoachContextSelections = z.infer<typeof coachContextSelectionsSchema>; 
+export type CoachContextSnapshot = z.infer<typeof coachContextSnapshotSchema>;
+export type CoachContextPayload = z.infer<typeof coachContextPayloadSchema>;
