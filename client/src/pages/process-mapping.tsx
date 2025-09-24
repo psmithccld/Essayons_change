@@ -177,18 +177,13 @@ export default function DevelopmentMaps() {
     }
     setIsItemCreationOpen(false);
     toast({ 
-      title: `${selectedItemType?.charAt(0).toUpperCase() + selectedItemType?.slice(1)} created and added to map`, 
-      description: `${selectedItemType?.charAt(0).toUpperCase() + selectedItemType?.slice(1)} has been created and symbol placed on the map.` 
+      title: `${selectedItemType ? selectedItemType.charAt(0).toUpperCase() + selectedItemType.slice(1) : 'Item'} created and added to map`, 
+      description: `${selectedItemType ? selectedItemType.charAt(0).toUpperCase() + selectedItemType.slice(1) : 'Item'} has been created and symbol placed on the map.` 
     });
   };
 
-  // Auto-load the first process map when available
-  useEffect(() => {
-    if (!isLoading && processMaps.length > 0 && !currentProcessMap && canvas) {
-      const firstProcessMap = processMaps[0];
-      loadProcessMap(firstProcessMap);
-    }
-  }, [isLoading, processMaps, currentProcessMap, canvas]);
+  // Note: Removed auto-loading to prevent unintended map switching.
+  // Users must explicitly select or create a process map before placing symbols.
 
   // Initialize Fabric.js canvas
   useEffect(() => {
@@ -276,8 +271,17 @@ export default function DevelopmentMaps() {
       
       // Handle symbol placement
       if (currentSymbolType && e.pointer) {
-        console.log('Adding process element:', currentSymbolType, 'at', e.pointer.x, e.pointer.y);
-        
+        // Double-check that a process map is selected before placing symbols
+        if (!currentProcessMap) {
+          toast({
+            title: "No Process Map Selected",
+            description: "Please create or select a process map first",
+            variant: "destructive",
+          });
+          setSelectedSymbolType(null);
+          return;
+        }
+
         // Check if this is a change management symbol that needs item creation
         const symbol = PROCESS_SYMBOLS[currentSymbolType];
         if (symbol?.isChangeItem) {
@@ -749,6 +753,15 @@ export default function DevelopmentMaps() {
 
   // Handle symbol selection from toolbar
   const handleSymbolSelect = (symbolType: string) => {
+    // Check if a process map is selected first
+    if (!currentProcessMap) {
+      toast({
+        title: "No Process Map Selected",
+        description: "Please create a new process map or select an existing one before placing symbols",
+        variant: "destructive",
+      });
+      return;
+    }
     setSelectedSymbolType(symbolType);
     setTools(prev => ({ ...prev, mode: 'select' }));
     if (canvas) {
