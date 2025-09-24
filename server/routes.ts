@@ -398,6 +398,14 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
         description: processedData.description || processedData.title || "Issue identified",
       };
       
+      // Convert date strings to Date objects before validation
+      if (issueData.dueDate && typeof issueData.dueDate === 'string') {
+        issueData.dueDate = new Date(issueData.dueDate);
+      }
+      if (issueData.targetResolutionDate && typeof issueData.targetResolutionDate === 'string') {
+        issueData.targetResolutionDate = new Date(issueData.targetResolutionDate);
+      }
+      
       // Clean assigneeId if it's empty or invalid
       if (!issueData.assigneeId || issueData.assigneeId === "" || issueData.assigneeId === "none") {
         delete issueData.assigneeId;
