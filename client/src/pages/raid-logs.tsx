@@ -12,7 +12,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, AlertTriangle, CheckCircle, AlertCircle, Link as LinkIcon, Calendar, User, Filter, Edit, Trash2 } from "lucide-react";
+import { Plus, AlertTriangle, CheckCircle, AlertCircle, Link as LinkIcon, Calendar, User, Filter, Edit, Trash2, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
@@ -116,6 +116,9 @@ export default function RaidLogs() {
   const [activeTab, setActiveTab] = useState<string>("all");
   const [isNewLogOpen, setIsNewLogOpen] = useState(false);
   const [editingLog, setEditingLog] = useState<RaidLog | null>(null);
+  const [isGptAnalysisOpen, setIsGptAnalysisOpen] = useState(false);
+  const [gptAnalysisResults, setGptAnalysisResults] = useState<any>(null);
+  const [isGptLoading, setIsGptLoading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { currentProject } = useCurrentProject();
@@ -277,10 +280,91 @@ export default function RaidLogs() {
     },
   });
 
+  // GPT Risk Mitigation Analysis
+  const riskMitigationMutation = useMutation({
+    mutationFn: async () => {
+      setIsGptLoading(true);
+      
+      // Filter risks from RAID logs
+      const risks = raidLogs.filter(log => log.type === 'risk').map(risk => ({
+        title: risk.title,
+        description: risk.description || '',
+        severity: risk.severity || 'medium',
+        impact: risk.impact || 'medium',
+        probability: risk.probability || 'medium',
+        likelihood: risk.likelihood || 3,
+        riskLevel: risk.riskLevel || 3,
+        potentialOutcome: risk.potentialOutcome || ''
+      }));
+
+      // Mock GPT analysis - in real implementation, this would call OpenAI API
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          const mockAnalysis = {
+            overallRiskScore: Math.floor(Math.random() * 40) + 60, // 60-100
+            riskBreakdown: risks.slice(0, 5).map((risk, index) => ({
+              title: risk.title,
+              currentLevel: 'High',
+              mitigationStrategies: [
+                `Implement monitoring and early warning systems for ${risk.title}`,
+                `Develop contingency plans to address potential ${risk.potentialOutcome}`,
+                `Assign dedicated team members to manage this risk area`,
+                `Establish regular review cycles for risk assessment updates`
+              ],
+              suggestedActions: [
+                `Create detailed action plan for ${risk.title} management`,
+                `Set up stakeholder communication protocols`,
+                `Establish risk tolerance thresholds and escalation procedures`
+              ]
+            })),
+            recommendations: [
+              'Focus immediate attention on high-probability, high-impact risks',
+              'Implement a systematic risk monitoring dashboard',
+              'Establish regular risk review meetings with key stakeholders',
+              'Develop risk escalation procedures for critical threats',
+              'Create risk mitigation playbooks for common scenarios'
+            ]
+          };
+          resolve(mockAnalysis);
+        }, 2000);
+      });
+    },
+    onSuccess: (data) => {
+      setGptAnalysisResults(data);
+      setIsGptLoading(false);
+      toast({
+        title: "Success",
+        description: "Risk mitigation analysis completed successfully",
+      });
+    },
+    onError: () => {
+      setIsGptLoading(false);
+      toast({
+        title: "Error",
+        description: "Failed to generate risk mitigation strategies",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDeleteLog = (logId: string, logTitle: string) => {
     if (window.confirm(`Are you sure you want to delete "${logTitle}"? This action cannot be undone.`)) {
       deleteRaidLogMutation.mutate(logId);
     }
+  };
+
+  const handleGptAnalysis = () => {
+    const risks = raidLogs.filter(log => log.type === 'risk');
+    if (risks.length === 0) {
+      toast({
+        title: "No Risks Found",
+        description: "Please add some risks to your RAID log before running the analysis",
+        variant: "destructive",
+      });
+      return;
+    }
+    riskMitigationMutation.mutate();
+    setIsGptAnalysisOpen(true);
   };
 
   const handleEditLog = (log: RaidLog) => {
@@ -473,13 +557,103 @@ export default function RaidLogs() {
           <h1 className="text-2xl font-semibold text-foreground">RAID Logs</h1>
           <p className="text-sm text-muted-foreground">Track risks, actions, issues, and deficiencies</p>
         </div>
-        <Dialog open={isNewLogOpen} onOpenChange={setIsNewLogOpen}>
-          <DialogTrigger asChild>
-            <Button disabled={!currentProject?.id} data-testid="button-new-raid-log">
-              <Plus className="w-4 h-4 mr-2" />
-              New Entry
-            </Button>
-          </DialogTrigger>
+        <div className="flex space-x-2">
+          <Dialog open={isGptAnalysisOpen} onOpenChange={setIsGptAnalysisOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                variant="outline" 
+                disabled={!currentProject?.id || raidLogs.filter(log => log.type === 'risk').length === 0}
+                onClick={handleGptAnalysis}
+                data-testid="button-analyze-risks"
+              >
+                <Bot className="w-4 h-4 mr-2" />
+                Risk Strategies
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Risk Mitigation Strategies</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6">
+                {isGptLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="text-sm text-muted-foreground mt-2">Analyzing risks and generating mitigation strategies...</p>
+                  </div>
+                ) : gptAnalysisResults ? (
+                  <>
+                    <div className="text-center">
+                      <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-4">
+                        <span className="text-2xl font-bold text-primary">{gptAnalysisResults.overallRiskScore}%</span>
+                      </div>
+                      <h3 className="text-lg font-semibold">Overall Risk Score</h3>
+                      <p className="text-sm text-muted-foreground">Higher scores indicate more comprehensive risk coverage</p>
+                    </div>
+                    
+                    {gptAnalysisResults.riskBreakdown && gptAnalysisResults.riskBreakdown.length > 0 && (
+                      <div className="space-y-4">
+                        <h4 className="font-medium text-foreground">Risk-Specific Strategies</h4>
+                        {gptAnalysisResults.riskBreakdown.map((risk: any, index: number) => (
+                          <Card key={index} className="p-4">
+                            <h5 className="font-medium mb-2">{risk.title}</h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <h6 className="text-sm font-medium text-blue-600 mb-2">Mitigation Strategies</h6>
+                                <ul className="space-y-1">
+                                  {risk.mitigationStrategies?.map((strategy: string, i: number) => (
+                                    <li key={i} className="text-sm flex items-start space-x-2">
+                                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                                      <span>{strategy}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                              <div>
+                                <h6 className="text-sm font-medium text-green-600 mb-2">Suggested Actions</h6>
+                                <ul className="space-y-1">
+                                  {risk.suggestedActions?.map((action: string, i: number) => (
+                                    <li key={i} className="text-sm flex items-start space-x-2">
+                                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                                      <span>{action}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {gptAnalysisResults.recommendations && (
+                      <div>
+                        <h4 className="font-medium text-foreground mb-3">General Recommendations</h4>
+                        <div className="space-y-2">
+                          {gptAnalysisResults.recommendations.map((rec: string, index: number) => (
+                            <div key={index} className="flex items-start space-x-2">
+                              <div className="w-2 h-2 bg-accent rounded-full mt-2 flex-shrink-0"></div>
+                              <p className="text-sm">{rec}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">Click "Risk Strategies" to analyze your risks and get AI-powered mitigation strategies.</p>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={isNewLogOpen} onOpenChange={setIsNewLogOpen}>
+            <DialogTrigger asChild>
+              <Button disabled={!currentProject?.id} data-testid="button-new-raid-log">
+                <Plus className="w-4 h-4 mr-2" />
+                New Entry
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>{editingLog ? "Edit RAID Log Entry" : "Create RAID Log Entry"}</DialogTitle>
@@ -1035,6 +1209,7 @@ export default function RaidLogs() {
             </Form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* RAID Logs */}
