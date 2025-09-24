@@ -123,6 +123,7 @@ type ActionFormData = z.infer<typeof actionFormSchema>;
 export default function DevelopmentMaps() {
   const [canvas, setCanvas] = useState<FabricCanvas | null>(null);
   const [currentProcessMap, setCurrentProcessMap] = useState<ProcessMap | null>(null);
+  const currentProcessMapRef = useRef<ProcessMap | null>(null);
   const [isNewProcessMapOpen, setIsNewProcessMapOpen] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -181,6 +182,11 @@ export default function DevelopmentMaps() {
       description: `${selectedItemType ? selectedItemType.charAt(0).toUpperCase() + selectedItemType.slice(1) : 'Item'} has been created and symbol placed on the map.` 
     });
   };
+
+  // Sync ref with state to ensure event handlers have latest value
+  useEffect(() => {
+    currentProcessMapRef.current = currentProcessMap;
+  }, [currentProcessMap]);
 
   // Note: Removed auto-loading to prevent unintended map switching.
   // Users must explicitly select or create a process map before placing symbols.
@@ -271,8 +277,9 @@ export default function DevelopmentMaps() {
       
       // Handle symbol placement
       if (currentSymbolType && e.pointer) {
-        // Double-check that a process map is selected before placing symbols
-        if (!currentProcessMap) {
+        // Double-check that a process map is selected before placing symbols (check both state and ref)
+        const hasProcessMap = currentProcessMap || currentProcessMapRef.current;
+        if (!hasProcessMap) {
           toast({
             title: "No Process Map Selected",
             description: "Please create or select a process map first",
@@ -334,8 +341,16 @@ export default function DevelopmentMaps() {
 
     const handleDoubleClick = (e: any) => {
       // Handle text editing on double-click
-      if (e.target && (e.target as any).processId) {
-        editSymbolText(e.target);
+      let targetElement = e.target;
+      
+      // If clicking on a shape within a group, get the group
+      if (targetElement && (targetElement as any).group) {
+        targetElement = (targetElement as any).group;
+      }
+      
+      // Check if the target (or its group) has a processId
+      if (targetElement && (targetElement as any).processId) {
+        editSymbolText(targetElement);
       }
     };
 
@@ -728,6 +743,7 @@ export default function DevelopmentMaps() {
         // When editing ends, update the element state
         textObject.on('editing:exited', () => {
           const processId = (symbolGroup as any).processId;
+          
           if (processId) {
             setElements(prev => prev.map(el => 
               el.id === processId 
@@ -740,7 +756,14 @@ export default function DevelopmentMaps() {
           textObject.selectable = false;
           textObject.evented = false;
           canvas.discardActiveObject();
+          
+          // Force canvas re-render to ensure text changes are visible
           canvas.requestRenderAll();
+          
+          // Additional force render after a small delay to ensure visibility
+          setTimeout(() => {
+            canvas.renderAll();
+          }, 10);
         });
       } catch (error) {
         console.warn('Could not enter text editing mode:', error);
@@ -753,8 +776,9 @@ export default function DevelopmentMaps() {
 
   // Handle symbol selection from toolbar
   const handleSymbolSelect = (symbolType: string) => {
-    // Check if a process map is selected first
-    if (!currentProcessMap) {
+    // Check if a process map is selected first (check both state and ref for robustness)
+    const hasProcessMap = currentProcessMap || currentProcessMapRef.current;
+    if (!hasProcessMap) {
       toast({
         title: "No Process Map Selected",
         description: "Please create a new process map or select an existing one before placing symbols",
@@ -1043,6 +1067,7 @@ export default function DevelopmentMaps() {
       // Clear current process map if it was deleted
       if (currentProcessMap?.id === processMapToDelete?.id) {
         setCurrentProcessMap(null);
+        currentProcessMapRef.current = null;
         clearCanvas();
       }
       
@@ -1089,6 +1114,7 @@ export default function DevelopmentMaps() {
     
     try {
       setCurrentProcessMap(processMap);
+      currentProcessMapRef.current = processMap;
       
       // Clear canvas state first
       setElements([]);
