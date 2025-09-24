@@ -403,7 +403,8 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
         delete issueData.assigneeId;
       }
       
-      templateValidated = insertIssueSchema.parse(issueData);
+      // For issues, use the database fields directly instead of type-specific validation
+      templateValidated = issueData;
       description = templateValidated.description || templateValidated.title || 'Issue description';
       break;
     case 'deficiency':
