@@ -32,6 +32,7 @@ interface UserDashboardMetrics {
   pendingTasks: number;
   openIssues: number;
   initiativesByPhase: Record<string, number>;
+  filterType?: 'all' | 'assigned_only' | 'my_initiatives' | 'exclude_owned_only';
 }
 
 interface Project {
@@ -74,10 +75,16 @@ function getProjectStatusColor(status: string) {
 export default function Dashboard() {
   const [editingProject, setEditingProject] = useState<string | null>(null);
   const [editData, setEditData] = useState<{ status: string; name: string }>({ status: '', name: '' });
+  const [filterType, setFilterType] = useState<'all' | 'assigned_only' | 'my_initiatives' | 'exclude_owned_only'>('assigned_only');
   const { toast } = useToast();
 
   const { data: userMetrics, isLoading: isLoadingMetrics } = useQuery<UserDashboardMetrics>({
-    queryKey: ['/api/my/dashboard-metrics'],
+    queryKey: ['/api/my/dashboard-metrics', filterType],
+    queryFn: async () => {
+      const response = await fetch(`/api/my/dashboard-metrics?filterType=${filterType}`);
+      if (!response.ok) throw new Error('Failed to fetch dashboard metrics');
+      return response.json();
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -238,7 +245,23 @@ export default function Dashboard() {
         <Card className="col-span-1 md:col-span-2 lg:col-span-4">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Change Process Flow</CardTitle>
+              <div className="flex flex-col space-y-2">
+                <CardTitle>Change Process Flow</CardTitle>
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-muted-foreground">Filter initiatives:</span>
+                  <Select value={filterType} onValueChange={(value: 'all' | 'assigned_only' | 'my_initiatives' | 'exclude_owned_only') => setFilterType(value)} data-testid="select-filter-type">
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Select filter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="assigned_only">My Assigned Initiatives</SelectItem>
+                      <SelectItem value="my_initiatives">Team Member Initiatives</SelectItem>
+                      <SelectItem value="exclude_owned_only">Explicitly Assigned Only</SelectItem>
+                      <SelectItem value="all">All Accessible Initiatives</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <Button variant="ghost" size="sm" data-testid="button-view-details" onClick={() => window.location.href = '/change-process-flow'}>
                 View Details
               </Button>

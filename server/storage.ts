@@ -2516,27 +2516,7 @@ export class DatabaseStorage implements IStorage {
     return Number(result.count);
   }
 
-  async getUserInitiativesByPhase(userId: string): Promise<Record<string, number>> {
-    // Get user's authorized projects, then count ALL active initiatives in those projects for any role
-    const userProjectIds = await this.getUserAuthorizedProjectIds(userId);
-    if (userProjectIds.length === 0) {
-      return {
-        'identify_need': 0,
-        'identify_stakeholders': 0,
-        'develop_change': 0,
-        'implement_change': 0,
-        'reinforce_change': 0
-      };
-    }
-    
-    const authorizedProjects = await db.select()
-      .from(projects)
-      .where(and(
-        inArray(projects.id, userProjectIds),
-        ne(projects.status, 'completed'),
-        ne(projects.status, 'cancelled')
-      ));
-    
+  async getUserInitiativesByPhase(userId: string, filterType: 'all' | 'assigned_only' | 'my_initiatives' | 'exclude_owned_only' = 'assigned_only'): Promise<Record<string, number>> {
     const phaseCount: Record<string, number> = {
       'identify_need': 0,
       'identify_stakeholders': 0,
@@ -2544,8 +2524,74 @@ export class DatabaseStorage implements IStorage {
       'implement_change': 0,
       'reinforce_change': 0
     };
+
+    let relevantProjects: any[] = [];
+
+    switch (filterType) {
+      case 'all':
+        // Original logic: Get ALL authorized projects (owned + assigned)
+        const userProjectIds = await this.getUserAuthorizedProjectIds(userId);
+        if (userProjectIds.length === 0) return phaseCount;
+        
+        relevantProjects = await db.select()
+          .from(projects)
+          .where(and(
+            inArray(projects.id, userProjectIds),
+            ne(projects.status, 'completed'),
+            ne(projects.status, 'cancelled')
+          ));
+        break;
+
+      case 'assigned_only':
+        // Solution 1: Only projects where user has active assignments
+        const assignedProjectIds = await db.select({ projectId: userInitiativeAssignments.projectId })
+          .from(userInitiativeAssignments)
+          .where(eq(userInitiativeAssignments.userId, userId));
+        
+        if (assignedProjectIds.length === 0) return phaseCount;
+        
+        relevantProjects = await db.select()
+          .from(projects)
+          .where(and(
+            inArray(projects.id, assignedProjectIds.map(p => p.projectId)),
+            ne(projects.status, 'completed'),
+            ne(projects.status, 'cancelled')
+          ));
+        break;
+
+      case 'my_initiatives':
+        // Solution 2: Only projects specifically assigned to user as team member
+        const myInitiativeProjects = await db.select()
+          .from(projects)
+          .innerJoin(userInitiativeAssignments, eq(userInitiativeAssignments.projectId, projects.id))
+          .where(and(
+            eq(userInitiativeAssignments.userId, userId),
+            ne(projects.status, 'completed'),
+            ne(projects.status, 'cancelled')
+          ));
+        
+        relevantProjects = myInitiativeProjects.map(p => p.projects);
+        break;
+
+      case 'exclude_owned_only':
+        // Solution 3: Only explicitly assigned projects (exclude owned-but-not-assigned)
+        const explicitlyAssignedIds = await db.select({ projectId: userInitiativeAssignments.projectId })
+          .from(userInitiativeAssignments)
+          .where(eq(userInitiativeAssignments.userId, userId));
+        
+        if (explicitlyAssignedIds.length === 0) return phaseCount;
+        
+        relevantProjects = await db.select()
+          .from(projects)
+          .where(and(
+            inArray(projects.id, explicitlyAssignedIds.map(p => p.projectId)),
+            ne(projects.status, 'completed'),
+            ne(projects.status, 'cancelled')
+          ));
+        break;
+    }
     
-    authorizedProjects.forEach(project => {
+    relevantProjects.forEach(project => {
       const phase = project.currentPhase || 'identify_need';
       if (phaseCount.hasOwnProperty(phase)) {
         phaseCount[phase]++;

@@ -3819,13 +3819,14 @@ Return the refined content in JSON format:
   app.get("/api/my/dashboard-metrics", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
+      const filterType = (req.query.filterType as 'all' | 'assigned_only' | 'my_initiatives' | 'exclude_owned_only') || 'assigned_only';
       
       const [activeInitiatives, pendingSurveys, pendingTasks, openIssues, initiativesByPhase] = await Promise.all([
         storage.getUserActiveInitiatives(userId),
         storage.getUserPendingSurveys(userId),
         storage.getUserPendingTasks(userId),
         storage.getUserOpenIssues(userId),
-        storage.getUserInitiativesByPhase(userId)
+        storage.getUserInitiativesByPhase(userId, filterType)
       ]);
 
       res.json({
@@ -3833,7 +3834,8 @@ Return the refined content in JSON format:
         pendingSurveys,
         pendingTasks,
         openIssues,
-        initiativesByPhase
+        initiativesByPhase,
+        filterType // Include the filter type so frontend knows what was applied
       });
     } catch (error) {
       console.error("Error fetching user dashboard metrics:", error);
