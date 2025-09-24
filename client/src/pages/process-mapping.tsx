@@ -647,7 +647,29 @@ export default function DevelopmentMaps() {
         linkedItemId: linkedItemId,
       };
       
-      setElements(prev => [...prev, newElement]);
+      setElements(prev => {
+        const updatedElements = [...prev, newElement];
+        
+        // Auto-save to database when element is added
+        if (currentProcessMap?.id) {
+          const canvasData = JSON.stringify(canvas.toJSON());
+          const updateData = {
+            canvasData: canvasData,
+            elements: updatedElements,
+            connections: connections,
+          };
+
+          apiRequest('PUT', `/api/process-maps/${currentProcessMap.id}`, updateData)
+            .then(() => {
+              queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'process-maps'] });
+            })
+            .catch((error) => {
+              console.error("Error auto-saving process map:", error);
+            });
+        }
+        
+        return updatedElements;
+      });
       canvas.renderAll();
     }
   };

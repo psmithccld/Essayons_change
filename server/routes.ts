@@ -1632,7 +1632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const validatedData = insertTaskSchema.parse(processedData);
-      const task = await storage.createTask(validatedData);
+      const task = await storage.createTask(validatedData, req.organizationId!);
       
       // Send email notification if task is assigned (internal user or external email)
       if (task.assigneeId || task.assigneeEmail) {
