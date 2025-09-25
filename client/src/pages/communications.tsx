@@ -39,7 +39,8 @@ import {
   Users2,
   Timer,
   CheckSquare,
-  Archive
+  Archive,
+  Check
 } from "lucide-react";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -51,11 +52,12 @@ import { type CommunicationStrategy, type CommunicationTemplate, type Communicat
 import { z } from "zod";
 import CommunicationRepository from "@/components/CommunicationRepository";
 
-// P2P Emails Execution Module Component
-function P2PEmailsExecutionModule() {
+// Emails Execution Module Component (Consolidates P2P and Group Emails)
+function EmailsExecutionModule() {
   const { currentProject } = useCurrentProject();
   const { user } = useAuth();
   const [activeView, setActiveView] = useState<'repository' | 'create' | 'manage'>('repository');
+  const [emailType, setEmailType] = useState<'point_to_point_email' | 'group_email'>('point_to_point_email');
   const [selectedTemplate, setSelectedTemplate] = useState<CommunicationTemplate | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -70,6 +72,8 @@ function P2PEmailsExecutionModule() {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [recipientRole, setRecipientRole] = useState('');
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
+  const [recipientInput, setRecipientInput] = useState('');
   const [selectedRaidLogs, setSelectedRaidLogs] = useState<string[]>([]);
   const [tone, setTone] = useState('professional');
   const [urgency, setUrgency] = useState('normal');
@@ -78,9 +82,9 @@ function P2PEmailsExecutionModule() {
   const [visibility, setVisibility] = useState('private');
   const { toast } = useToast();
 
-  // Fetch communication templates for P2P emails
+  // Fetch communication templates based on email type
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
-    queryKey: ['/api/communication-templates/category/p2p_email']
+    queryKey: ['/api/communication-templates/category', emailType === 'point_to_point_email' ? 'p2p_email' : 'email']
   });
 
   // Fetch created P2P emails
@@ -90,6 +94,8 @@ function P2PEmailsExecutionModule() {
   });
 
   const p2pEmails = communications.filter((comm: Communication) => comm.type === 'point_to_point_email');
+  const groupEmails = communications.filter((comm: Communication) => comm.type === 'group_email');
+  const allEmails = [...p2pEmails, ...groupEmails].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // Fetch stakeholders for recipient selection
   const { data: stakeholders = [], isLoading: stakeholdersLoading } = useQuery({
@@ -103,19 +109,20 @@ function P2PEmailsExecutionModule() {
     enabled: !!currentProject?.id
   });
 
-  // Create P2P email mutation - Modified to save AND send automatically
-  const createP2PEmailMutation = useMutation({
+  // Create email mutation - handles both P2P and group emails
+  const createEmailMutation = useMutation({
     mutationFn: (data: any) => apiRequest('POST', `/api/projects/${currentProject?.id}/communications`, {
       ...data,
-      type: 'point_to_point_email',
+      type: emailType,
       status: 'draft'
     }),
     onSuccess: async (newEmail) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
       
       // Don't auto-send - just save the email successfully
+      const emailTypeLabel = emailType === 'point_to_point_email' ? 'Personal email' : 'Group email';
       toast({ 
-        title: "Personal email saved successfully", 
+        title: `${emailTypeLabel} saved successfully`, 
         description: `Email saved to repository. You can send it from the repository when ready.` 
       });
       
@@ -125,9 +132,12 @@ function P2PEmailsExecutionModule() {
       setRecipientEmail('');
       setRecipientName('');
       setRecipientRole('');
+      setSelectedRecipients([]);
+      setRecipientInput('');
     },
     onError: () => {
-      toast({ title: "Failed to create P2P email", variant: "destructive" });
+      const emailTypeLabel = emailType === 'point_to_point_email' ? 'personal email' : 'group email';
+      toast({ title: `Failed to create ${emailTypeLabel}`, variant: "destructive" });
     }
   });
 
@@ -186,9 +196,36 @@ function P2PEmailsExecutionModule() {
   });
 
   const handleStakeholderSelect = (stakeholder: any) => {
-    setRecipientEmail(stakeholder.email || '');
-    setRecipientName(stakeholder.name || '');
-    setRecipientRole(stakeholder.role || '');
+    if (emailType === 'point_to_point_email') {
+      // For personal emails, replace the current recipient
+      setRecipientEmail(stakeholder.email || '');
+      setRecipientName(stakeholder.name || '');
+      setRecipientRole(stakeholder.role || '');
+    } else {
+      // For group emails, add to the recipients list if not already included
+      const email = stakeholder.email || '';
+      if (email && !selectedRecipients.includes(email)) {
+        setSelectedRecipients([...selectedRecipients, email]);
+      }
+    }
+  };
+
+  const handleAddRecipient = () => {
+    const email = recipientInput.trim();
+    if (email && !selectedRecipients.includes(email)) {
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailRegex.test(email)) {
+        setSelectedRecipients([...selectedRecipients, email]);
+        setRecipientInput('');
+      } else {
+        toast({ title: "Please enter a valid email address", variant: "destructive" });
+      }
+    }
+  };
+
+  const handleRemoveRecipient = (emailToRemove: string) => {
+    setSelectedRecipients(selectedRecipients.filter(email => email !== emailToRemove));
   };
 
   const handleGenerateP2PContent = () => {
@@ -258,7 +295,7 @@ function P2PEmailsExecutionModule() {
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <User className="w-5 h-5" />
-            <span>Person-to-Person Emails</span>
+            <span>Emails</span>
           </div>
           <div className="flex space-x-2">
             <Button
@@ -396,77 +433,199 @@ function P2PEmailsExecutionModule() {
               </Button>
             </div>
 
+            {/* Email Type Selection */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">1. Choose Email Type</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="email-type">Email Type</Label>
+                  <Select value={emailType} onValueChange={(value: 'point_to_point_email' | 'group_email') => setEmailType(value)}>
+                    <SelectTrigger data-testid="select-email-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="point_to_point_email">Personal Email - Send to one person</SelectItem>
+                      <SelectItem value="group_email">Group Email - Send to multiple recipients</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Recipient Selection */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">1. Select Recipient</CardTitle>
+                <CardTitle className="text-base">2. Select Recipient{emailType === 'group_email' ? 's' : ''}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="recipient-email">Recipient Email</Label>
-                    <Input
-                      id="recipient-email"
-                      type="email"
-                      placeholder="Enter email address"
-                      value={recipientEmail}
-                      onChange={(e) => setRecipientEmail(e.target.value)}
-                      data-testid="input-recipient-email"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="recipient-name">Recipient Name</Label>
-                    <Input
-                      id="recipient-name"
-                      placeholder="Enter recipient name"
-                      value={recipientName}
-                      onChange={(e) => setRecipientName(e.target.value)}
-                      data-testid="input-recipient-name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="recipient-role">Role (Optional)</Label>
-                    <Input
-                      id="recipient-role"
-                      placeholder="e.g., Department Manager"
-                      value={recipientRole}
-                      onChange={(e) => setRecipientRole(e.target.value)}
-                      data-testid="input-recipient-role"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="relationship">Relationship</Label>
-                    <Select value={relationship} onValueChange={setRelationship}>
-                      <SelectTrigger data-testid="select-relationship">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="colleague">Colleague</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="stakeholder">Stakeholder</SelectItem>
-                        <SelectItem value="external">External Contact</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Stakeholder Quick Select */}
-                {stakeholders.length > 0 && (
-                  <div>
-                    <Label className="text-sm">Or select from stakeholders:</Label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {stakeholders.slice(0, 5).map((stakeholder: any) => (
-                        <Button
-                          key={stakeholder.id}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleStakeholderSelect(stakeholder)}
-                          data-testid={`button-select-stakeholder-${stakeholder.id}`}
-                        >
-                          {stakeholder.name}
-                        </Button>
-                      ))}
+                {emailType === 'point_to_point_email' ? (
+                  // Single recipient for personal emails
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="recipient-email">Recipient Email</Label>
+                      <Input
+                        id="recipient-email"
+                        type="email"
+                        placeholder="Enter email address"
+                        value={recipientEmail}
+                        onChange={(e) => setRecipientEmail(e.target.value)}
+                        data-testid="input-recipient-email"
+                      />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="recipient-name">Recipient Name</Label>
+                      <Input
+                        id="recipient-name"
+                        placeholder="Enter recipient name"
+                        value={recipientName}
+                        onChange={(e) => setRecipientName(e.target.value)}
+                        data-testid="input-recipient-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="recipient-role">Role (Optional)</Label>
+                      <Input
+                        id="recipient-role"
+                        placeholder="e.g., Department Manager"
+                        value={recipientRole}
+                        onChange={(e) => setRecipientRole(e.target.value)}
+                        data-testid="input-recipient-role"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="relationship">Relationship</Label>
+                      <Select value={relationship} onValueChange={setRelationship}>
+                        <SelectTrigger data-testid="select-relationship">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="colleague">Colleague</SelectItem>
+                          <SelectItem value="manager">Manager</SelectItem>
+                          <SelectItem value="stakeholder">Stakeholder</SelectItem>
+                          <SelectItem value="external">External Contact</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                ) : (
+                  // Multiple recipients for group emails
+                  <div className="space-y-4">
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <Label htmlFor="group-recipient-input">Add Recipients</Label>
+                        <Input
+                          id="group-recipient-input"
+                          type="email"
+                          placeholder="Enter email address and press Enter"
+                          value={recipientInput}
+                          onChange={(e) => setRecipientInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddRecipient();
+                            }
+                          }}
+                          data-testid="input-group-recipients"
+                        />
+                      </div>
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        onClick={handleAddRecipient}
+                        disabled={!recipientInput.trim()}
+                        data-testid="button-add-recipient"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add
+                      </Button>
+                    </div>
+                    
+                    {/* Selected Recipients */}
+                    {selectedRecipients.length > 0 && (
+                      <div>
+                        <Label className="text-sm">Selected Recipients ({selectedRecipients.length})</Label>
+                        <div className="flex flex-wrap gap-2 mt-2 p-3 border rounded-lg">
+                          {selectedRecipients.map((email, index) => (
+                            <div 
+                              key={index}
+                              className="flex items-center gap-1 bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm"
+                              data-testid={`recipient-chip-${index}`}
+                            >
+                              <span>{email}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                                onClick={() => handleRemoveRecipient(email)}
+                                data-testid={`button-remove-recipient-${index}`}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Quick Select from Users and Stakeholders */}
+                {(users.length > 0 || stakeholders.length > 0) && (
+                  <div className="space-y-3">
+                    <Label className="text-sm">
+                      {emailType === 'group_email' ? 'Quick add from users and stakeholders:' : 'Or select from users and stakeholders:'}
+                    </Label>
+                    
+                    {users.length > 0 && (
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Users:</Label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {users.slice(0, 6).map((user: any) => (
+                            <Button
+                              key={`user-${user.id}`}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUserSelect(user)}
+                              disabled={emailType === 'group_email' && selectedRecipients.includes(user.email)}
+                              data-testid={`button-select-user-${user.id}`}
+                            >
+                              <User className="w-3 h-3 mr-1" />
+                              {user.name}
+                              {emailType === 'group_email' && selectedRecipients.includes(user.email) && (
+                                <Check className="w-3 h-3 ml-1" />
+                              )}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {stakeholders.length > 0 && (
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Stakeholders:</Label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {stakeholders.slice(0, 6).map((stakeholder: any) => (
+                            <Button
+                              key={`stakeholder-${stakeholder.id}`}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleStakeholderSelect(stakeholder)}
+                              disabled={emailType === 'group_email' && selectedRecipients.includes(stakeholder.email)}
+                              data-testid={`button-select-stakeholder-${stakeholder.id}`}
+                            >
+                              <Users className="w-3 h-3 mr-1" />
+                              {stakeholder.name}
+                              {emailType === 'group_email' && selectedRecipients.includes(stakeholder.email) && (
+                                <Check className="w-3 h-3 ml-1" />
+                              )}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -475,7 +634,7 @@ function P2PEmailsExecutionModule() {
             {/* Communication Settings */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">2. Communication Settings</CardTitle>
+                <CardTitle className="text-base">3. Communication Settings</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -528,7 +687,7 @@ function P2PEmailsExecutionModule() {
             {/* Privacy Settings */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">3. Privacy & Visibility</CardTitle>
+                <CardTitle className="text-base">4. Privacy & Visibility</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -1867,88 +2026,38 @@ function MeetingsExecutionModule() {
   );
 }
 
-// Group Emails Execution Module Component
-function GroupEmailsExecutionModule() {
+// Flyers Execution Module Component
+function FlyersExecutionModule() {
   const { currentProject } = useCurrentProject();
   const [activeView, setActiveView] = useState<'repository' | 'create' | 'manage'>('repository');
   const [selectedTemplate, setSelectedTemplate] = useState<CommunicationTemplate | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [emailContent, setEmailContent] = useState({ title: '', content: '', callToAction: '' });
-  const [currentEmail, setCurrentEmail] = useState<Communication | null>(null);
+  const [flyerContent, setFlyerContent] = useState({ title: '', content: '', callToAction: '' });
+  const [currentFlyer, setCurrentFlyer] = useState<Communication | null>(null);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showDistributeModal, setShowDistributeModal] = useState(false);
-  const [distributionEmail, setDistributionEmail] = useState<Communication | null>(null);
-  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
-  const [recipientInput, setRecipientInput] = useState('');
-  const [selectedRaidLogs, setSelectedRaidLogs] = useState<string[]>([]);
-  const [tone, setTone] = useState('professional');
-  const [urgency, setUrgency] = useState('normal');
+  const [distributionFlyer, setDistributionFlyer] = useState<Communication | null>(null);
   const { toast } = useToast();
 
-  // Fetch communication templates for group emails
+  // Fetch communication templates
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
-    queryKey: ['/api/communication-templates/category/email']
+    queryKey: ['/api/communication-templates/category/flyer']
   });
 
-  // Fetch created group emails
-  const { data: communications = [], isLoading: communicationsLoading } = useQuery({
+  // Fetch created flyers
+  const { data: flyers = [], isLoading: flyersLoading } = useQuery({
     queryKey: ['/api/projects', currentProject?.id, 'communications'],
     enabled: !!currentProject?.id
   });
 
-  const groupEmails = communications.filter((comm: Communication) => comm.type === 'group_email');
+  const flyerFlyers = flyers.filter((comm: Communication) => comm.type === 'flyer');
 
-  // Fetch stakeholders for recipient selection
-  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useQuery({
-    queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
-    enabled: !!currentProject?.id
-  });
-
-  // Fetch RAID logs for context integration
-  const { data: raidLogs = [], isLoading: raidLogsLoading } = useQuery({
-    queryKey: ['/api/projects', currentProject?.id, 'raid-logs'],
-    enabled: !!currentProject?.id
-  });
-
-  // Create group email mutation
-  const createEmailMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', `/api/projects/${currentProject?.id}/communications`, {
-      ...data,
-      type: 'group_email',
-      status: 'draft'
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
-      toast({ title: "Group email created successfully" });
-      setShowCreateModal(false);
-      setEmailContent({ title: '', content: '', callToAction: '' });
-      setSelectedRaidLogs([]);
-      setSelectedRecipients([]);
-    },
-    onError: () => {
-      toast({ title: "Failed to create group email", variant: "destructive" });
-    }
-  });
-
-  // GPT content generation for group emails
-  const generateContentMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', '/api/gpt/generate-group-email-content', data),
-    onSuccess: (content) => {
-      setEmailContent(content);
-      setIsGeneratingContent(false);
-      toast({ title: "Email content generated successfully" });
-    },
-    onError: () => {
-      setIsGeneratingContent(false);
-      toast({ title: "Failed to generate email content", variant: "destructive" });
-    }
-  });
-
-  // Distribution mutation
+  // Create flyer mutation
+  const createFlyerMutation = useMutation({
   const distributeEmailMutation = useMutation({
     mutationFn: ({ emailId, recipients, dryRun }: { 
       emailId: string; 
@@ -2030,16 +2139,59 @@ function GroupEmailsExecutionModule() {
       return;
     }
 
-    createEmailMutation.mutate({
+    // Validate recipients based on email type
+    if (emailType === 'point_to_point_email') {
+      if (!recipientEmail || !recipientName) {
+        toast({ title: "Please specify recipient details", variant: "destructive" });
+        return;
+      }
+    } else {
+      if (selectedRecipients.length === 0) {
+        toast({ title: "Please add at least one recipient for group email", variant: "destructive" });
+        return;
+      }
+    }
+
+    // Prepare data based on email type
+    const emailData = {
       title: emailContent.title,
       content: emailContent.content,
-      targetAudience: ['All Staff'],
       templateId: selectedTemplate?.id || null,
       raidLogReferences: selectedRaidLogs,
       isGptGenerated: isGeneratingContent,
-      distributionMethod: 'email',
-      visibilitySettings: 'public'
-    });
+      visibilitySettings: visibility,
+    };
+
+    if (emailType === 'point_to_point_email') {
+      // For personal emails
+      Object.assign(emailData, {
+        targetAudience: [recipientName],
+        metadata: {
+          recipientEmail,
+          recipientName,
+          recipientRole,
+          communicationPurpose,
+          relationship,
+          tone,
+          urgency,
+          senderEmail: user?.email
+        }
+      });
+    } else {
+      // For group emails
+      Object.assign(emailData, {
+        targetAudience: selectedRecipients,
+        metadata: {
+          communicationPurpose,
+          tone,
+          urgency,
+          senderEmail: user?.email,
+          recipientCount: selectedRecipients.length
+        }
+      });
+    }
+
+    createEmailMutation.mutate(emailData);
   };
 
   const handleAddRecipient = () => {
@@ -4169,8 +4321,7 @@ export default function Communications() {
             <TabsContent value="execution" className="space-y-6" data-testid="execution-content">
               <div className="space-y-6">
                 <MeetingsExecutionModule />
-                <P2PEmailsExecutionModule />
-                <GroupEmailsExecutionModule />
+                <EmailsExecutionModule />
                 <FlyersExecutionModule />
               </div>
             </TabsContent>
