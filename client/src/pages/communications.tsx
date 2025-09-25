@@ -152,11 +152,13 @@ function P2PEmailsExecutionModule() {
   const generateP2PContentMutation = useMutation({
     mutationFn: (data: any) => apiRequest('POST', '/api/gpt/generate-p2p-email-content', data),
     onSuccess: (content) => {
+      console.log('Generated content received:', content);
       setEmailContent(content);
       setIsGeneratingContent(false);
       toast({ title: "Personal email content generated successfully" });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('P2P content generation error:', error);
       setIsGeneratingContent(false);
       toast({ title: "Failed to generate personal email content", variant: "destructive" });
     }

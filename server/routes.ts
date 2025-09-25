@@ -2219,7 +2219,7 @@ Return the refined content in JSON format:
 
       const { openai } = await import("./openai");
       const response = await openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
       });
@@ -2292,7 +2292,7 @@ Return the refined content in JSON format:
 
       const { openai } = await import("./openai");
       const response = await openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
       });
@@ -2382,7 +2382,7 @@ Return the content in JSON format:
 
       const { openai } = await import("./openai");
       const response = await openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
       });
@@ -2447,7 +2447,7 @@ Return the refined content in JSON format:
 
       const { openai } = await import("./openai");
       const response = await openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
       });
