@@ -2583,13 +2583,13 @@ function FlyersExecutionModule() {
                   </Card>
                   <Card className="p-4 text-center">
                     <div className="text-2xl font-bold text-[#832c2c]">
-                      {groupEmails.filter(e => e.status === 'draft').length}
+                      {0}
                     </div>
                     <div className="text-sm text-muted-foreground">Drafts</div>
                   </Card>
                   <Card className="p-4 text-center">
                     <div className="text-2xl font-bold text-[#832c2c]">
-                      {groupEmails.filter(e => e.isGptGenerated).length}
+                      {0}
                     </div>
                     <div className="text-sm text-muted-foreground">AI Generated</div>
                   </Card>
