@@ -685,27 +685,26 @@ export const changeArtifacts = pgTable("change_artifacts", {
   filename: text("filename").notNull(), // System filename (unique)
   originalFilename: text("original_filename").notNull(), // User's original filename
   fileSize: integer("file_size").notNull(), // File size in bytes
-  mimeType: text("mime_type").notNull(), // File MIME type (application/pdf, image/png, etc.)
-  fileUrl: text("file_url").notNull(), // Storage path/URL
+  contentType: text("content_type").notNull(), // File MIME type (application/pdf, image/png, etc.)
+  filePath: text("file_path").notNull(), // Storage path/URL
+  objectPath: text("object_path").notNull(), // Object storage path
   description: text("description"), // User-provided description
   tags: text("tags").array().default([]), // Searchable tags
   category: text("category").default("general"), // document, image, template, presentation, other
-  version: integer("version").default(1), // Version tracking
+  versionNumber: integer("version_number").default(1), // Version tracking
   isActive: boolean("is_active").default(true), // Soft delete capability
-  accessLevel: text("access_level").notNull().default("project"), // project, public, restricted
-  downloadCount: integer("download_count").default(0), // Usage tracking
+  accessCount: integer("access_count").default(0), // Usage tracking
   lastAccessedAt: timestamp("last_accessed_at"), // Last download/view time
   uploadedById: uuid("uploaded_by_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+  isPublic: boolean("is_public").default(false),
   metadata: jsonb("metadata").default({}), // Extended metadata (upload client, processing info, etc.)
 }, (table) => ({
   // Performance indexes for artifact queries
   projectIdIdx: index("change_artifacts_project_id_idx").on(table.projectId),
   categoryIdx: index("change_artifacts_category_idx").on(table.category),
-  accessLevelIdx: index("change_artifacts_access_level_idx").on(table.accessLevel),
   uploadedByIdx: index("change_artifacts_uploaded_by_idx").on(table.uploadedById),
-  createdAtIdx: index("change_artifacts_created_at_idx").on(table.createdAt),
+  uploadedAtIdx: index("change_artifacts_uploaded_at_idx").on(table.uploadedAt),
   // Composite indexes for common queries
   projectCategoryIdx: index("change_artifacts_project_category_idx").on(table.projectId, table.category),
   projectActiveIdx: index("change_artifacts_project_active_idx").on(table.projectId, table.isActive),

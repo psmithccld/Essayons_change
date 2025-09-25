@@ -5852,6 +5852,80 @@ export class DatabaseStorage implements IStorage {
       }, {} as Record<string, number>),
     };
   }
+
+  // Change Artifacts
+  async getChangeArtifactsByProject(projectId: string): Promise<ChangeArtifact[]> {
+    return await db.select().from(changeArtifacts)
+      .where(and(eq(changeArtifacts.projectId, projectId), eq(changeArtifacts.isActive, true)))
+      .orderBy(desc(changeArtifacts.createdAt));
+  }
+
+  async getChangeArtifact(id: string): Promise<ChangeArtifact | undefined> {
+    const [artifact] = await db.select().from(changeArtifacts).where(eq(changeArtifacts.id, id));
+    return artifact || undefined;
+  }
+
+  async createChangeArtifact(artifact: InsertChangeArtifact): Promise<ChangeArtifact> {
+    const [created] = await db.insert(changeArtifacts).values(artifact).returning();
+    return created;
+  }
+
+  async updateChangeArtifact(id: string, updateData: Partial<InsertChangeArtifact>): Promise<ChangeArtifact | undefined> {
+    const [updated] = await db.update(changeArtifacts)
+      .set(updateData)
+      .where(eq(changeArtifacts.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteChangeArtifact(id: string): Promise<boolean> {
+    const result = await db.delete(changeArtifacts).where(eq(changeArtifacts.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async searchChangeArtifacts(params: {
+    projectId?: string;
+    category?: string;
+    tags?: string[];
+    query?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ artifacts: ChangeArtifact[]; total: number; }> {
+    const { projectId, category, tags, query, limit = 50, offset = 0 } = params;
+    
+    let conditions: any[] = [eq(changeArtifacts.isActive, true)];
+    
+    if (projectId) {
+      conditions.push(eq(changeArtifacts.projectId, projectId));
+    }
+    
+    if (category) {
+      conditions.push(eq(changeArtifacts.category, category));
+    }
+    
+    if (query) {
+      conditions.push(
+        or(
+          sql`${changeArtifacts.filename} ILIKE ${'%' + query + '%'}`,
+          sql`${changeArtifacts.description} ILIKE ${'%' + query + '%'}`
+        )
+      );
+    }
+    
+    const artifacts = await db.select().from(changeArtifacts)
+      .where(and(...conditions))
+      .orderBy(desc(changeArtifacts.uploadedAt))
+      .limit(limit)
+      .offset(offset);
+    
+    const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(changeArtifacts)
+      .where(and(...conditions));
+    
+    return {
+      artifacts,
+      total: Number(count) || 0
+    };
+  }
 }
 
 export const storage = new DatabaseStorage();
