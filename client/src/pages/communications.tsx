@@ -113,28 +113,11 @@ function P2PEmailsExecutionModule() {
     onSuccess: async (newEmail) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
       
-      // Automatically send the email after saving
-      try {
-        const sendResult = await apiRequest('POST', `/api/communications/${newEmail.id}/send-p2p`, {
-          recipientEmail,
-          recipientName,
-          visibility,
-          dryRun: false,
-          senderEmail: user?.email // Include sender email for CC
-        });
-        
-        toast({ 
-          title: "Personal email saved and sent successfully", 
-          description: `Email sent to ${recipientName} with copy to ${user?.email || 'sender'}` 
-        });
-      } catch (sendError) {
-        console.error('Failed to send email after saving:', sendError);
-        toast({ 
-          title: "Email saved but failed to send", 
-          description: "The email was saved to the repository but could not be sent automatically.",
-          variant: "destructive" 
-        });
-      }
+      // Don't auto-send - just save the email successfully
+      toast({ 
+        title: "Personal email saved successfully", 
+        description: `Email saved to repository. You can send it from the repository when ready.` 
+      });
       
       setShowCreateModal(false);
       setEmailContent({ title: '', content: '', callToAction: '' });

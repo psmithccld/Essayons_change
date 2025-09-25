@@ -1716,7 +1716,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select({ communication: communications })
       .from(communications)
       .innerJoin(projects, eq(communications.projectId, projects.id))
-      .where(and(eq(communications.type, 'p2p'), eq(projects.organizationId, organizationId)))
+      .where(and(eq(communications.type, 'point_to_point_email'), eq(projects.organizationId, organizationId)))
       .orderBy(desc(communications.createdAt))
       .then(results => results.map(r => r.communication));
   }

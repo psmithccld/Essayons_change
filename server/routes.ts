@@ -3150,9 +3150,9 @@ Return the refined content in JSON format:
   });
 
   // Communications
-  app.get("/api/projects/:projectId/communications", async (req, res) => {
+  app.get("/api/projects/:projectId/communications", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const communications = await storage.getCommunicationsByProject(req.params.projectId);
+      const communications = await storage.getCommunicationsByProject(req.params.projectId, req.organizationId!);
       res.json(communications);
     } catch (error) {
       console.error("Error fetching communications:", error);
