@@ -2620,6 +2620,7 @@ Return the refined content in JSON format:
   // P2P Email Sending - SECURITY: Requires individual email permission and proper auth
   app.post("/api/communications/:id/send-p2p", requireAuthAndPermission('canSendEmails'), async (req: AuthenticatedRequest, res: Response) => {
     try {
+      console.log(`[SEND-P2P] Route hit for communication ID: ${req.params.id}, user: ${req.userId}`);
       const { recipientEmail, recipientName, visibility, dryRun, senderEmail } = req.body;
 
       // Validate input
@@ -2643,7 +2644,7 @@ Return the refined content in JSON format:
       }
 
       // Get communication
-      const communication = await storage.getCommunication(req.params.id);
+      const communication = await storage.getCommunication(req.params.id, req.organizationId!);
       if (!communication) {
         return res.status(404).json({ error: "Communication not found" });
       }
