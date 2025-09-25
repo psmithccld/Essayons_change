@@ -132,7 +132,7 @@ export default function CommunicationRepository({ onCreateNew, onViewCommunicati
   // Fetch communication metrics
   const { data: metrics, isLoading: metricsLoading } = useQuery<CommunicationMetrics>({
     queryKey: ['/api/communications/metrics', currentProject?.id],
-    queryFn: () => apiRequest(`/api/communications/metrics?projectId=${currentProject?.id}`),
+    queryFn: () => apiRequest('GET', `/api/communications/metrics?projectId=${currentProject?.id}`),
     enabled: !!currentProject?.id
   });
 
@@ -161,7 +161,7 @@ export default function CommunicationRepository({ onCreateNew, onViewCommunicati
   const [selectedCommForVersions, setSelectedCommForVersions] = useState<string | null>(null);
   const { data: versionHistory, isLoading: versionsLoading } = useQuery({
     queryKey: ['/api/communications', selectedCommForVersions, 'versions'],
-    queryFn: () => apiRequest(`/api/communications/${selectedCommForVersions}/versions`),
+    queryFn: () => apiRequest('GET', `/api/communications/${selectedCommForVersions}/versions`),
     enabled: !!selectedCommForVersions
   });
 
