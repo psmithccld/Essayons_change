@@ -2684,9 +2684,9 @@ function FlyersExecutionModule() {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <h3 className="font-medium mb-2">Email: {distributionEmail?.title}</h3>
+                <h3 className="font-medium mb-2">Email: No Title</h3>
                 <p className="text-sm text-muted-foreground">
-                  {distributionEmail?.content.substring(0, 200)}...
+                  No content available...
                 </p>
               </div>
 
