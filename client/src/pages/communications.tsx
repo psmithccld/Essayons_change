@@ -2975,9 +2975,7 @@ function CommunicationChannelSettings() {
 
   // Orphaned template filtering removed for clean component structure
 
-  const filteredFlyers = flyerFlyers.filter((flyer: Communication) =>
-    flyer.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Orphaned flyer filtering removed for clean component structure
 
   // Distribution mutation with enhanced UX feedback
   const distributeFlyerMutation = useMutation({
