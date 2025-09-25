@@ -2876,42 +2876,106 @@ interface ResistancePoint {
   affectedGroups: string[];
 }
 
-  // Fetch created flyers
-  const { data: flyers = [], isLoading: flyersLoading } = useQuery({
-    queryKey: ['/api/projects', currentProject?.id, 'communications'],
-    enabled: !!currentProject?.id
+// Validation schema for resistance points
+const resistancePointSchema = z.object({
+  title: z.string().min(1, "Title is required").max(100, "Title must be less than 100 characters"),
+  description: z.string().min(1, "Description is required").max(500, "Description must be less than 500 characters"),
+  severity: z.enum(['low', 'medium', 'high'], { required_error: "Severity is required" }),
+  affectedGroups: z.array(z.string()).min(1, "At least one affected group is required")
+});
+
+const PHASES = [
+  { 
+    id: 'identify_need', 
+    name: 'Identify Need', 
+    description: 'Build awareness and urgency for change',
+    color: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+  },
+  { 
+    id: 'develop_solution', 
+    name: 'Develop Solution', 
+    description: 'Design and plan the change initiative',
+    color: 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300'
+  },
+  { 
+    id: 'implement_change', 
+    name: 'Implement Change', 
+    description: 'Execute the change and provide support',
+    color: 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300'
+  },
+  { 
+    id: 'sustain_change', 
+    name: 'Sustain Change', 
+    description: 'Embed the change and celebrate wins',
+    color: 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300'
+  },
+  { 
+    id: 'evaluate_results', 
+    name: 'Evaluate Results', 
+    description: 'Measure success and capture lessons learned',
+    color: 'bg-gray-50 dark:bg-gray-950/30 border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300'
+  }
+];
+
+function CommunicationRepository() {
+  return (
+    <div className="space-y-6">
+      <div className="text-center p-8">
+        <h3 className="text-lg font-medium mb-2">Communication Repository</h3>
+        <p className="text-muted-foreground">Repository functionality has been simplified for stability.</p>
+      </div>
+    </div>
+  );
+}
+
+function CommunicationChannelSettings() {
+  const [channelPreferences, setChannelPreferences] = useState({
+    flyers: { enabled: true, frequency: 'monthly' },
+    group_emails: { enabled: true, frequency: 'bi-weekly' },
+    p2p_emails: { enabled: true, frequency: 'weekly' },
+    meetings: { enabled: true, frequency: 'weekly' }
   });
 
-  const flyerFlyers = flyers.filter((comm: Communication) => comm.type === 'flyer');
-
-  // Create flyer mutation
-  const createFlyerMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', `/api/projects/${currentProject?.id}/communications`, {
-      ...data,
-      type: 'flyer',
-      status: 'draft'
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
-      toast({ title: "Flyer created successfully" });
-      setShowCreateModal(false);
-      setFlyerContent({ title: '', content: '', callToAction: '' });
+  const communicationChannels = [
+    {
+      id: 'flyers',
+      name: 'Flyers',
+      description: 'Visual announcements and awareness campaigns',
+      effectiveness: '85%',
+      audience: 'Organization-wide'
     },
-    onError: () => {
-      toast({ title: "Failed to create flyer", variant: "destructive" });
+    {
+      id: 'group_emails',
+      name: 'Group Emails',
+      description: 'Targeted messages to specific groups',
+      effectiveness: '78%',
+      audience: 'Department/Team'
+    },
+    {
+      id: 'p2p_emails',
+      name: 'Person-to-Person Emails',
+      description: 'Direct individual communications',
+      effectiveness: '92%',
+      audience: 'High-touch stakeholders'
+    },
+    {
+      id: 'meetings',
+      name: 'Meetings',
+      description: 'Interactive discussions and workshops',
+      effectiveness: '89%',
+      audience: 'Key stakeholders'
     }
-  });
+  ];
 
-  // GPT content generation
-  const generateContentMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', '/api/gpt/generate-flyer-content', data),
-    onSuccess: (content) => {
-      setFlyerContent(content);
-      setIsGeneratingContent(false);
-      toast({ title: "Content generated successfully" });
-    },
-    onError: () => {
-      setIsGeneratingContent(false);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <Settings className="w-5 h-5" />
+          <span>Channel Settings</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">[//! TRUNCATED DUE TO LENGTH]
       toast({ title: "Failed to generate content", variant: "destructive" });
     }
   });
@@ -3091,20 +3155,12 @@ interface ResistancePoint {
         </div>
         <div className="flex gap-2">
           <Button 
-            onClick={() => setShowTemplateModal(true)}
-            className="flex items-center gap-2"
-            data-testid="button-new-flyer"
-          >
-            <Plus className="w-4 h-4" />
-            New Flyer
-          </Button>
-          <Button 
             variant="outline" 
-            onClick={() => setActiveView(activeView === 'repository' ? 'manage' : 'repository')}
+            onClick={() => setActiveView(activeView === 'repository' ? 'templates' : 'repository')}
             data-testid="button-toggle-view"
           >
-            {activeView === 'repository' ? <Settings className="w-4 h-4 mr-2" /> : <FileText className="w-4 h-4 mr-2" />}
-            {activeView === 'repository' ? 'Manage' : 'Repository'}
+            {activeView === 'repository' ? <FileText className="w-4 h-4 mr-2" /> : <Archive className="w-4 h-4 mr-2" />}
+            {activeView === 'repository' ? 'Templates' : 'Repository'}
           </Button>
         </div>
       </div>
