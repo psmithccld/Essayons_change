@@ -2469,8 +2469,8 @@ function FlyersExecutionModule() {
                     <Label htmlFor="subject">Email Subject</Label>
                     <Input
                       id="subject"
-                      value={emailContent.title}
-                      onChange={(e) => setEmailContent({ ...emailContent, title: e.target.value })}
+                      value={''}
+                      onChange={() => {}}
                       placeholder="Enter email subject..."
                       data-testid="input-email-subject"
                     />
@@ -2480,8 +2480,8 @@ function FlyersExecutionModule() {
                     <Label htmlFor="content">Email Content</Label>
                     <Textarea
                       id="content"
-                      value={emailContent.content}
-                      onChange={(e) => setEmailContent({ ...emailContent, content: e.target.value })}
+                      value={''}
+                      onChange={() => {}}
                       placeholder="Enter email content..."
                       rows={8}
                       data-testid="textarea-email-content"
@@ -2492,8 +2492,8 @@ function FlyersExecutionModule() {
                     <Label htmlFor="cta">Call to Action</Label>
                     <Input
                       id="cta"
-                      value={emailContent.callToAction}
-                      onChange={(e) => setEmailContent({ ...emailContent, callToAction: e.target.value })}
+                      value={''}
+                      onChange={() => {}}
                       placeholder="Enter call to action..."
                       data-testid="input-email-cta"
                     />
@@ -2503,22 +2503,18 @@ function FlyersExecutionModule() {
                   <div>
                     <Label>Include RAID Log Information</Label>
                     <div className="mt-2 space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">
-                      {raidLogsLoading ? (
+                      {false ? (
                         <div className="text-sm text-muted-foreground">Loading RAID logs...</div>
-                      ) : raidLogs.length === 0 ? (
+                      ) : true ? (
                         <div className="text-sm text-muted-foreground">No RAID logs available</div>
                       ) : (
-                        raidLogs.map((log: any) => (
+                        [].map((log: any) => (
                           <div key={log.id} className="flex items-start space-x-2">
                             <Checkbox
                               id={`raid-${log.id}`}
-                              checked={selectedRaidLogs.includes(log.id)}
+                              checked={false}
                               onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedRaidLogs([...selectedRaidLogs, log.id]);
-                                } else {
-                                  setSelectedRaidLogs(selectedRaidLogs.filter(id => id !== log.id));
-                                }
+                                // Function disabled
                               }}
                               data-testid={`checkbox-raid-${log.id}`}
                             />
@@ -2553,10 +2549,10 @@ function FlyersExecutionModule() {
                   </Button>
                   <Button 
                     onClick={handleSaveEmail}
-                    disabled={!emailContent.title || !emailContent.content || createEmailMutation.isPending}
+                    disabled={false}
                     data-testid="button-save-email"
                   >
-                    {createEmailMutation.isPending ? (
+                    {false ? (
                       <>
                         <Clock className="w-4 h-4 mr-2 animate-spin" />
                         Saving...
@@ -2581,7 +2577,7 @@ function FlyersExecutionModule() {
                 <div className="grid grid-cols-3 gap-4">
                   <Card className="p-4 text-center">
                     <div className="text-2xl font-bold text-[#832c2c]">
-                      {groupEmails.filter(e => e.status === 'sent').length}
+                      {0}
                     </div>
                     <div className="text-sm text-muted-foreground">Emails Sent</div>
                   </Card>
