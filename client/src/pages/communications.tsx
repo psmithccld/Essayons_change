@@ -103,6 +103,11 @@ function EmailsExecutionModule() {
     enabled: !!currentProject?.id
   });
 
+  // Fetch users for recipient selection
+  const { data: users = [], isLoading: usersLoading } = useQuery({
+    queryKey: ['/api/users']
+  });
+
   // Fetch RAID logs for context integration
   const { data: raidLogs = [], isLoading: raidLogsLoading } = useQuery({
     queryKey: ['/api/projects', currentProject?.id, 'raid-logs'],
@@ -204,6 +209,21 @@ function EmailsExecutionModule() {
     } else {
       // For group emails, add to the recipients list if not already included
       const email = stakeholder.email || '';
+      if (email && !selectedRecipients.includes(email)) {
+        setSelectedRecipients([...selectedRecipients, email]);
+      }
+    }
+  };
+
+  const handleUserSelect = (user: any) => {
+    if (emailType === 'point_to_point_email') {
+      // For personal emails, replace the current recipient
+      setRecipientEmail(user.email || '');
+      setRecipientName(user.name || '');
+      setRecipientRole(user.role || 'User');
+    } else {
+      // For group emails, add to the recipients list if not already included
+      const email = user.email || '';
       if (email && !selectedRecipients.includes(email)) {
         setSelectedRecipients([...selectedRecipients, email]);
       }
@@ -2058,6 +2078,21 @@ function FlyersExecutionModule() {
 
   // Create flyer mutation
   const createFlyerMutation = useMutation({
+    mutationFn: (data: any) => apiRequest('POST', `/api/projects/${currentProject?.id}/communications`, {
+      ...data,
+      type: 'flyer',
+      status: 'draft'
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      toast({ title: "Flyer created successfully" });
+      setShowCreateModal(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to create flyer", variant: "destructive" });
+    }
+  });
+
   const distributeEmailMutation = useMutation({
     mutationFn: ({ emailId, recipients, dryRun }: { 
       emailId: string; 
@@ -2831,27 +2866,15 @@ function FlyersExecutionModule() {
   );
 }
 
-// Flyers Execution Module Component
-function FlyersExecutionModule() {
-  const { currentProject } = useCurrentProject();
-  const [activeView, setActiveView] = useState<'repository' | 'create' | 'manage'>('repository');
-  const [selectedTemplate, setSelectedTemplate] = useState<CommunicationTemplate | null>(null);
-  const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [flyerContent, setFlyerContent] = useState({ title: '', content: '', callToAction: '' });
-  const [currentFlyer, setCurrentFlyer] = useState<Communication | null>(null);
-  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [showDistributeModal, setShowDistributeModal] = useState(false);
-  const [distributionFlyer, setDistributionFlyer] = useState<Communication | null>(null);
-  const { toast } = useToast();
-
-  // Fetch communication templates
-  const { data: templates = [], isLoading: templatesLoading } = useQuery({
-    queryKey: ['/api/communication-templates/category/flyer']
-  });
+// Frontend-only interface for resistance points (not persisted to database)
+// These are used only for local state management and GPT API interactions
+interface ResistancePoint {
+  id: string;
+  title: string;
+  description: string;
+  severity: 'low' | 'medium' | 'high';
+  affectedGroups: string[];
+}
 
   // Fetch created flyers
   const { data: flyers = [], isLoading: flyersLoading } = useQuery({
