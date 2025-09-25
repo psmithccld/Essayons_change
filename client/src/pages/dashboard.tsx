@@ -510,7 +510,7 @@ export default function Dashboard() {
                 icon: AlertCircle
               },
               {
-                title: "Dependencies",
+                title: "Deficiencies",
                 count: 12,
                 detail: "3 Blocked",
                 color: "secondary",
