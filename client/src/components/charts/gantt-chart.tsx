@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Calendar, Diamond, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Calendar, Diamond, Clock, ZoomIn, ZoomOut, Move } from "lucide-react";
 import type { Task, Milestone, Communication } from "@shared/schema";
 
 interface GanttChartProps {
@@ -75,6 +77,13 @@ function getMeetingColor(type: string) {
 }
 
 export default function GanttChart({ tasks, milestones = [], meetings = [] }: GanttChartProps) {
+  const basePxPerDay = 12; // Base pixels per day for 100% zoom
+  const [pxPerDay, setPxPerDay] = useState(basePxPerDay);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  
+  // Calculate zoom percentage for display
+  const zoomLevel = Math.round((pxPerDay / basePxPerDay) * 100);
+  
   const ganttData = useMemo(() => {
     // Filter tasks that have dates
     const validTasks = tasks.filter(task => task.startDate && task.dueDate);
@@ -148,38 +157,62 @@ export default function GanttChart({ tasks, milestones = [], meetings = [] }: Ga
 
   const { ganttTasks, ganttMilestones, ganttMeetings, timelineStart, timelineEnd, totalDays } = ganttData;
 
+  const handleZoomIn = () => {
+    setPxPerDay(prev => Math.min(prev + 3, 36)); // 25% increments roughly
+  };
+
+  const handleZoomOut = () => {
+    setPxPerDay(prev => Math.max(prev - 3, 4)); // 25% decrements roughly  
+  };
+
+  const handleZoomSlider = (value: number[]) => {
+    const newZoomPercent = value[0];
+    const newPxPerDay = (newZoomPercent / 100) * basePxPerDay;
+    setPxPerDay(Math.max(4, Math.min(36, newPxPerDay)));
+  };
+
+  const scrollToStart = () => {
+    if (timelineRef.current) {
+      timelineRef.current.scrollLeft = 0;
+    }
+  };
+
+  const scrollToEnd = () => {
+    if (timelineRef.current) {
+      timelineRef.current.scrollLeft = timelineRef.current.scrollWidth - timelineRef.current.clientWidth;
+    }
+  };
+
   const getTaskPosition = (task: GanttTask) => {
     const taskStart = Math.max(0, Math.floor((task.startDate.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)));
     const taskDuration = Math.ceil((task.endDate.getTime() - task.startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const leftPercentage = (taskStart / totalDays) * 100;
-    const widthPercentage = (taskDuration / totalDays) * 100;
+    const leftPx = taskStart * pxPerDay;
+    const widthPx = Math.max(taskDuration * pxPerDay, 2); // Minimum 2px width
     
     return {
-      left: `${leftPercentage}%`,
-      width: `${widthPercentage}%`,
+      left: `${leftPx}px`,
+      width: `${widthPx}px`,
     };
   };
 
   const getMilestonePosition = (milestone: GanttMilestone) => {
     const milestoneDay = Math.max(0, Math.floor((milestone.targetDate.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)));
-    const leftPercentage = (milestoneDay / totalDays) * 100;
+    const leftPx = milestoneDay * pxPerDay;
     
     return {
-      left: `${leftPercentage}%`,
+      left: `${leftPx}px`,
     };
   };
 
   const getMeetingPosition = (meeting: GanttMeeting) => {
     const meetingStart = Math.max(0, Math.floor((meeting.startDate.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)));
     const meetingDuration = Math.ceil((meeting.endDate.getTime() - meeting.startDate.getTime()) / (1000 * 60 * 60 * 24));
-    // For short meetings (less than a day), ensure minimum width for visibility
-    const displayDuration = Math.max(meetingDuration, 0.1);
-    const leftPercentage = (meetingStart / totalDays) * 100;
-    const widthPercentage = (displayDuration / totalDays) * 100;
+    const leftPx = meetingStart * pxPerDay;
+    const widthPx = Math.max(meetingDuration * pxPerDay, 4); // Minimum 4px width for visibility
     
     return {
-      left: `${leftPercentage}%`,
-      width: `${Math.max(widthPercentage, 1)}%`, // Minimum 1% width for visibility
+      left: `${leftPx}px`,
+      width: `${widthPx}px`,
     };
   };
 
@@ -210,21 +243,35 @@ export default function GanttChart({ tasks, milestones = [], meetings = [] }: Ga
   return (
     <div className="space-y-4" data-testid="gantt-chart">
       {/* Timeline Header */}
-      <div className="relative bg-muted/30 p-4 rounded-lg overflow-x-auto">
-        <div className="flex items-center justify-between text-sm font-medium text-muted-foreground mb-2">
-          <span>Project Timeline</span>
-          <span>{totalDays} days</span>
-        </div>
-        
-        {/* Time markers */}
-        <div className="relative h-6 mb-4">
+      <div 
+        ref={timelineRef}
+        className="relative bg-muted/30 p-4 rounded-lg overflow-x-auto"
+        style={{ 
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'hsl(var(--border)) hsl(var(--background))'
+        }}
+      >
+        <div 
+          style={{
+            width: `${Math.max(totalDays * pxPerDay, 100)}px`,
+            minWidth: '100%'
+          }}
+        >
+          <div className="flex items-center justify-between text-sm font-medium text-muted-foreground mb-2">
+            <span>Project Timeline</span>
+            <span>{totalDays} days</span>
+          </div>
+          
+          {/* Time markers */}
+          <div className="relative h-6 mb-4">
           {generateTimelineHeaders().map((date, index) => {
-            const position = ((date.getTime() - timelineStart.getTime()) / (timelineEnd.getTime() - timelineStart.getTime())) * 100;
+            const dayIndex = Math.floor((date.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24));
+            const leftPx = dayIndex * pxPerDay;
             return (
               <div
                 key={index}
                 className="absolute top-0 text-xs text-muted-foreground"
-                style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
+                style={{ left: `${leftPx}px`, transform: 'translateX(-50%)' }}
               >
                 <div className="w-px h-2 bg-border mb-1"></div>
                 {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -362,7 +409,75 @@ export default function GanttChart({ tasks, milestones = [], meetings = [] }: Ga
             </div>
           </div>
         )}
+        </div> {/* End of zoom wrapper */}
       </div>
+
+      {/* Timeline Controls */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-foreground">Zoom:</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleZoomOut}
+                disabled={zoomLevel <= 50}
+                data-testid="button-zoom-out"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <div className="w-24">
+                <Slider
+                  value={[zoomLevel]}
+                  onValueChange={handleZoomSlider}
+                  min={50}
+                  max={300}
+                  step={25}
+                  className="cursor-pointer"
+                  data-testid="slider-zoom"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleZoomIn}
+                disabled={zoomLevel >= 300}
+                data-testid="button-zoom-in"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground min-w-[3rem]">
+                {zoomLevel}%
+              </span>
+            </div>
+
+            {/* Scroll Controls */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-foreground">Navigate:</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={scrollToStart}
+                data-testid="button-scroll-start"
+              >
+                <Move className="h-4 w-4 mr-1" />
+                Start
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={scrollToEnd}
+                data-testid="button-scroll-end"
+              >
+                End
+                <Move className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Legend */}
       <Card>
