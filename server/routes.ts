@@ -3165,7 +3165,8 @@ Return the refined content in JSON format:
       const validatedData = insertCommunicationSchema.parse({
         ...req.body,
         projectId: req.params.projectId,
-        createdById: req.userId!
+        createdById: req.userId!,
+        organizationId: req.organizationId!
       });
       const communication = await storage.createCommunication(validatedData, req.organizationId!);
       res.status(201).json(communication);

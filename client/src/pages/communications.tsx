@@ -162,6 +162,48 @@ function EmailsExecutionModule() {
     }
   });
 
+  // Create P2P email mutation
+  const createP2PEmailMutation = useMutation({
+    mutationFn: (emailData: any) => {
+      console.log('createP2PEmailMutation - Starting mutation with data:', emailData);
+      console.log('createP2PEmailMutation - Current project ID:', currentProject?.id);
+      
+      if (!currentProject?.id) {
+        throw new Error('No current project selected');
+      }
+      
+      const url = `/api/projects/${currentProject.id}/communications`;
+      console.log('createP2PEmailMutation - Making request to:', url);
+      
+      return apiRequest('POST', url, emailData);
+    },
+    onSuccess: () => {
+      console.log('createP2PEmailMutation - Success!');
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      
+      // Reset form and show success message
+      setEmailContent({ title: '', content: '', callToAction: '' });
+      setRecipientEmail('');
+      setRecipientName('');
+      setRecipientRole('');
+      setRelationship('colleague');
+      setSelectedRaidLogs([]);
+      setSelectedTemplate(null);
+      
+      toast({ 
+        title: "Personal email created successfully", 
+        description: "Email saved to repository. You can send it from the repository when ready." 
+      });
+      
+      // Switch back to repository view
+      setActiveView('repository');
+    },
+    onError: (error) => {
+      console.error('createP2PEmailMutation - Error:', error);
+      toast({ title: "Failed to create personal email", variant: "destructive" });
+    }
+  });
+
   // Send P2P email mutation
   const sendP2PEmailMutation = useMutation({
     mutationFn: ({ emailId, recipientEmail, recipientName, dryRun }: { 
@@ -288,6 +330,7 @@ function EmailsExecutionModule() {
 
     // Modified to save AND send automatically
     createP2PEmailMutation.mutate({
+      type: 'point_to_point_email',
       title: emailContent.title,
       content: emailContent.content,
       targetAudience: [recipientName],
@@ -2049,6 +2092,7 @@ function MeetingsExecutionModule() {
 // Flyers Execution Module Component
 function FlyersExecutionModule() {
   const { currentProject } = useCurrentProject();
+  const { user } = useAuth();
   const [activeView, setActiveView] = useState<'repository' | 'create' | 'manage'>('repository');
   const [selectedTemplate, setSelectedTemplate] = useState<CommunicationTemplate | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -2056,11 +2100,16 @@ function FlyersExecutionModule() {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [flyerContent, setFlyerContent] = useState({ title: '', content: '', callToAction: '' });
   const [currentFlyer, setCurrentFlyer] = useState<Communication | null>(null);
+  const [currentEmail, setCurrentEmail] = useState<Communication | null>(null);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showDistributeModal, setShowDistributeModal] = useState(false);
   const [distributionFlyer, setDistributionFlyer] = useState<Communication | null>(null);
+  const [distributionEmail, setDistributionEmail] = useState<Communication | null>(null);
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
+  const [recipientInput, setRecipientInput] = useState('');
+  const [selectedRaidLogs, setSelectedRaidLogs] = useState<string[]>([]);
   const { toast } = useToast();
 
   // Fetch communication templates
@@ -2074,7 +2123,27 @@ function FlyersExecutionModule() {
     enabled: !!currentProject?.id
   });
 
+  // Fetch stakeholders for recipient selection
+  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
+    enabled: !!currentProject?.id
+  });
+
+  // Fetch RAID logs for content context
+  const { data: raidLogs = [], isLoading: raidLogsLoading } = useQuery({
+    queryKey: ['/api/projects', currentProject?.id, 'raid-logs'],
+    enabled: !!currentProject?.id
+  });
+
   const flyerFlyers = flyers.filter((comm: Communication) => comm.type === 'flyer');
+  
+  // Filter templates based on search and category
+  const filteredTemplates = templates.filter((template: CommunicationTemplate) => {
+    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         template.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   // Create flyer mutation
   const createFlyerMutation = useMutation({
@@ -2130,12 +2199,68 @@ function FlyersExecutionModule() {
     }
   });
 
-  // Orphaned hook usage removed for clean component structure
+  // Increment template usage mutation
+  const incrementUsageMutation = useMutation({
+    mutationFn: (templateId: string) => 
+      apiRequest('PATCH', `/api/communication-templates/${templateId}/increment-usage`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/communication-templates/category/flyer'] });
+    }
+  });
+
+  // Generate content mutation using GPT
+  const generateContentMutation = useMutation({
+    mutationFn: (data: any) => apiRequest('POST', '/api/gpt/generate-content', data),
+    onSuccess: (data) => {
+      setFlyerContent(prevContent => ({
+        ...prevContent,
+        content: data.generatedContent || data.content || ''
+      }));
+      setIsGeneratingContent(false);
+      toast({ title: "Content generated successfully!" });
+    },
+    onError: () => {
+      setIsGeneratingContent(false);
+      toast({ title: "Failed to generate content", variant: "destructive" });
+    }
+  });
+
+  // Handler functions for recipient management
+  const handleAddRecipient = () => {
+    const email = recipientInput.trim();
+    if (email && !selectedRecipients.includes(email)) {
+      setSelectedRecipients([...selectedRecipients, email]);
+      setRecipientInput('');
+    }
+  };
+
+  const handleRemoveRecipient = (emailToRemove: string) => {
+    setSelectedRecipients(selectedRecipients.filter(email => email !== emailToRemove));
+  };
+
+  const handleStakeholderSelect = (stakeholder: any) => {
+    if (stakeholder.email && !selectedRecipients.includes(stakeholder.email)) {
+      setSelectedRecipients([...selectedRecipients, stakeholder.email]);
+    }
+  };
+
+  const handleDistribute = (email: Communication, dryRun: boolean = false) => {
+    if (selectedRecipients.length === 0) {
+      toast({ title: "Please select at least one recipient", variant: "destructive" });
+      return;
+    }
+
+    distributeEmailMutation.mutate({
+      emailId: email.id,
+      recipients: selectedRecipients,
+      dryRun
+    });
+  };
 
   const handleTemplateSelect = (template: CommunicationTemplate) => {
     setSelectedTemplate(template);
     incrementUsageMutation.mutate(template.id);
-    setEmailContent({
+    setFlyerContent({
       title: template.name,
       content: template.content,
       callToAction: 'Please review this information and let us know if you have any questions'
@@ -2226,29 +2351,6 @@ function FlyersExecutionModule() {
     createEmailMutation.mutate(emailData);
   };
 
-  const handleAddRecipient = () => {
-    if (recipientInput.trim() && !selectedRecipients.includes(recipientInput.trim())) {
-      setSelectedRecipients([...selectedRecipients, recipientInput.trim()]);
-      setRecipientInput('');
-    }
-  };
-
-  const handleRemoveRecipient = (email: string) => {
-    setSelectedRecipients(selectedRecipients.filter(r => r !== email));
-  };
-
-  const handleDistribute = (email: Communication, dryRun: boolean = false) => {
-    if (selectedRecipients.length === 0) {
-      toast({ title: "Please select at least one recipient", variant: "destructive" });
-      return;
-    }
-
-    distributeEmailMutation.mutate({
-      emailId: email.id,
-      recipients: selectedRecipients,
-      dryRun
-    });
-  };
 
   // Orphaned template filtering removed for clean component structure
 
@@ -2714,18 +2816,14 @@ function FlyersExecutionModule() {
                   <div>
                     <Label className="text-sm">Quick add from stakeholders:</Label>
                     <div className="flex flex-wrap gap-2 mt-1">
-                      {[]
-                        .filter((s: any) => s.email && ![].includes(s.email))
+                      {stakeholders
+                        .filter((s: any) => s.email && !selectedRecipients.includes(s.email))
                         .map((stakeholder: any) => (
                         <Button
                           key={stakeholder.id}
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            if (stakeholder.email) {
-                              // Function disabled - setSelectedRecipients([...[], stakeholder.email]);
-                            }
-                          }}
+                          onClick={() => handleStakeholderSelect(stakeholder)}
                           data-testid={`button-add-stakeholder-${stakeholder.id}`}
                         >
                           <User className="w-3 h-3 mr-1" />
@@ -2736,11 +2834,11 @@ function FlyersExecutionModule() {
                   </div>
                   
                   {/* Selected Recipients */}
-                  {[].length > 0 && (
+                  {selectedRecipients.length > 0 && (
                     <div>
                       <Label className="text-sm">Selected recipients:</Label>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {[].map((email) => (
+                        {selectedRecipients.map((email) => (
                           <Badge 
                             key={email} 
                             variant="secondary" 
@@ -2762,14 +2860,14 @@ function FlyersExecutionModule() {
                 <Button 
                   variant="outline"
                   onClick={() => distributionEmail && handleDistribute(distributionEmail, true)}
-                  disabled={[].length === 0 || true}
+                  disabled={selectedRecipients.length === 0 || distributeEmailMutation.isPending}
                   data-testid="button-dry-run"
                 >
                   Test Send (Dry Run)
                 </Button>
                 <Button 
                   onClick={() => distributionEmail && handleDistribute(distributionEmail, false)}
-                  disabled={[].length === 0 || true}
+                  disabled={selectedRecipients.length === 0 || distributeEmailMutation.isPending}
                   data-testid="button-send-email"
                   className="bg-[#832c2c] hover:bg-[#6d2424]"
                 >
@@ -2797,12 +2895,12 @@ function FlyersExecutionModule() {
               <DialogTitle>Email Preview</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              {null && (
+              {currentEmail && (
                 <div className="space-y-4">
                   <div>
                     <Label className="text-sm text-muted-foreground">Subject:</Label>
                     <div className="font-medium" data-testid="preview-email-subject">
-                      {null?.title}
+                      {currentEmail.title}
                     </div>
                   </div>
                   <div>
@@ -2811,16 +2909,16 @@ function FlyersExecutionModule() {
                       className="prose prose-sm max-w-none mt-2"
                       data-testid="preview-email-content"
                     >
-                      {null?.content?.split('\n').map((paragraph, index) => (
+                      {currentEmail.content.split('\n').map((paragraph, index) => (
                         <p key={index}>{paragraph}</p>
                       ))}
                     </div>
                   </div>
-                  {null?.raidLogReferences && null?.raidLogReferences.length > 0 && (
+                  {currentEmail.raidLogReferences && currentEmail.raidLogReferences.length > 0 && (
                     <div>
                       <Label className="text-sm text-muted-foreground">Related RAID Information:</Label>
                       <div className="space-y-2 mt-2">
-                        {null?.raidLogReferences?.map((raidId: string) => {
+                        {currentEmail.raidLogReferences.map((raidId: string) => {
                           const raidLog = raidLogs.find((log: any) => log.id === raidId);
                           if (!raidLog) return null;
                           return (
