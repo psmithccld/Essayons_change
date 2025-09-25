@@ -61,6 +61,53 @@ function EmailsExecutionModule() {
   const [activeView, setActiveView] = useState<'repository' | 'create' | 'manage'>('repository');
   const [emailType, setEmailType] = useState<'point_to_point_email' | 'group_email'>('point_to_point_email');
   const [selectedTemplate, setSelectedTemplate] = useState<CommunicationTemplate | null>(null);
+
+  // Helper function to format email for copying - defined early to avoid initialization issues
+  const formatEmailForCopy = (email: Communication) => {
+    const lines = [
+      `EMAIL DETAILS`,
+      `=============`,
+      '',
+      `Subject: ${email.title}`,
+      `Type: ${email.type === 'point_to_point_email' ? 'Personal Email' : 'Group Email'}`,
+      `Status: ${email.status}`,
+      `Created: ${new Date(email.createdAt).toLocaleDateString()}`,
+      '',
+    ];
+
+    // Add recipients
+    if (email.targetAudience && email.targetAudience.length > 0) {
+      lines.push(`RECIPIENTS`);
+      lines.push(`----------`);
+      email.targetAudience.forEach((recipient: string) => {
+        lines.push(`• ${recipient}`);
+      });
+      if (email.type === 'point_to_point_email' && (email.metadata as any)?.recipientEmail) {
+        lines.push(`Email: ${(email.metadata as any).recipientEmail}`);
+      }
+      lines.push('');
+    }
+
+    // Add content
+    lines.push(`EMAIL CONTENT`);
+    lines.push(`-------------`);
+    lines.push(email.content);
+    lines.push('');
+
+    // Add metadata if available
+    if (email.metadata && Object.keys(email.metadata as any).length > 0) {
+      lines.push(`METADATA`);
+      lines.push(`--------`);
+      const metadata = email.metadata as any;
+      if (metadata.communicationPurpose) lines.push(`Purpose: ${metadata.communicationPurpose}`);
+      if (metadata.tone) lines.push(`Tone: ${metadata.tone}`);
+      if (metadata.urgency) lines.push(`Urgency: ${metadata.urgency}`);
+      if (metadata.relationship) lines.push(`Relationship: ${metadata.relationship}`);
+      lines.push('');
+    }
+
+    return lines.join('\n');
+  };
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -1196,51 +1243,6 @@ function EmailsExecutionModule() {
   );
 
   // Helper function to format email for copying
-  const formatEmailForCopy = (email: Communication) => {
-    const lines = [
-      `EMAIL DETAILS`,
-      `=============`,
-      '',
-      `Subject: ${email.title}`,
-      `Type: ${email.type === 'point_to_point_email' ? 'Personal Email' : 'Group Email'}`,
-      `Status: ${email.status}`,
-      `Created: ${new Date(email.createdAt).toLocaleDateString()}`,
-      '',
-    ];
-
-    // Add recipients
-    if (email.targetAudience && email.targetAudience.length > 0) {
-      lines.push(`RECIPIENTS`);
-      lines.push(`----------`);
-      email.targetAudience.forEach((recipient: string) => {
-        lines.push(`• ${recipient}`);
-      });
-      if (email.type === 'point_to_point_email' && (email.metadata as any)?.recipientEmail) {
-        lines.push(`Email: ${(email.metadata as any).recipientEmail}`);
-      }
-      lines.push('');
-    }
-
-    // Add content
-    lines.push(`EMAIL CONTENT`);
-    lines.push(`-------------`);
-    lines.push(email.content);
-    lines.push('');
-
-    // Add metadata if available
-    if (email.metadata && Object.keys(email.metadata as any).length > 0) {
-      lines.push(`METADATA`);
-      lines.push(`--------`);
-      const metadata = email.metadata as any;
-      if (metadata.communicationPurpose) lines.push(`Purpose: ${metadata.communicationPurpose}`);
-      if (metadata.tone) lines.push(`Tone: ${metadata.tone}`);
-      if (metadata.urgency) lines.push(`Urgency: ${metadata.urgency}`);
-      if (metadata.relationship) lines.push(`Relationship: ${metadata.relationship}`);
-      lines.push('');
-    }
-
-    return lines.join('\n');
-  };
 }
 
 // Meetings Execution Module Component
@@ -1256,6 +1258,106 @@ function MeetingsExecutionModule() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedRaidLogs, setSelectedRaidLogs] = useState<string[]>([]);
   const { toast } = useToast();
+
+  // Helper function to format meeting details for copying - defined early to avoid initialization issues
+  const formatMeetingForCopy = (meeting: Communication) => {
+    const lines = [
+      `MEETING DETAILS`,
+      `================`,
+      '',
+      `Title: ${meeting.title}`,
+      `Purpose: ${meeting.content || 'No purpose specified'}`,
+      `Type: ${(meeting as any).meetingType || 'General'}`,
+      `Status: ${meeting.status}`,
+      '',
+      `SCHEDULE`,
+      `--------`,
+      `Date & Time: ${meeting.meetingWhen ? new Date(meeting.meetingWhen).toLocaleDateString() + ' at ' + new Date(meeting.meetingWhen).toLocaleTimeString() : 'TBD'}`,
+      `Duration: ${(meeting as any).meetingDuration || 60} minutes`,
+      `Location: ${(meeting as any).meetingWhere || 'TBD'}`,
+      `Timezone: ${(meeting as any).meetingTimezone || 'Local timezone'}`,
+      '',
+    ];
+
+    if ((meeting as any).meetingParticipants?.length > 0) {
+      lines.push(`PARTICIPANTS`);
+      lines.push(`------------`);
+      (meeting as any).meetingParticipants.forEach((p: any) => {
+        lines.push(`• ${p.name} (${p.role})${p.email ? ' - ' + p.email : ''}`);
+      });
+      lines.push('');
+    }
+
+    if ((meeting as any).meetingObjectives?.length > 0) {
+      lines.push(`OBJECTIVES`);
+      lines.push(`----------`);
+      (meeting as any).meetingObjectives.forEach((obj: string) => {
+        lines.push(`• ${obj}`);
+      });
+      lines.push('');
+    }
+
+    if ((meeting as any).meetingAgenda?.length > 0) {
+      lines.push(`AGENDA`);
+      lines.push(`------`);
+      (meeting as any).meetingAgenda.forEach((item: any, index: number) => {
+        lines.push(`${index + 1}. ${item.item || item}${item.timeAllocation ? ` (${item.timeAllocation}min)` : ''}`);
+      });
+      lines.push('');
+    }
+
+    if ((meeting as any).meetingContext) {
+      lines.push(`CONTEXT`);
+      lines.push(`-------`);
+      lines.push((meeting as any).meetingContext);
+      lines.push('');
+    }
+
+    return lines.join('\n');
+  };
+
+  // Helper function to format meeting invite for copying - defined early to avoid initialization issues
+  const formatMeetingInvite = (meeting: Communication) => {
+    const lines = [
+      `Subject: Meeting Invitation - ${meeting.title}`,
+      '',
+      `You are invited to attend: ${meeting.title}`,
+      '',
+      `📅 Date & Time: ${meeting.meetingWhen ? new Date(meeting.meetingWhen).toLocaleDateString() + ' at ' + new Date(meeting.meetingWhen).toLocaleTimeString() : 'TBD'}`,
+      `⏱️ Duration: ${(meeting as any).meetingDuration || 60} minutes`,
+      `📍 Location: ${(meeting as any).meetingWhere || 'TBD'}`,
+      `🌍 Timezone: ${(meeting as any).meetingTimezone || 'Local timezone'}`,
+      '',
+    ];
+
+    if (meeting.content) {
+      lines.push(`📋 Purpose:`);
+      lines.push(meeting.content);
+      lines.push('');
+    }
+
+    if ((meeting as any).meetingObjectives?.length > 0) {
+      lines.push(`🎯 Meeting Objectives:`);
+      (meeting as any).meetingObjectives.forEach((obj: string) => {
+        lines.push(`• ${obj}`);
+      });
+      lines.push('');
+    }
+
+    if ((meeting as any).meetingAgenda?.length > 0) {
+      lines.push(`📝 Agenda:`);
+      (meeting as any).meetingAgenda.forEach((item: any, index: number) => {
+        lines.push(`${index + 1}. ${item.item || item}${item.timeAllocation ? ` (${item.timeAllocation} minutes)` : ''}`);
+      });
+      lines.push('');
+    }
+
+    lines.push(`Please confirm your attendance and let us know if you have any questions.`);
+    lines.push('');
+    lines.push(`Thank you!`);
+
+    return lines.join('\n');
+  };
 
   // Fetch users for participant selection
   const { data: users = [], isLoading: usersLoading } = useQuery({
@@ -2594,105 +2696,7 @@ function MeetingsExecutionModule() {
     </Card>
   );
 
-  // Helper function to format meeting details for copying
-  const formatMeetingForCopy = (meeting: Communication) => {
-    const lines = [
-      `MEETING DETAILS`,
-      `================`,
-      '',
-      `Title: ${meeting.title}`,
-      `Purpose: ${meeting.content || 'No purpose specified'}`,
-      `Type: ${(meeting as any).meetingType || 'General'}`,
-      `Status: ${meeting.status}`,
-      '',
-      `SCHEDULE`,
-      `--------`,
-      `Date & Time: ${meeting.meetingWhen ? new Date(meeting.meetingWhen).toLocaleDateString() + ' at ' + new Date(meeting.meetingWhen).toLocaleTimeString() : 'TBD'}`,
-      `Duration: ${(meeting as any).meetingDuration || 60} minutes`,
-      `Location: ${(meeting as any).meetingWhere || 'TBD'}`,
-      `Timezone: ${(meeting as any).meetingTimezone || 'Local timezone'}`,
-      '',
-    ];
 
-    if ((meeting as any).meetingParticipants?.length > 0) {
-      lines.push(`PARTICIPANTS`);
-      lines.push(`------------`);
-      (meeting as any).meetingParticipants.forEach((p: any) => {
-        lines.push(`• ${p.name} (${p.role})${p.email ? ' - ' + p.email : ''}`);
-      });
-      lines.push('');
-    }
-
-    if ((meeting as any).meetingObjectives?.length > 0) {
-      lines.push(`OBJECTIVES`);
-      lines.push(`----------`);
-      (meeting as any).meetingObjectives.forEach((obj: string) => {
-        lines.push(`• ${obj}`);
-      });
-      lines.push('');
-    }
-
-    if ((meeting as any).meetingAgenda?.length > 0) {
-      lines.push(`AGENDA`);
-      lines.push(`------`);
-      (meeting as any).meetingAgenda.forEach((item: any, index: number) => {
-        lines.push(`${index + 1}. ${item.item || item}${item.timeAllocation ? ` (${item.timeAllocation}min)` : ''}`);
-      });
-      lines.push('');
-    }
-
-    if ((meeting as any).meetingContext) {
-      lines.push(`CONTEXT`);
-      lines.push(`-------`);
-      lines.push((meeting as any).meetingContext);
-      lines.push('');
-    }
-
-    return lines.join('\n');
-  };
-
-  // Helper function to format meeting invite for copying
-  const formatMeetingInvite = (meeting: Communication) => {
-    const lines = [
-      `Subject: Meeting Invitation - ${meeting.title}`,
-      '',
-      `You are invited to attend: ${meeting.title}`,
-      '',
-      `📅 Date & Time: ${meeting.meetingWhen ? new Date(meeting.meetingWhen).toLocaleDateString() + ' at ' + new Date(meeting.meetingWhen).toLocaleTimeString() : 'TBD'}`,
-      `⏱️ Duration: ${(meeting as any).meetingDuration || 60} minutes`,
-      `📍 Location: ${(meeting as any).meetingWhere || 'TBD'}`,
-      `🌍 Timezone: ${(meeting as any).meetingTimezone || 'Local timezone'}`,
-      '',
-    ];
-
-    if (meeting.content) {
-      lines.push(`📋 Purpose:`);
-      lines.push(meeting.content);
-      lines.push('');
-    }
-
-    if ((meeting as any).meetingObjectives?.length > 0) {
-      lines.push(`🎯 Meeting Objectives:`);
-      (meeting as any).meetingObjectives.forEach((obj: string) => {
-        lines.push(`• ${obj}`);
-      });
-      lines.push('');
-    }
-
-    if ((meeting as any).meetingAgenda?.length > 0) {
-      lines.push(`📝 Agenda:`);
-      (meeting as any).meetingAgenda.forEach((item: any, index: number) => {
-        lines.push(`${index + 1}. ${item.item || item}${item.timeAllocation ? ` (${item.timeAllocation} minutes)` : ''}`);
-      });
-      lines.push('');
-    }
-
-    lines.push(`Please confirm your attendance and let us know if you have any questions.`);
-    lines.push('');
-    lines.push(`Thank you!`);
-
-    return lines.join('\n');
-  };
 }
 
 // Flyers Execution Module Component
