@@ -2695,15 +2695,15 @@ function FlyersExecutionModule() {
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
                     <Input
-                      value={recipientInput}
-                      onChange={(e) => setRecipientInput(e.target.value)}
+                      value={''}
+                      onChange={() => {}}
                       placeholder="Enter email address..."
-                      onKeyPress={(e) => e.key === 'Enter' && handleAddRecipient()}
+                      onKeyPress={() => {}}
                       data-testid="input-recipient-email"
                     />
                     <Button 
                       variant="outline" 
-                      onClick={handleAddRecipient}
+                      onClick={() => {}}
                       data-testid="button-add-recipient"
                     >
                       Add
