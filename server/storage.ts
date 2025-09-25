@@ -5857,7 +5857,7 @@ export class DatabaseStorage implements IStorage {
   async getChangeArtifactsByProject(projectId: string): Promise<ChangeArtifact[]> {
     return await db.select().from(changeArtifacts)
       .where(and(eq(changeArtifacts.projectId, projectId), eq(changeArtifacts.isActive, true)))
-      .orderBy(desc(changeArtifacts.createdAt));
+      .orderBy(desc(changeArtifacts.uploadedAt));
   }
 
   async getChangeArtifact(id: string): Promise<ChangeArtifact | undefined> {
