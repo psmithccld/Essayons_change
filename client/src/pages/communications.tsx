@@ -2977,60 +2977,7 @@ function CommunicationChannelSettings() {
 
   // Orphaned flyer filtering removed for clean component structure
 
-  // Distribution mutation with enhanced UX feedback
-  const distributeFlyerMutation = useMutation({
-    mutationFn: ({ flyerId, method, recipients, dryRun }: { 
-      flyerId: string; 
-      method: string; 
-      recipients?: string[]; 
-      dryRun?: boolean 
-    }) => 
-      apiRequest('POST', `/api/communications/${flyerId}/distribute`, {
-        distributionMethod: method,
-        recipients: recipients || [],
-        dryRun: dryRun || false
-      }),
-    onSuccess: (data, { method, dryRun }) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
-      
-      if (dryRun) {
-        toast({ 
-          title: "Dry Run Complete", 
-          description: `Would distribute to ${data.distributionResult?.sent || 0} recipients via ${method}. No emails were actually sent.`,
-          variant: "default"
-        });
-      } else {
-        const successCount = data.distributionResult?.sent || 0;
-        const failCount = data.distributionResult?.failed || 0;
-        toast({ 
-          title: "Distribution Complete", 
-          description: `Successfully sent to ${successCount} recipients${failCount > 0 ? `, ${failCount} failed` : ''} via ${method}.`,
-          variant: failCount > 0 ? "destructive" : "default"
-        });
-      }
-      
-      setShowDistributeModal(false);
-    },
-    onError: (error: any) => {
-      let errorMessage = "Failed to distribute flyer";
-      
-      if (error?.message?.includes('Rate limit')) {
-        errorMessage = "Rate limit exceeded. Please wait before sending more distributions.";
-      } else if (error?.message?.includes('production')) {
-        errorMessage = "Email distribution disabled in production environment.";
-      } else if (error?.message?.includes('Authentication')) {
-        errorMessage = "Authentication required. Please log in.";
-      } else if (error?.message?.includes('permission')) {
-        errorMessage = "Insufficient permissions for bulk email distribution.";
-      }
-      
-      toast({ 
-        title: "Distribution Failed", 
-        description: errorMessage,
-        variant: "destructive" 
-      });
-    }
-  });
+  // Orphaned distribution mutation and callbacks completely removed for clean component structure
 
 // Remove orphaned code to fix syntax errors
 
