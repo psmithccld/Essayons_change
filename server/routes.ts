@@ -31,8 +31,12 @@ import {
   insertUserGroupSchema, insertUserGroupMembershipSchema, insertUserPermissionSchema, insertNotificationSchema, insertChangeArtifactSchema,
   insertOrganizationSettingsSchema,
   coachContextPayloadSchema,
-  type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload
+  type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload,
+  // Add missing schema imports
+  users, organizationMemberships
 } from "@shared/schema";
+import { db } from "./db"; // Import db from correct location
+import { and, eq, or, sql } from "drizzle-orm"; // Add missing drizzle operators
 import * as openaiService from "./openai";
 import { sendTaskAssignmentNotification, sendBulkGroupEmail, sendP2PEmail } from "./services/emailService";
 import { z } from "zod";
@@ -2614,7 +2618,7 @@ Return the refined content in JSON format:
   });
 
   // P2P Email Sending - SECURITY: Requires individual email permission and proper auth
-  app.post("/api/communications/:id/send-p2p", requireAuthAndPermission('canSendEmails'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/communications/:id/send-p2p", requireAuthAndPermission('canSendEmails'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { recipientEmail, recipientName, visibility, dryRun, senderEmail } = req.body;
 
