@@ -3894,7 +3894,10 @@ export default function Communications() {
             <FileText className="w-4 h-4 mr-2" />
             Export Plan
           </Button>
-          <Button data-testid="button-new-communication">
+          <Button 
+            onClick={() => setActiveTab("execution")}
+            data-testid="button-new-communication"
+          >
             <Plus className="w-4 h-4 mr-2" />
             New Communication
           </Button>

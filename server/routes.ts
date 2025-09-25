@@ -2644,7 +2644,9 @@ Return the refined content in JSON format:
       }
 
       // Get communication
+      console.log(`[SEND-P2P] Looking for communication: id=${req.params.id}, orgId=${req.organizationId}`);
       const communication = await storage.getCommunication(req.params.id, req.organizationId!);
+      console.log(`[SEND-P2P] Communication found:`, communication ? 'YES' : 'NO');
       if (!communication) {
         return res.status(404).json({ error: "Communication not found" });
       }
@@ -2655,13 +2657,17 @@ Return the refined content in JSON format:
       }
 
       // Get project
-      const project = await storage.getProject(communication.projectId);
+      console.log(`[SEND-P2P] Looking for project: id=${communication.projectId}`);
+      const project = await storage.getProject(communication.projectId, req.organizationId!);
+      console.log(`[SEND-P2P] Project found:`, project ? 'YES' : 'NO');
       if (!project) {
         return res.status(404).json({ error: "Project not found" });
       }
 
       // Get sender info
+      console.log(`[SEND-P2P] Looking for sender: userId=${req.userId}`);
       const sender = await storage.getUser(req.userId!);
+      console.log(`[SEND-P2P] Sender found:`, sender ? 'YES' : 'NO');
       if (!sender) {
         return res.status(404).json({ error: "Sender not found" });
       }
