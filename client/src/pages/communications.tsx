@@ -40,7 +40,9 @@ import {
   Timer,
   CheckSquare,
   Archive,
-  Check
+  Check,
+  Copy,
+  Download
 } from "lucide-react";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -93,8 +95,8 @@ function EmailsExecutionModule() {
     enabled: !!currentProject?.id
   });
 
-  const p2pEmails = communications.filter((comm: Communication) => comm.type === 'point_to_point_email');
-  const groupEmails = communications.filter((comm: Communication) => comm.type === 'group_email');
+  const p2pEmails = (communications as Communication[]).filter((comm: Communication) => comm.type === 'point_to_point_email');
+  const groupEmails = (communications as Communication[]).filter((comm: Communication) => comm.type === 'group_email');
   const allEmails = [...p2pEmails, ...groupEmails].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // Fetch stakeholders for recipient selection
@@ -464,8 +466,8 @@ function EmailsExecutionModule() {
                               size="sm"
                               onClick={() => {
                                 setDistributionEmail(email);
-                                setRecipientEmail(email.metadata?.recipientEmail || '');
-                                setRecipientName(email.metadata?.recipientName || '');
+                                setRecipientEmail((email.metadata as any)?.recipientEmail || '');
+                                setRecipientName((email.metadata as any)?.recipientName || '');
                                 setShowSendModal(true);
                               }}
                               data-testid={`button-send-p2p-${email.id}`}
@@ -636,17 +638,17 @@ function EmailsExecutionModule() {
                 )}
 
                 {/* Quick Select from Users and Stakeholders */}
-                {(users.length > 0 || stakeholders.length > 0) && (
+                {((users as any[]).length > 0 || (stakeholders as any[]).length > 0) && (
                   <div className="space-y-3">
                     <Label className="text-sm">
                       {emailType === 'group_email' ? 'Quick add from users and stakeholders:' : 'Or select from users and stakeholders:'}
                     </Label>
                     
-                    {users.length > 0 && (
+                    {(users as any[]).length > 0 && (
                       <div>
                         <Label className="text-xs text-muted-foreground">Users:</Label>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {users.slice(0, 6).map((user: any) => (
+                          {(users as any[]).slice(0, 6).map((user: any) => (
                             <Button
                               key={`user-${user.id}`}
                               variant="outline"
@@ -666,11 +668,11 @@ function EmailsExecutionModule() {
                       </div>
                     )}
                     
-                    {stakeholders.length > 0 && (
+                    {(stakeholders as any[]).length > 0 && (
                       <div>
                         <Label className="text-xs text-muted-foreground">Stakeholders:</Label>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {stakeholders.slice(0, 6).map((stakeholder: any) => (
+                          {(stakeholders as any[]).slice(0, 6).map((stakeholder: any) => (
                             <Button
                               key={`stakeholder-${stakeholder.id}`}
                               variant="outline"
@@ -966,34 +968,217 @@ function EmailsExecutionModule() {
           </DialogContent>
         </Dialog>
 
-        {/* Preview Modal */}
+        {/* Email Preview Modal with Copy/Paste Functionality */}
         <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Email Preview</DialogTitle>
+              <DialogTitle className="flex items-center space-x-2">
+                <Mail className="h-5 w-5" />
+                <span>Email Details & Copy Options</span>
+              </DialogTitle>
             </DialogHeader>
             {currentEmail && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Subject</Label>
-                  <p className="font-medium">{currentEmail.title}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Content</Label>
-                  <div className="p-4 bg-muted rounded-lg whitespace-pre-wrap text-sm">
-                    {currentEmail.content}
+              <div className="space-y-6">
+                {/* Header with Copy Options */}
+                <div className="flex items-center justify-between border-b pb-4">
+                  <h3 className="text-lg font-semibold">{currentEmail.title}</h3>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const emailText = formatEmailForCopy(currentEmail);
+                        navigator.clipboard.writeText(emailText);
+                        toast({ title: "Complete email copied to clipboard" });
+                      }}
+                      data-testid="copy-complete-email"
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Complete Email
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const subjectBody = `Subject: ${currentEmail.title}\n\n${currentEmail.content}`;
+                        navigator.clipboard.writeText(subjectBody);
+                        toast({ title: "Subject & body copied to clipboard" });
+                      }}
+                      data-testid="copy-subject-body"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Copy Subject & Body
+                    </Button>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Metadata</Label>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <span>Purpose: {currentEmail.metadata?.communicationPurpose || 'N/A'}</span>
-                    <span>Tone: {currentEmail.metadata?.tone || 'N/A'}</span>
-                    <span>Urgency: {currentEmail.metadata?.urgency || 'N/A'}</span>
-                    <span>Relationship: {currentEmail.metadata?.relationship || 'N/A'}</span>
-                  </div>
+
+                {/* Email Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  
+                  {/* Email Information */}
+                  <Card className="p-4">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <Mail className="h-4 w-4 mr-2" />
+                      Email Information
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <strong>Subject:</strong> {currentEmail.title}
+                      </div>
+                      <div>
+                        <strong>Type:</strong> {currentEmail.type === 'point_to_point_email' ? 'Personal Email' : 'Group Email'}
+                      </div>
+                      <div>
+                        <strong>Status:</strong>
+                        <Badge className="ml-2" variant={currentEmail.status === 'sent' ? 'default' : 'secondary'}>
+                          {currentEmail.status}
+                        </Badge>
+                      </div>
+                      <div>
+                        <strong>Created:</strong> {new Date(currentEmail.createdAt).toLocaleDateString()}
+                      </div>
+                      {currentEmail.isGptGenerated && (
+                        <div className="flex items-center space-x-2">
+                          <strong>AI Generated:</strong>
+                          <Badge variant="outline">
+                            <Bot className="w-3 h-3 mr-1" />
+                            GPT Generated
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full"
+                      onClick={() => {
+                        const basicInfo = `Subject: ${currentEmail.title}\nType: ${currentEmail.type === 'point_to_point_email' ? 'Personal Email' : 'Group Email'}\nStatus: ${currentEmail.status}\nCreated: ${new Date(currentEmail.createdAt).toLocaleDateString()}`;
+                        navigator.clipboard.writeText(basicInfo);
+                        toast({ title: "Email info copied" });
+                      }}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy Info
+                    </Button>
+                  </Card>
+
+                  {/* Recipients */}
+                  <Card className="p-4">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <Users className="h-4 w-4 mr-2" />
+                      Recipients ({currentEmail.targetAudience?.length || 0})
+                    </h4>
+                    <div className="space-y-2 text-sm max-h-40 overflow-y-auto">
+                      {currentEmail.targetAudience && currentEmail.targetAudience.length > 0 ? (
+                        currentEmail.targetAudience.map((recipient: string, index: number) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                            <span>{recipient}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-muted-foreground">No recipients specified</p>
+                      )}
+                      {currentEmail.type === 'point_to_point_email' && (currentEmail.metadata as any)?.recipientEmail && (
+                        <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
+                          <strong>Email:</strong> {(currentEmail.metadata as any).recipientEmail}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full"
+                      onClick={() => {
+                        let recipientText = '';
+                        if (currentEmail.targetAudience && currentEmail.targetAudience.length > 0) {
+                          recipientText = currentEmail.targetAudience.join(', ');
+                        }
+                        if (currentEmail.type === 'point_to_point_email' && (currentEmail.metadata as any)?.recipientEmail) {
+                          recipientText += (recipientText ? '\nEmail: ' : 'Email: ') + (currentEmail.metadata as any).recipientEmail;
+                        }
+                        if (!recipientText) recipientText = 'No recipients specified';
+                        navigator.clipboard.writeText(`To: ${recipientText}`);
+                        toast({ title: "Recipients copied" });
+                      }}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy Recipients
+                    </Button>
+                  </Card>
+
+                  {/* Email Content */}
+                  <Card className="p-4 md:col-span-2">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Email Content
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="p-4 bg-muted rounded-lg whitespace-pre-wrap text-sm max-h-60 overflow-y-auto">
+                        {currentEmail.content}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(currentEmail.content);
+                            toast({ title: "Email content copied" });
+                          }}
+                        >
+                          <Copy className="h-3 w-3 mr-1" />
+                          Copy Content Only
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const formattedEmail = `Subject: ${currentEmail.title}\n\nTo: ${currentEmail.targetAudience?.join(', ') || 'Recipients'}\n\n${currentEmail.content}`;
+                            navigator.clipboard.writeText(formattedEmail);
+                            toast({ title: "Formatted email copied" });
+                          }}
+                        >
+                          <Mail className="h-3 w-3 mr-1" />
+                          Copy as Email Draft
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Metadata */}
+                  {currentEmail.metadata && Object.keys(currentEmail.metadata as any).length > 0 && (
+                    <Card className="p-4 md:col-span-2">
+                      <h4 className="font-medium mb-3 flex items-center">
+                        <Settings className="h-4 w-4 mr-2" />
+                        Email Metadata
+                      </h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        {(currentEmail.metadata as any)?.communicationPurpose && (
+                          <div>
+                            <strong>Purpose:</strong> {(currentEmail.metadata as any).communicationPurpose}
+                          </div>
+                        )}
+                        {(currentEmail.metadata as any)?.tone && (
+                          <div>
+                            <strong>Tone:</strong> {(currentEmail.metadata as any).tone}
+                          </div>
+                        )}
+                        {(currentEmail.metadata as any)?.urgency && (
+                          <div>
+                            <strong>Urgency:</strong> {(currentEmail.metadata as any).urgency}
+                          </div>
+                        )}
+                        {(currentEmail.metadata as any)?.relationship && (
+                          <div>
+                            <strong>Relationship:</strong> {(currentEmail.metadata as any).relationship}
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  )}
                 </div>
-                <div className="flex justify-end">
+
+                {/* Footer Actions */}
+                <div className="flex justify-end space-x-2 pt-4 border-t">
                   <Button
                     variant="outline"
                     onClick={() => setShowPreviewModal(false)}
@@ -1009,6 +1194,53 @@ function EmailsExecutionModule() {
       </CardContent>
     </Card>
   );
+
+  // Helper function to format email for copying
+  const formatEmailForCopy = (email: Communication) => {
+    const lines = [
+      `EMAIL DETAILS`,
+      `=============`,
+      '',
+      `Subject: ${email.title}`,
+      `Type: ${email.type === 'point_to_point_email' ? 'Personal Email' : 'Group Email'}`,
+      `Status: ${email.status}`,
+      `Created: ${new Date(email.createdAt).toLocaleDateString()}`,
+      '',
+    ];
+
+    // Add recipients
+    if (email.targetAudience && email.targetAudience.length > 0) {
+      lines.push(`RECIPIENTS`);
+      lines.push(`----------`);
+      email.targetAudience.forEach((recipient: string) => {
+        lines.push(`• ${recipient}`);
+      });
+      if (email.type === 'point_to_point_email' && (email.metadata as any)?.recipientEmail) {
+        lines.push(`Email: ${(email.metadata as any).recipientEmail}`);
+      }
+      lines.push('');
+    }
+
+    // Add content
+    lines.push(`EMAIL CONTENT`);
+    lines.push(`-------------`);
+    lines.push(email.content);
+    lines.push('');
+
+    // Add metadata if available
+    if (email.metadata && Object.keys(email.metadata as any).length > 0) {
+      lines.push(`METADATA`);
+      lines.push(`--------`);
+      const metadata = email.metadata as any;
+      if (metadata.communicationPurpose) lines.push(`Purpose: ${metadata.communicationPurpose}`);
+      if (metadata.tone) lines.push(`Tone: ${metadata.tone}`);
+      if (metadata.urgency) lines.push(`Urgency: ${metadata.urgency}`);
+      if (metadata.relationship) lines.push(`Relationship: ${metadata.relationship}`);
+      lines.push('');
+    }
+
+    return lines.join('\n');
+  };
 }
 
 // Meetings Execution Module Component
@@ -2084,9 +2316,383 @@ function MeetingsExecutionModule() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Meeting View Modal with Copy/Paste Functionality */}
+        <Dialog open={showAgendaModal} onOpenChange={setShowAgendaModal}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Calendar className="h-5 w-5" />
+                <span>Meeting Details</span>
+              </DialogTitle>
+            </DialogHeader>
+            
+            {currentMeeting && (
+              <div className="space-y-6">
+                {/* Header with Copy Options */}
+                <div className="flex items-center justify-between border-b pb-4">
+                  <h3 className="text-lg font-semibold">{currentMeeting.title}</h3>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const meetingText = formatMeetingForCopy(currentMeeting);
+                        navigator.clipboard.writeText(meetingText);
+                        toast({ title: "Meeting details copied to clipboard" });
+                      }}
+                      data-testid="copy-meeting-details"
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy All Details
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const inviteText = formatMeetingInvite(currentMeeting);
+                        navigator.clipboard.writeText(inviteText);
+                        toast({ title: "Meeting invite copied to clipboard" });
+                      }}
+                      data-testid="copy-meeting-invite"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Copy Invite Text
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Meeting Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  
+                  {/* Basic Information */}
+                  <Card className="p-4">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Meeting Information
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <strong>Title:</strong> {currentMeeting.title}
+                      </div>
+                      <div>
+                        <strong>Purpose:</strong> {currentMeeting.content || 'No purpose specified'}
+                      </div>
+                      <div>
+                        <strong>Type:</strong> {currentMeeting.meetingType || 'General'}
+                      </div>
+                      <div>
+                        <strong>Status:</strong>
+                        <Badge className="ml-2" variant={currentMeeting.status === 'sent' ? 'default' : 'secondary'}>
+                          {currentMeeting.status}
+                        </Badge>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full"
+                      onClick={() => {
+                        const basicInfo = `Meeting: ${currentMeeting.title}\nPurpose: ${currentMeeting.content || 'No purpose specified'}\nType: ${currentMeeting.meetingType || 'General'}\nStatus: ${currentMeeting.status}`;
+                        navigator.clipboard.writeText(basicInfo);
+                        toast({ title: "Basic info copied" });
+                      }}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy Info
+                    </Button>
+                  </Card>
+
+                  {/* Time & Location */}
+                  <Card className="p-4">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <Clock className="h-4 w-4 mr-2" />
+                      When & Where
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <strong>Date & Time:</strong> 
+                        {currentMeeting.meetingWhen ? (
+                          <div className="mt-1">
+                            {new Date(currentMeeting.meetingWhen).toLocaleDateString()} at {new Date(currentMeeting.meetingWhen).toLocaleTimeString()}
+                          </div>
+                        ) : (
+                          <span className="ml-2 text-muted-foreground">TBD</span>
+                        )}
+                      </div>
+                      <div>
+                        <strong>Duration:</strong> {currentMeeting.meetingDuration || 60} minutes
+                      </div>
+                      <div>
+                        <strong>Location:</strong> {currentMeeting.meetingWhere || 'TBD'}
+                      </div>
+                      <div>
+                        <strong>Timezone:</strong> {currentMeeting.meetingTimezone || 'Local timezone'}
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full"
+                      onClick={() => {
+                        const timeLocation = `Date: ${currentMeeting.meetingWhen ? new Date(currentMeeting.meetingWhen).toLocaleDateString() + ' at ' + new Date(currentMeeting.meetingWhen).toLocaleTimeString() : 'TBD'}\nDuration: ${currentMeeting.meetingDuration || 60} minutes\nLocation: ${currentMeeting.meetingWhere || 'TBD'}\nTimezone: ${currentMeeting.meetingTimezone || 'Local timezone'}`;
+                        navigator.clipboard.writeText(timeLocation);
+                        toast({ title: "Time & location copied" });
+                      }}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy Schedule
+                    </Button>
+                  </Card>
+
+                  {/* Participants */}
+                  <Card className="p-4">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <Users2 className="h-4 w-4 mr-2" />
+                      Participants ({(currentMeeting as any).meetingParticipants?.length || 0})
+                    </h4>
+                    <div className="space-y-2 text-sm max-h-40 overflow-y-auto">
+                      {(currentMeeting as any).meetingParticipants?.length > 0 ? (
+                        (currentMeeting as any).meetingParticipants.map((participant: any, index: number) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                            <div>
+                              <div className="font-medium">{participant.name}</div>
+                              <div className="text-xs text-muted-foreground">{participant.role}</div>
+                            </div>
+                            {participant.email && (
+                              <Badge variant="outline" className="text-xs">
+                                {participant.email}
+                              </Badge>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-muted-foreground">No participants specified</p>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full"
+                      onClick={() => {
+                        const participants = (currentMeeting as any).meetingParticipants?.length > 0
+                          ? (currentMeeting as any).meetingParticipants.map((p: any) => `${p.name} (${p.role})${p.email ? ' - ' + p.email : ''}`).join('\n')
+                          : 'No participants specified';
+                        navigator.clipboard.writeText(`Participants:\n${participants}`);
+                        toast({ title: "Participants copied" });
+                      }}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy Participants
+                    </Button>
+                  </Card>
+
+                  {/* Objectives & Agenda */}
+                  <Card className="p-4">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <Target className="h-4 w-4 mr-2" />
+                      Objectives & Agenda
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      {(currentMeeting as any).meetingObjectives?.length > 0 && (
+                        <div>
+                          <strong>Objectives:</strong>
+                          <ul className="list-disc list-inside mt-1 text-muted-foreground">
+                            {(currentMeeting as any).meetingObjectives.map((objective: string, index: number) => (
+                              <li key={index}>{objective}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {(currentMeeting as any).meetingAgenda?.length > 0 && (
+                        <div>
+                          <strong>Agenda:</strong>
+                          <div className="mt-1 space-y-1">
+                            {(currentMeeting as any).meetingAgenda.map((item: any, index: number) => (
+                              <div key={index} className="flex items-center justify-between p-1 border rounded text-xs">
+                                <span>{item.item || item}</span>
+                                {item.timeAllocation && (
+                                  <Badge variant="outline" className="text-xs">{item.timeAllocation}min</Badge>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {!(currentMeeting as any).meetingObjectives?.length && !(currentMeeting as any).meetingAgenda?.length && (
+                        <p className="text-muted-foreground">No objectives or agenda specified</p>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full"
+                      onClick={() => {
+                        let agendaText = '';
+                        if ((currentMeeting as any).meetingObjectives?.length > 0) {
+                          agendaText += 'Objectives:\n' + (currentMeeting as any).meetingObjectives.map((obj: string) => `• ${obj}`).join('\n') + '\n\n';
+                        }
+                        if ((currentMeeting as any).meetingAgenda?.length > 0) {
+                          agendaText += 'Agenda:\n' + (currentMeeting as any).meetingAgenda.map((item: any, index: number) => `${index + 1}. ${item.item || item}${item.timeAllocation ? ` (${item.timeAllocation}min)` : ''}`).join('\n');
+                        }
+                        if (!agendaText) agendaText = 'No objectives or agenda specified';
+                        navigator.clipboard.writeText(agendaText);
+                        toast({ title: "Objectives & agenda copied" });
+                      }}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy Agenda
+                    </Button>
+                  </Card>
+                </div>
+
+                {/* Additional Context */}
+                {((currentMeeting as any).meetingContext || (currentMeeting as any).meetingUrgency) && (
+                  <Card className="p-4">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Additional Context
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      {(currentMeeting as any).meetingContext && (
+                        <div>
+                          <strong>Context:</strong>
+                          <p className="mt-1 text-muted-foreground">{(currentMeeting as any).meetingContext}</p>
+                        </div>
+                      )}
+                      {(currentMeeting as any).meetingUrgency && (
+                        <div>
+                          <strong>Urgency:</strong>
+                          <Badge className="ml-2" variant={
+                            (currentMeeting as any).meetingUrgency === 'high' ? 'destructive' :
+                            (currentMeeting as any).meetingUrgency === 'critical' ? 'destructive' :
+                            (currentMeeting as any).meetingUrgency === 'normal' ? 'default' : 'secondary'
+                          }>
+                            {(currentMeeting as any).meetingUrgency}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Footer Actions */}
+                <div className="flex justify-end space-x-2 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAgendaModal(false)}
+                    data-testid="close-meeting-modal"
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
+
+  // Helper function to format meeting details for copying
+  const formatMeetingForCopy = (meeting: Communication) => {
+    const lines = [
+      `MEETING DETAILS`,
+      `================`,
+      '',
+      `Title: ${meeting.title}`,
+      `Purpose: ${meeting.content || 'No purpose specified'}`,
+      `Type: ${(meeting as any).meetingType || 'General'}`,
+      `Status: ${meeting.status}`,
+      '',
+      `SCHEDULE`,
+      `--------`,
+      `Date & Time: ${meeting.meetingWhen ? new Date(meeting.meetingWhen).toLocaleDateString() + ' at ' + new Date(meeting.meetingWhen).toLocaleTimeString() : 'TBD'}`,
+      `Duration: ${(meeting as any).meetingDuration || 60} minutes`,
+      `Location: ${(meeting as any).meetingWhere || 'TBD'}`,
+      `Timezone: ${(meeting as any).meetingTimezone || 'Local timezone'}`,
+      '',
+    ];
+
+    if ((meeting as any).meetingParticipants?.length > 0) {
+      lines.push(`PARTICIPANTS`);
+      lines.push(`------------`);
+      (meeting as any).meetingParticipants.forEach((p: any) => {
+        lines.push(`• ${p.name} (${p.role})${p.email ? ' - ' + p.email : ''}`);
+      });
+      lines.push('');
+    }
+
+    if ((meeting as any).meetingObjectives?.length > 0) {
+      lines.push(`OBJECTIVES`);
+      lines.push(`----------`);
+      (meeting as any).meetingObjectives.forEach((obj: string) => {
+        lines.push(`• ${obj}`);
+      });
+      lines.push('');
+    }
+
+    if ((meeting as any).meetingAgenda?.length > 0) {
+      lines.push(`AGENDA`);
+      lines.push(`------`);
+      (meeting as any).meetingAgenda.forEach((item: any, index: number) => {
+        lines.push(`${index + 1}. ${item.item || item}${item.timeAllocation ? ` (${item.timeAllocation}min)` : ''}`);
+      });
+      lines.push('');
+    }
+
+    if ((meeting as any).meetingContext) {
+      lines.push(`CONTEXT`);
+      lines.push(`-------`);
+      lines.push((meeting as any).meetingContext);
+      lines.push('');
+    }
+
+    return lines.join('\n');
+  };
+
+  // Helper function to format meeting invite for copying
+  const formatMeetingInvite = (meeting: Communication) => {
+    const lines = [
+      `Subject: Meeting Invitation - ${meeting.title}`,
+      '',
+      `You are invited to attend: ${meeting.title}`,
+      '',
+      `📅 Date & Time: ${meeting.meetingWhen ? new Date(meeting.meetingWhen).toLocaleDateString() + ' at ' + new Date(meeting.meetingWhen).toLocaleTimeString() : 'TBD'}`,
+      `⏱️ Duration: ${(meeting as any).meetingDuration || 60} minutes`,
+      `📍 Location: ${(meeting as any).meetingWhere || 'TBD'}`,
+      `🌍 Timezone: ${(meeting as any).meetingTimezone || 'Local timezone'}`,
+      '',
+    ];
+
+    if (meeting.content) {
+      lines.push(`📋 Purpose:`);
+      lines.push(meeting.content);
+      lines.push('');
+    }
+
+    if ((meeting as any).meetingObjectives?.length > 0) {
+      lines.push(`🎯 Meeting Objectives:`);
+      (meeting as any).meetingObjectives.forEach((obj: string) => {
+        lines.push(`• ${obj}`);
+      });
+      lines.push('');
+    }
+
+    if ((meeting as any).meetingAgenda?.length > 0) {
+      lines.push(`📝 Agenda:`);
+      (meeting as any).meetingAgenda.forEach((item: any, index: number) => {
+        lines.push(`${index + 1}. ${item.item || item}${item.timeAllocation ? ` (${item.timeAllocation} minutes)` : ''}`);
+      });
+      lines.push('');
+    }
+
+    lines.push(`Please confirm your attendance and let us know if you have any questions.`);
+    lines.push('');
+    lines.push(`Thank you!`);
+
+    return lines.join('\n');
+  };
 }
 
 // Flyers Execution Module Component
