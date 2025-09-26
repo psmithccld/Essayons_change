@@ -1279,8 +1279,7 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 // Change Artifacts Insert Schema
 export const insertChangeArtifactSchema = createInsertSchema(changeArtifacts).omit({
   id: true,
-  createdAt: true,
-  updatedAt: true,
+  uploadedAt: true,
 }).extend({
   category: z.enum(['document', 'image', 'template', 'presentation', 'other']).default('document'),
   accessLevel: z.enum(['project', 'public', 'restricted']).default('project'),

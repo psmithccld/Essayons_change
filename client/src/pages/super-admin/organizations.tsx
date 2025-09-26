@@ -81,7 +81,7 @@ export default function SuperAdminOrganizations() {
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const { sessionId } = useSuperAdmin();
+  const { isAuthenticated } = useSuperAdmin();
   const { toast } = useToast();
 
   // Fetch organizations
@@ -89,9 +89,7 @@ export default function SuperAdminOrganizations() {
     queryKey: ["/api/super-admin/organizations"],
     queryFn: async () => {
       const response = await fetch("/api/super-admin/organizations", {
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include', // Use cookies for authentication
       });
       if (!response.ok) throw new Error("Failed to fetch organizations");
       const rawData = await response.json();
@@ -103,7 +101,7 @@ export default function SuperAdminOrganizations() {
         isActive: org.status === "active", // Map status to isActive boolean
       })) as Organization[];
     },
-    enabled: !!sessionId,
+    enabled: isAuthenticated,
   });
 
   // Create organization mutation
@@ -129,8 +127,8 @@ export default function SuperAdminOrganizations() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-super-admin-session": sessionId!,
         },
+        credentials: 'include', // Use cookies for authentication
         body: JSON.stringify(organizationData),
       });
       if (!response.ok) {
@@ -179,8 +177,8 @@ export default function SuperAdminOrganizations() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "x-super-admin-session": sessionId!,
         },
+        credentials: 'include', // Use cookies for authentication
         body: JSON.stringify(organizationData),
       });
       if (!response.ok) {
@@ -213,9 +211,7 @@ export default function SuperAdminOrganizations() {
     mutationFn: async (id: string) => {
       const response = await fetch(`/api/super-admin/organizations/${id}`, {
         method: "DELETE",
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include', // Use cookies for authentication
       });
       if (!response.ok) {
         const error = await response.json();
