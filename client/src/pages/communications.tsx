@@ -1111,7 +1111,6 @@ function EmailsExecutionModule() {
             )}
           </DialogContent>
         </Dialog>
-      </CardContent>
     </Card>
   );
 
@@ -2565,7 +2564,6 @@ function MeetingsExecutionModule() {
             )}
           </DialogContent>
         </Dialog>
-      </CardContent>
     </Card>
   );
 
@@ -3364,7 +3362,6 @@ function ChannelPreferences() {
             </div>
           </DialogContent>
         </Dialog>
-      </CardContent>
     </Card>
   );
 }
@@ -3744,7 +3741,6 @@ function PhaseGuidance() {
             )}
           </DialogContent>
         </Dialog>
-      </CardContent>
     </Card>
   );
 }
@@ -4181,7 +4177,6 @@ function ResistanceIdentification() {
             </Form>
           </DialogContent>
         </Dialog>
-      </CardContent>
     </Card>
   );
 }
