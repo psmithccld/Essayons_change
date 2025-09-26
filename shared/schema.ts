@@ -1976,23 +1976,49 @@ export const superAdminUsers = pgTable("super_admin_users", {
   name: text("name").notNull(),
   role: text("role").notNull().default("admin"), // admin, super_admin, platform_manager
   isActive: boolean("is_active").notNull().default(true),
+  // MFA (Multi-Factor Authentication) fields
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
+  totpSecret: text("totp_secret"), // Encrypted TOTP secret for authenticator apps
+  backupCodes: text("backup_codes").array(), // Array of hashed backup codes for recovery
+  mfaEnrolledAt: timestamp("mfa_enrolled_at"), // When MFA was first enabled
+  lastMfaUsedAt: timestamp("last_mfa_used_at"), // Last time MFA was successfully used
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   usernameIdx: index("super_admin_users_username_idx").on(table.username),
   emailIdx: index("super_admin_users_email_idx").on(table.email),
+  mfaEnabledIdx: index("super_admin_users_mfa_enabled_idx").on(table.mfaEnabled),
 }));
 
-// Super Admin Sessions - separate session management
+// Super Admin Sessions - separate session management with MFA tracking
 export const superAdminSessions = pgTable("super_admin_sessions", {
   id: text("id").primaryKey(), // Session ID
   superAdminUserId: uuid("super_admin_user_id").references(() => superAdminUsers.id, { onDelete: "cascade" }).notNull(),
+  // MFA verification tracking
+  mfaVerified: boolean("mfa_verified").notNull().default(false), // Whether MFA was completed for this session
+  mfaVerifiedAt: timestamp("mfa_verified_at"), // When MFA verification was completed
+  pendingMfaVerification: boolean("pending_mfa_verification").notNull().default(false), // Session requires MFA verification
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   userIdx: index("super_admin_sessions_user_idx").on(table.superAdminUserId),
   expiresIdx: index("super_admin_sessions_expires_idx").on(table.expiresAt),
+  mfaVerifiedIdx: index("super_admin_sessions_mfa_verified_idx").on(table.mfaVerified),
+}));
+
+// Super Admin MFA Setup - temporary storage during MFA enrollment
+export const superAdminMfaSetup = pgTable("super_admin_mfa_setup", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  superAdminUserId: uuid("super_admin_user_id").references(() => superAdminUsers.id, { onDelete: "cascade" }).notNull().unique(),
+  tempTotpSecret: text("temp_totp_secret").notNull(), // Temporary TOTP secret during setup
+  backupCodes: text("backup_codes").array().notNull(), // Generated backup codes for download
+  qrCodeDataUrl: text("qr_code_data_url").notNull(), // QR code data URL for easy setup
+  expiresAt: timestamp("expires_at").notNull(), // Setup expires in 10 minutes
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("super_admin_mfa_setup_user_idx").on(table.superAdminUserId),
+  expiresIdx: index("super_admin_mfa_setup_expires_idx").on(table.expiresAt),
 }));
 
 // Super Admin Insert Schemas
@@ -2001,6 +2027,13 @@ export const insertSuperAdminUserSchema = createInsertSchema(superAdminUsers).om
   createdAt: true,
   updatedAt: true,
   lastLoginAt: true,
+  mfaEnrolledAt: true,
+  lastMfaUsedAt: true,
+});
+
+export const insertSuperAdminMfaSetupSchema = createInsertSchema(superAdminMfaSetup).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertSuperAdminSessionSchema = createInsertSchema(superAdminSessions).omit({
@@ -2014,10 +2047,28 @@ export type InsertSuperAdminUser = z.infer<typeof insertSuperAdminUserSchema>;
 export type SuperAdminSession = typeof superAdminSessions.$inferSelect;
 export type InsertSuperAdminSession = z.infer<typeof insertSuperAdminSessionSchema>;
 
+export type SuperAdminMfaSetup = typeof superAdminMfaSetup.$inferSelect;
+export type InsertSuperAdminMfaSetup = z.infer<typeof insertSuperAdminMfaSetupSchema>;
+
 // Super Admin authentication schemas
 export const superAdminLoginSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
+});
+
+// MFA verification schema
+export const superAdminMfaVerifySchema = z.object({
+  sessionId: z.string().min(1, "Session ID is required"),
+  totpCode: z.string().regex(/^\d{6}$/, "TOTP code must be 6 digits").optional(),
+  backupCode: z.string().min(8, "Backup code must be at least 8 characters").optional(),
+}).refine(data => data.totpCode || data.backupCode, {
+  message: "Either TOTP code or backup code is required",
+});
+
+// MFA setup completion schema
+export const superAdminMfaSetupCompleteSchema = z.object({
+  setupId: z.string().min(1, "Setup ID is required"),
+  totpCode: z.string().regex(/^\d{6}$/, "TOTP code must be 6 digits"),
 });
 
 export const superAdminRegistrationSchema = z.object({

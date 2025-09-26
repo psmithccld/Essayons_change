@@ -4,7 +4,7 @@ import {
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
   organizations, organizationMemberships, organizationSettings, plans, subscriptions, invitations,
-  superAdminUsers, superAdminSessions, supportTickets, supportConversations,
+  superAdminUsers, superAdminSessions, superAdminMfaSetup, supportTickets, supportConversations,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type CommunicationVersion, type InsertCommunicationVersion, type Survey, type InsertSurvey,
@@ -21,7 +21,7 @@ import {
   type Organization, type InsertOrganization, type OrganizationMembership, type InsertOrganizationMembership,
   type OrganizationSettings, type InsertOrganizationSettings,
   type Plan, type InsertPlan, type Subscription, type InsertSubscription, type Invitation, type InsertInvitation,
-  type SuperAdminUser, type InsertSuperAdminUser, type SuperAdminSession, type InsertSuperAdminSession,
+  type SuperAdminUser, type InsertSuperAdminUser, type SuperAdminSession, type InsertSuperAdminSession, type SuperAdminMfaSetup, type InsertSuperAdminMfaSetup,
   type SuperAdminLoginRequest, type SuperAdminRegistrationRequest,
   type SupportTicket, type InsertSupportTicket, type SupportConversation, type InsertSupportConversation, type GPTMessage
 } from "@shared/schema";
@@ -1318,8 +1318,8 @@ export class DatabaseStorage implements IStorage {
     return userWithoutHash as SuperAdminUser;
   }
 
-  // Super Admin Session Management
-  async createSuperAdminSession(userId: string): Promise<SuperAdminSession> {
+  // Super Admin Session Management with MFA support
+  async createSuperAdminSession(userId: string, mfaRequired: boolean = false): Promise<SuperAdminSession> {
     // Generate cryptographically secure session ID
     const sessionId = crypto.randomBytes(32).toString('hex');
     
@@ -1329,6 +1329,9 @@ export class DatabaseStorage implements IStorage {
     const sessionData = {
       id: sessionId,
       superAdminUserId: userId,
+      pendingMfaVerification: mfaRequired,
+      mfaVerified: !mfaRequired, // If MFA not required, mark as verified
+      mfaVerifiedAt: !mfaRequired ? new Date() : undefined,
       expiresAt
     };
 
@@ -1356,8 +1359,203 @@ export class DatabaseStorage implements IStorage {
     try {
       const now = new Date();
       await db.delete(superAdminSessions).where(sql`expires_at < ${now}`);
+      // Also cleanup expired MFA setup sessions
+      await db.delete(superAdminMfaSetup).where(sql`expires_at < ${now}`);
     } catch (error) {
       console.error("Error cleaning up expired super admin sessions:", error);
+    }
+  }
+
+  // SECURITY: MFA Management for Super Admin Users
+  async initiateSuperAdminMfaSetup(userId: string): Promise<{ setupId: string; qrCode: string; backupCodes: string[] }> {
+    // Import TOTP library dynamically
+    const speakeasy = await import('speakeasy');
+    const qrcode = await import('qrcode');
+    const crypto = await import('crypto');
+    
+    // Generate TOTP secret
+    const secret = speakeasy.generateSecret({
+      name: 'Super Admin',
+      issuer: 'Project Management Platform',
+      length: 32
+    });
+
+    // Generate backup codes (8 codes, 12 characters each)
+    const backupCodes: string[] = [];
+    for (let i = 0; i < 8; i++) {
+      const code = crypto.randomBytes(6).toString('hex').toUpperCase();
+      backupCodes.push(`${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8)}`);
+    }
+
+    // Generate QR code
+    const qrCodeDataUrl = await qrcode.toDataURL(secret.otpauth_url!);
+
+    // Store temporary setup data (expires in 10 minutes)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    
+    const setupData = {
+      superAdminUserId: userId,
+      tempTotpSecret: secret.base32!,
+      backupCodes,
+      qrCodeDataUrl,
+      expiresAt
+    };
+
+    // Remove any existing setup for this user
+    await db.delete(superAdminMfaSetup).where(eq(superAdminMfaSetup.superAdminUserId, userId));
+    
+    // Insert new setup
+    const [setup] = await db.insert(superAdminMfaSetup).values(setupData).returning();
+
+    return {
+      setupId: setup.id,
+      qrCode: qrCodeDataUrl,
+      backupCodes
+    };
+  }
+
+  async completeSuperAdminMfaSetup(setupId: string, totpCode: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // Import TOTP library
+      const speakeasy = await import('speakeasy');
+      const bcrypt = await import('bcrypt');
+      
+      // Get setup data
+      const [setup] = await db.select()
+        .from(superAdminMfaSetup)
+        .where(and(
+          eq(superAdminMfaSetup.id, setupId),
+          sql`expires_at > NOW()`
+        ));
+      
+      if (!setup) {
+        return { success: false, message: "Setup session expired or invalid" };
+      }
+
+      // Verify TOTP code
+      const verified = speakeasy.totp.verify({
+        secret: setup.tempTotpSecret,
+        encoding: 'base32',
+        token: totpCode,
+        window: 2 // Allow 2 time steps of drift (±60 seconds)
+      });
+
+      if (!verified) {
+        return { success: false, message: "Invalid TOTP code" };
+      }
+
+      // Hash backup codes for storage
+      const hashedBackupCodes = await Promise.all(
+        setup.backupCodes.map(code => bcrypt.hash(code, 10))
+      );
+
+      // Update user with MFA settings
+      await db.update(superAdminUsers)
+        .set({
+          mfaEnabled: true,
+          totpSecret: setup.tempTotpSecret, // In production, this should be encrypted
+          backupCodes: hashedBackupCodes,
+          mfaEnrolledAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(superAdminUsers.id, setup.superAdminUserId));
+
+      // Clean up setup data
+      await db.delete(superAdminMfaSetup).where(eq(superAdminMfaSetup.id, setupId));
+
+      return { success: true, message: "MFA enabled successfully" };
+    } catch (error) {
+      console.error("Error completing MFA setup:", error);
+      return { success: false, message: "Failed to complete MFA setup" };
+    }
+  }
+
+  async verifySuperAdminMfa(userId: string, totpCode?: string, backupCode?: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // Get user with MFA settings
+      const [user] = await db.select().from(superAdminUsers).where(eq(superAdminUsers.id, userId));
+      
+      if (!user || !user.mfaEnabled) {
+        return { success: false, message: "MFA not enabled for this user" };
+      }
+
+      if (totpCode) {
+        // Verify TOTP code
+        const speakeasy = await import('speakeasy');
+        
+        const verified = speakeasy.totp.verify({
+          secret: user.totpSecret!,
+          encoding: 'base32',
+          token: totpCode,
+          window: 2 // Allow 2 time steps of drift (±60 seconds)
+        });
+
+        if (verified) {
+          // Update last MFA used timestamp
+          await db.update(superAdminUsers)
+            .set({ lastMfaUsedAt: new Date() })
+            .where(eq(superAdminUsers.id, userId));
+          
+          return { success: true, message: "MFA verification successful" };
+        }
+      }
+
+      if (backupCode && user.backupCodes) {
+        // Verify backup code
+        const bcrypt = await import('bcrypt');
+        
+        for (let i = 0; i < user.backupCodes.length; i++) {
+          const isValid = await bcrypt.compare(backupCode, user.backupCodes[i]);
+          if (isValid) {
+            // Remove used backup code
+            const updatedBackupCodes = user.backupCodes.filter((_, index) => index !== i);
+            
+            await db.update(superAdminUsers)
+              .set({ 
+                backupCodes: updatedBackupCodes,
+                lastMfaUsedAt: new Date()
+              })
+              .where(eq(superAdminUsers.id, userId));
+            
+            return { success: true, message: "Backup code verification successful" };
+          }
+        }
+      }
+
+      return { success: false, message: "Invalid MFA code" };
+    } catch (error) {
+      console.error("Error verifying MFA:", error);
+      return { success: false, message: "MFA verification failed" };
+    }
+  }
+
+  async updateSuperAdminSessionMfaStatus(sessionId: string, verified: boolean): Promise<void> {
+    await db.update(superAdminSessions)
+      .set({
+        mfaVerified: verified,
+        mfaVerifiedAt: verified ? new Date() : undefined,
+        pendingMfaVerification: !verified
+      })
+      .where(eq(superAdminSessions.id, sessionId));
+  }
+
+  async disableSuperAdminMfa(userId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      await db.update(superAdminUsers)
+        .set({
+          mfaEnabled: false,
+          totpSecret: null,
+          backupCodes: null,
+          mfaEnrolledAt: null,
+          lastMfaUsedAt: null,
+          updatedAt: new Date()
+        })
+        .where(eq(superAdminUsers.id, userId));
+      
+      return { success: true, message: "MFA disabled successfully" };
+    } catch (error) {
+      console.error("Error disabling MFA:", error);
+      return { success: false, message: "Failed to disable MFA" };
     }
   }
 

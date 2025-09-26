@@ -1031,7 +1031,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SUPER ADMIN AUTHENTICATION ROUTES - Platform Management
   // ===============================================
 
-  // Super Admin authentication middleware - completely separate from tenant auth
+  // Super Admin authentication middleware with MFA verification
   const requireSuperAdminAuth = async (req: Request & { superAdminUser?: any }, res: Response, next: NextFunction) => {
     try {
       // SECURITY: Read session ID from secure HttpOnly cookie instead of custom header
@@ -1066,6 +1066,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sameSite: 'strict'
         });
         return res.status(401).json({ error: "Invalid or inactive super admin account" });
+      }
+
+      // SECURITY: Check MFA verification if required
+      if (user.mfaEnabled && session.pendingMfaVerification) {
+        return res.status(403).json({ 
+          error: "MFA verification required",
+          requiresMfa: true,
+          sessionId: session.id
+        });
       }
 
       // Store user info for use in route handlers
@@ -1127,8 +1136,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // SECURITY: Record successful login (clears failed attempts)
       recordSuccessfulLogin(username, clientIp);
       
-      // Create super admin session
-      const session = await storage.createSuperAdminSession(user.id);
+      // SECURITY: Check if MFA is enabled for this user
+      const mfaRequired = user.mfaEnabled || false;
+      
+      // Create super admin session with MFA requirement
+      const session = await storage.createSuperAdminSession(user.id, mfaRequired);
 
       // SECURITY: Set secure, HttpOnly cookie for Super Admin session
       res.cookie('superAdminSessionId', session.id, {
@@ -1139,11 +1151,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         path: '/api/super-admin' // Restrict cookie to Super Admin endpoints only
       });
 
-      res.json({
-        user,
-        expiresAt: session.expiresAt,
-        message: "Super admin login successful"
-      });
+      if (mfaRequired) {
+        // User needs to complete MFA verification
+        res.json({
+          user: { id: user.id, username: user.username, mfaEnabled: true },
+          requiresMfa: true,
+          sessionId: session.id,
+          message: "Please complete MFA verification"
+        });
+      } else {
+        // Login complete
+        res.json({
+          user,
+          expiresAt: session.expiresAt,
+          message: "Super admin login successful"
+        });
+      }
     } catch (error) {
       console.error("Error during super admin login:", error);
       res.status(500).json({ error: "Login failed" });
@@ -1161,6 +1184,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error checking super admin auth status:", error);
       res.status(500).json({ error: "Failed to check authentication status" });
+    }
+  });
+
+  // MFA Verification for Super Admin with rate limiting
+  app.post("/api/super-admin/auth/verify-mfa", async (req: Request, res: Response) => {
+    try {
+      const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
+      
+      // SECURITY: Rate limiting for MFA verification (5 attempts per 15 minutes per IP)
+      if (!checkRateLimit(`mfa-verify-ip:${clientIp}`, 5, 900000)) {
+        return res.status(429).json({ 
+          error: "Too many MFA verification attempts. Please wait before trying again.",
+          retryAfter: 900
+        });
+      }
+      
+      const { superAdminMfaVerifySchema } = await import("@shared/schema");
+      
+      // Validate request body
+      const validationResult = superAdminMfaVerifySchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid MFA verification data", 
+          details: validationResult.error.errors 
+        });
+      }
+
+      const { sessionId, totpCode, backupCode } = validationResult.data;
+
+      // SECURITY: Per-session rate limiting (3 attempts per session to prevent brute force)
+      if (!checkRateLimit(`mfa-verify-session:${sessionId}`, 3, 900000)) {
+        return res.status(429).json({ 
+          error: "Too many verification attempts for this session. Please wait before trying again.",
+          retryAfter: 900
+        });
+      }
+
+      // Get session to verify it exists and get user ID
+      const session = await storage.getSuperAdminSession(sessionId);
+      if (!session || !session.pendingMfaVerification) {
+        return res.status(401).json({ error: "Invalid or expired session" });
+      }
+
+      // Verify MFA code
+      const mfaResult = await storage.verifySuperAdminMfa(session.superAdminUserId, totpCode, backupCode);
+      if (!mfaResult.success) {
+        console.warn(`SECURITY: Failed MFA verification attempt for session ${sessionId} from IP ${clientIp}`);
+        return res.status(401).json({ error: mfaResult.message });
+      }
+
+      // SECURITY: Generate new session ID after successful MFA (prevent session fixation)
+      const newSession = await storage.createSuperAdminSession(session.superAdminUserId, false);
+      
+      // Delete old session
+      await storage.deleteSuperAdminSession(sessionId);
+      
+      // Clear old cookie and set new one
+      res.clearCookie('superAdminSessionId', { 
+        path: '/api/super-admin',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict'
+      });
+      
+      res.cookie('superAdminSessionId', newSession.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 2 * 60 * 60 * 1000, // 2 hours
+        path: '/api/super-admin'
+      });
+
+      // Get full user details
+      const user = await storage.getSuperAdminUser(session.superAdminUserId);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      console.log(`SECURITY: Successful MFA verification for user ${user.username} from IP ${clientIp}`);
+      
+      res.json({
+        user,
+        expiresAt: newSession.expiresAt,
+        message: "MFA verification successful"
+      });
+    } catch (error) {
+      console.error("Error during MFA verification:", error);
+      res.status(500).json({ error: "MFA verification failed" });
+    }
+  });
+
+  // Initiate MFA Setup for Super Admin
+  app.post("/api/super-admin/mfa/setup", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const userId = req.superAdminUser.id;
+      
+      // Check if MFA is already enabled
+      if (req.superAdminUser.mfaEnabled) {
+        return res.status(400).json({ error: "MFA is already enabled for this account" });
+      }
+
+      // Initiate MFA setup
+      const setupResult = await storage.initiateSuperAdminMfaSetup(userId);
+      
+      res.json({
+        setupId: setupResult.setupId,
+        qrCode: setupResult.qrCode,
+        backupCodes: setupResult.backupCodes,
+        message: "MFA setup initiated. Scan the QR code with your authenticator app."
+      });
+    } catch (error) {
+      console.error("Error initiating MFA setup:", error);
+      res.status(500).json({ error: "Failed to initiate MFA setup" });
+    }
+  });
+
+  // Complete MFA Setup for Super Admin
+  app.post("/api/super-admin/mfa/setup/complete", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { superAdminMfaSetupCompleteSchema } = await import("@shared/schema");
+      
+      // Validate request body
+      const validationResult = superAdminMfaSetupCompleteSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid MFA setup completion data", 
+          details: validationResult.error.errors 
+        });
+      }
+
+      const { setupId, totpCode } = validationResult.data;
+
+      // Complete MFA setup
+      const result = await storage.completeSuperAdminMfaSetup(setupId, totpCode);
+      
+      if (result.success) {
+        res.json({ message: result.message });
+      } else {
+        res.status(400).json({ error: result.message });
+      }
+    } catch (error) {
+      console.error("Error completing MFA setup:", error);
+      res.status(500).json({ error: "Failed to complete MFA setup" });
+    }
+  });
+
+  // Disable MFA for Super Admin
+  app.post("/api/super-admin/mfa/disable", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const userId = req.superAdminUser.id;
+      
+      // Disable MFA
+      const result = await storage.disableSuperAdminMfa(userId);
+      
+      if (result.success) {
+        res.json({ message: result.message });
+      } else {
+        res.status(400).json({ error: result.message });
+      }
+    } catch (error) {
+      console.error("Error disabling MFA:", error);
+      res.status(500).json({ error: "Failed to disable MFA" });
     }
   });
 
