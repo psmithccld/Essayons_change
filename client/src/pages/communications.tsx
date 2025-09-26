@@ -173,7 +173,7 @@ function EmailsExecutionModule() {
     onSuccess: async (newEmail) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
       
-      // Don't auto-send - just save the email successfully
+      // Save successfully without sending per Phase 1 requirements
       const emailTypeLabel = emailType === 'point_to_point_email' ? 'Personal email' : 'Group email';
       toast({ 
         title: `${emailTypeLabel} saved successfully`, 
@@ -340,7 +340,7 @@ function EmailsExecutionModule() {
       return;
     }
 
-    // Modified to save AND send automatically
+    // Modified to save (no auto-send per Phase 1 requirements)
     createP2PEmailMutation.mutate({
       type: 'point_to_point_email',
       title: emailContent.title,
@@ -506,8 +506,8 @@ function EmailsExecutionModule() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="point_to_point_email">Personal Email - Send to one person</SelectItem>
-                      <SelectItem value="group_email">Group Email - Send to multiple recipients</SelectItem>
+                      <SelectItem value="point_to_point_email">Personal Email - For one recipient</SelectItem>
+                      <SelectItem value="group_email">Group Email - For multiple recipients</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1467,7 +1467,8 @@ function MeetingsExecutionModule() {
     createMeetingMutation.mutate(meetingData);
   };
 
-  const handleSendInvites = (meeting: Communication) => {
+  // Send functionality removed - replaced with copy functionality
+  const handleCopyMeetingDetails = (meeting: Communication) => {
     if (!meeting.meetingParticipants || meeting.meetingParticipants.length === 0) {
       toast({ title: "No participants found for this meeting", variant: "destructive" });
       return;
@@ -1495,11 +1496,13 @@ function MeetingsExecutionModule() {
       role: p.role
     }));
 
-    sendInvitesMutation.mutate({
-      meetingId: meeting.id,
-      recipients,
-      meetingData,
-      dryRun: false
+    // Copy functionality for meeting details
+    const meetingDetails = formatMeetingDetails(meeting);
+    navigator.clipboard.writeText(meetingDetails).then(() => {
+      toast({
+        title: "Meeting details copied!",
+        description: "Meeting information copied to clipboard for sharing."
+      });
     });
   };
 
@@ -2300,14 +2303,14 @@ function MeetingsExecutionModule() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        const inviteText = formatMeetingInvite(currentMeeting);
-                        navigator.clipboard.writeText(inviteText);
-                        toast({ title: "Meeting invite copied to clipboard" });
+                        const meetingText = formatMeetingDetails(currentMeeting);
+                        navigator.clipboard.writeText(meetingText);
+                        toast({ title: "Meeting details copied to clipboard" });
                       }}
                       data-testid="copy-meeting-invite"
                     >
                       <Send className="h-4 w-4 mr-2" />
-                      Copy Invite Text
+                      Copy Meeting Details
                     </Button>
                   </div>
                 </div>
