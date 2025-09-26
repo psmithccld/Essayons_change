@@ -115,8 +115,8 @@ const refineP2PEmailContentSchema = z.object({
   urgency: z.enum(['low', 'normal', 'high', 'critical']).default('normal')
 });
 
-// Demo user constant for fallback scenarios
-const DEMO_USER_ID = "demo-user-00000000-0000-0000-0000-000000000000";
+// Demo user constant for fallback scenarios  
+const DEMO_USER_ID = "bdc321c7-9687-4302-ac33-2d17f552191b";
 
 // SECURITY: Enhanced rate limiting and brute-force protection system
 // In production, use Redis for distributed rate limiting
@@ -450,8 +450,8 @@ const requireAuth = async (req: AuthenticatedRequest, res: Response, next: NextF
         userId = headerUserId;
         console.warn('Using x-user-id header in development mode - NOT SECURE FOR PRODUCTION');
       } else {
-        // Fall back to demo user only in development
-        userId = "550e8400-e29b-41d4-a716-446655440000";
+        // Fall back to admin user with organization context in development
+        userId = "bdc321c7-9687-4302-ac33-2d17f552191b";
         console.warn('Using demo user ID in development mode');
       }
     }
@@ -936,7 +936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // DEVELOPMENT: Allow demo user fallback for development mode
       if (!userId && process.env.NODE_ENV === 'development') {
-        userId = "550e8400-e29b-41d4-a716-446655440000";
+        userId = "bdc321c7-9687-4302-ac33-2d17f552191b";
         console.log('Using demo user ID for auth status in development mode');
       }
       
