@@ -94,7 +94,14 @@ export default function SuperAdminOrganizations() {
         },
       });
       if (!response.ok) throw new Error("Failed to fetch organizations");
-      return response.json() as Promise<Organization[]>;
+      const rawData = await response.json();
+      
+      // Transform backend data to match frontend interface
+      return rawData.map((org: any) => ({
+        ...org,
+        domain: org.slug, // Map slug to domain for display
+        isActive: org.status === "active", // Map status to isActive boolean
+      })) as Organization[];
     },
     enabled: !!sessionId,
   });
@@ -115,7 +122,7 @@ export default function SuperAdminOrganizations() {
         maxUsers: data.maxUsers,
         taxId: data.taxId,
         status: data.isActive ? "active" : "inactive", // Map isActive to status
-        ownerUserId: "bdc321c7-9687-4302-ac33-2d17f552191b", // Default admin user as owner
+        ownerUserId: "bdc321c7-9687-4302-ac33-2d17f552191b", // TODO: Make this configurable/dynamic for production
       };
       
       const response = await fetch("/api/super-admin/organizations", {
