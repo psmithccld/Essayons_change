@@ -21,7 +21,8 @@ import {
   FileText,
   Settings,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Crown
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -56,7 +57,8 @@ const allNavigationItems: NavigationItem[] = [
   { id: "gpt-coach", icon: Bot, label: "GPT Coach", path: "/gpt-coach" },
   { id: "fishbone", icon: Fish, label: "Change Process Flow", path: "/change-process-flow" },
   { id: "process-mapping", icon: GitBranch, label: "Development Maps", path: "/process-mapping", permissions: ["canSeeAllProjects", "canModifyProjects"], requireAll: false },
-  { id: "organization", icon: Settings, label: "Organization Settings", path: "/organization", permissions: ["canModifyOrganizationSettings"] }
+  { id: "organization", icon: Settings, label: "Organization Settings", path: "/organization", permissions: ["canModifyOrganizationSettings"] },
+  { id: "super-admin", icon: Crown, label: "Super Admin", path: "/super-admin", permissions: ["canManageSystem"] }
 ];
 
 const SIDEBAR_ORDER_KEY = "sidebarOrder";
