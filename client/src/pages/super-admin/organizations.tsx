@@ -102,13 +102,29 @@ export default function SuperAdminOrganizations() {
   // Create organization mutation
   const createOrgMutation = useMutation({
     mutationFn: async (data: OrganizationFormData) => {
+      // Transform form data to match database schema
+      const organizationData = {
+        name: data.name,
+        slug: data.domain, // Map domain to slug
+        description: data.description,
+        contactEmail: data.contactEmail,
+        billingEmail: data.billingEmail,
+        contactPhone: data.contactPhone,
+        address: data.address,
+        website: data.website,
+        maxUsers: data.maxUsers,
+        taxId: data.taxId,
+        status: data.isActive ? "active" : "inactive", // Map isActive to status
+        ownerUserId: "bdc321c7-9687-4302-ac33-2d17f552191b", // Default admin user as owner
+      };
+      
       const response = await fetch("/api/super-admin/organizations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-super-admin-session": sessionId!,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(organizationData),
       });
       if (!response.ok) {
         const error = await response.json();
@@ -137,13 +153,28 @@ export default function SuperAdminOrganizations() {
   // Update organization mutation
   const updateOrgMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: OrganizationFormData }) => {
+      // Transform form data to match database schema
+      const organizationData = {
+        name: data.name,
+        slug: data.domain, // Map domain to slug
+        description: data.description,
+        contactEmail: data.contactEmail,
+        billingEmail: data.billingEmail,
+        contactPhone: data.contactPhone,
+        address: data.address,
+        website: data.website,
+        maxUsers: data.maxUsers,
+        taxId: data.taxId,
+        status: data.isActive ? "active" : "inactive", // Map isActive to status
+      };
+      
       const response = await fetch(`/api/super-admin/organizations/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "x-super-admin-session": sessionId!,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(organizationData),
       });
       if (!response.ok) {
         const error = await response.json();
