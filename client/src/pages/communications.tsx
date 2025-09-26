@@ -112,7 +112,7 @@ function EmailsExecutionModule() {
   };
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showEmailPreviewModal, setShowEmailPreviewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [emailContent, setEmailContent] = useState({ title: '', content: '', callToAction: '' });
@@ -512,7 +512,7 @@ function EmailsExecutionModule() {
                             size="sm"
                             onClick={() => {
                               setCurrentEmail(email);
-                              setShowPreviewModal(true);
+                              setShowEmailPreviewModal(true);
                             }}
                             data-testid={`button-preview-p2p-${email.id}`}
                           >
@@ -961,7 +961,7 @@ function EmailsExecutionModule() {
 
 
         {/* Email Preview Modal with Copy/Paste Functionality */}
-        <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
+        <Dialog open={showEmailPreviewModal} onOpenChange={setShowEmailPreviewModal}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center space-x-2">
@@ -1173,7 +1173,7 @@ function EmailsExecutionModule() {
                 <div className="flex justify-end space-x-2 pt-4 border-t">
                   <Button
                     variant="outline"
-                    onClick={() => setShowPreviewModal(false)}
+                    onClick={() => setShowEmailPreviewModal(false)}
                     data-testid="button-close-preview"
                   >
                     Close
@@ -2906,7 +2906,7 @@ function FlyersExecutionModule() {
   const [selectedTemplate, setSelectedTemplate] = useState<CommunicationTemplate | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showFlyerPreviewModal, setShowFlyerPreviewModal] = useState(false);
   const [flyerContent, setFlyerContent] = useState({ title: '', content: '', callToAction: '' });
   const [currentFlyer, setCurrentFlyer] = useState<Communication | null>(null);
   const [currentEmail, setCurrentEmail] = useState<Communication | null>(null);
