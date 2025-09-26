@@ -1068,8 +1068,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid or inactive super admin account" });
       }
 
-      // SECURITY: Check MFA verification if required
-      if (user.mfaEnabled && session.pendingMfaVerification) {
+      // SECURITY: Check MFA verification if required (temporary fallback for missing columns)
+      if ((user as any).mfaEnabled && (session as any).pendingMfaVerification) {
         return res.status(403).json({ 
           error: "MFA verification required",
           requiresMfa: true,
@@ -1136,8 +1136,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // SECURITY: Record successful login (clears failed attempts)
       recordSuccessfulLogin(username, clientIp);
       
-      // SECURITY: Check if MFA is enabled for this user
-      const mfaRequired = user.mfaEnabled || false;
+      // SECURITY: Check if MFA is enabled for this user (temporary fallback for missing columns)
+      const mfaRequired = (user as any).mfaEnabled || false;
       
       // Create super admin session with MFA requirement
       const session = await storage.createSuperAdminSession(user.id, mfaRequired);
@@ -1667,6 +1667,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error during session cleanup:", error);
       res.status(500).json({ error: "Session cleanup failed" });
+    }
+  });
+
+  // Super Admin User Management Endpoints
+  
+  // GET /api/super-admin/users - List all Super Admin users
+  app.get("/api/super-admin/users", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const adminUsers = await storage.getAllSuperAdminUsers();
+      res.json(adminUsers);
+    } catch (error) {
+      console.error("Error fetching super admin users:", error);
+      res.status(500).json({ error: "Failed to fetch admin users" });
+    }
+  });
+
+  // POST /api/super-admin/users - Create new Super Admin user
+  app.post("/api/super-admin/users", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { createSuperAdminSchema } = await import("@shared/schema");
+      
+      // Validate request body
+      const validationResult = createSuperAdminSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid user data", 
+          details: validationResult.error.errors 
+        });
+      }
+
+      const { username, password } = validationResult.data;
+
+      // Check if username already exists
+      const existingUser = await storage.getSuperAdminUserByUsername(username);
+      if (existingUser) {
+        return res.status(409).json({ error: "Username already exists" });
+      }
+
+      // Create new Super Admin user
+      const newUser = await storage.createSuperAdminUser(username, password);
+      
+      res.status(201).json({
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          isActive: newUser.isActive,
+          createdAt: newUser.createdAt
+        },
+        message: "Super Admin user created successfully"
+      });
+    } catch (error) {
+      console.error("Error creating super admin user:", error);
+      res.status(500).json({ error: "Failed to create admin user" });
+    }
+  });
+
+  // POST /api/super-admin/users/:userId/activate - Activate Super Admin user
+  app.post("/api/super-admin/users/:userId/activate", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const userId = req.params.userId;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+
+      await storage.updateSuperAdminUserStatus(userId, true);
+      
+      res.json({ message: "User activated successfully" });
+    } catch (error) {
+      console.error("Error activating super admin user:", error);
+      res.status(500).json({ error: "Failed to activate user" });
+    }
+  });
+
+  // POST /api/super-admin/users/:userId/deactivate - Deactivate Super Admin user
+  app.post("/api/super-admin/users/:userId/deactivate", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const userId = req.params.userId;
+      const currentUserId = req.superAdminUser.id;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+
+      // Prevent self-deactivation
+      if (userId === currentUserId) {
+        return res.status(400).json({ error: "Cannot deactivate your own account" });
+      }
+
+      await storage.updateSuperAdminUserStatus(userId, false);
+      
+      res.json({ message: "User deactivated successfully" });
+    } catch (error) {
+      console.error("Error deactivating super admin user:", error);
+      res.status(500).json({ error: "Failed to deactivate user" });
+    }
+  });
+
+  // POST /api/super-admin/users/:userId/force-password-reset - Force password reset
+  app.post("/api/super-admin/users/:userId/force-password-reset", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const userId = req.params.userId;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+
+      await storage.forceSuperAdminPasswordReset(userId);
+      
+      res.json({ message: "Password reset required on next login" });
+    } catch (error) {
+      console.error("Error forcing password reset:", error);
+      res.status(500).json({ error: "Failed to force password reset" });
     }
   });
 

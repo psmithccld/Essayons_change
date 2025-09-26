@@ -14,6 +14,7 @@ import {
   AlertTriangle 
 } from "lucide-react";
 import { useSuperAdmin } from "@/contexts/SuperAdminContext";
+import { SuperAdminUserManagement } from "@/components/super-admin/user-management";
 
 interface DashboardStats {
   totalOrganizations: number;
@@ -139,7 +140,7 @@ export default function SuperAdminDashboard() {
 
       {/* Main Dashboard Content */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview" data-testid="tab-overview">
             <Activity className="h-4 w-4 mr-2" />
             Overview
@@ -155,6 +156,10 @@ export default function SuperAdminDashboard() {
           <TabsTrigger value="analytics" data-testid="tab-analytics">
             <TrendingUp className="h-4 w-4 mr-2" />
             Analytics
+          </TabsTrigger>
+          <TabsTrigger value="admin-users" data-testid="tab-admin-users">
+            <UserCheck className="h-4 w-4 mr-2" />
+            Admin Users
           </TabsTrigger>
         </TabsList>
 
@@ -289,6 +294,10 @@ export default function SuperAdminDashboard() {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="admin-users">
+          <SuperAdminUserManagement />
         </TabsContent>
       </Tabs>
     </div>

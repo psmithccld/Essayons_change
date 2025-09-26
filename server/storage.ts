@@ -65,7 +65,7 @@ export interface IStorage {
   updateSuperAdminUser(id: string, user: Partial<InsertSuperAdminUser>): Promise<SuperAdminUser | undefined>;
   
   // Super Admin Session Management
-  createSuperAdminSession(userId: string): Promise<SuperAdminSession>;
+  createSuperAdminSession(userId: string, mfaRequired?: boolean): Promise<SuperAdminSession>;
   getSuperAdminSession(sessionId: string): Promise<SuperAdminSession | undefined>;
   deleteSuperAdminSession(sessionId: string): Promise<boolean>;
   cleanupExpiredSuperAdminSessions(): Promise<void>;
@@ -1557,6 +1557,42 @@ export class DatabaseStorage implements IStorage {
       console.error("Error disabling MFA:", error);
       return { success: false, message: "Failed to disable MFA" };
     }
+  }
+
+  // Super Admin User Management Methods
+  async getAllSuperAdminUsers(): Promise<SuperAdminUser[]> {
+    const users = await db.select({
+      id: superAdminUsers.id,
+      username: superAdminUsers.username,
+      email: superAdminUsers.email,
+      isActive: superAdminUsers.isActive,
+      mfaEnabled: superAdminUsers.mfaEnabled,
+      lastLoginAt: superAdminUsers.lastLoginAt,
+      createdAt: superAdminUsers.createdAt,
+      mustChangePassword: superAdminUsers.mustChangePassword
+    })
+    .from(superAdminUsers)
+    .orderBy(superAdminUsers.createdAt);
+    
+    return users as SuperAdminUser[];
+  }
+
+  async updateSuperAdminUserStatus(userId: string, isActive: boolean): Promise<void> {
+    await db.update(superAdminUsers)
+      .set({ 
+        isActive,
+        updatedAt: new Date()
+      })
+      .where(eq(superAdminUsers.id, userId));
+  }
+
+  async forceSuperAdminPasswordReset(userId: string): Promise<void> {
+    await db.update(superAdminUsers)
+      .set({ 
+        mustChangePassword: true,
+        updatedAt: new Date()
+      })
+      .where(eq(superAdminUsers.id, userId));
   }
 
   // Projects - SECURITY: Organization-scoped for tenant isolation

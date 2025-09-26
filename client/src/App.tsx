@@ -35,6 +35,7 @@ import { HelpDeskButton } from "@/components/HelpDeskButton";
 import { AppBreadcrumbs } from "@/components/layout/AppBreadcrumbs";
 import PersistentAICoach from "@/components/PersistentAICoach";
 import SuperAdminApp from "@/pages/super-admin/super-admin-app";
+import { AdminPortal } from "@/pages/admin-portal";
 
 function LoadingSpinner() {
   return (
@@ -99,6 +100,11 @@ function Router() {
   // Check if accessing Super Admin routes
   if (location.startsWith("/super-admin")) {
     return <SuperAdminApp />;
+  }
+
+  // Check if accessing hidden Admin Portal
+  if (location === "/admin-portal") {
+    return <AdminPortal />;
   }
 
   if (isLoading) {

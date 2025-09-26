@@ -2079,8 +2079,21 @@ export const superAdminRegistrationSchema = z.object({
   role: z.enum(["admin", "super_admin", "platform_manager"]).default("admin"),
 });
 
+// Create Super Admin Schema (for admin user management)
+export const createSuperAdminSchema = z.object({
+  username: z.string()
+    .min(3, "Username must be at least 3 characters")
+    .max(50, "Username must be less than 50 characters")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens"),
+  password: z.string()
+    .min(12, "Password must be at least 12 characters")
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/, 
+      "Password must contain uppercase, lowercase, number, and special character"),
+});
+
 export type SuperAdminLoginRequest = z.infer<typeof superAdminLoginSchema>;
 export type SuperAdminRegistrationRequest = z.infer<typeof superAdminRegistrationSchema>;
+export type CreateSuperAdminRequest = z.infer<typeof createSuperAdminSchema>;
 
 // AI Coach Context Types for context-aware responses
 export const coachContextPageSchema = z.enum([
