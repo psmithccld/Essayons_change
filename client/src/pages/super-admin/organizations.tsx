@@ -33,7 +33,10 @@ import {
   Globe,
   Mail,
   Phone,
-  MapPin
+  MapPin,
+  CreditCard,
+  Package,
+  DollarSign
 } from "lucide-react";
 import { useSuperAdmin } from "@/contexts/SuperAdminContext";
 import { useToast } from "@/hooks/use-toast";
@@ -75,12 +78,38 @@ interface Organization {
   updatedAt: string;
 }
 
+interface Plan {
+  id: string;
+  name: string;
+  description?: string;
+  seatLimit: number;
+  priceCents: number;
+  features: Record<string, boolean>;
+}
+
+interface SubscriptionInfo {
+  id?: string;
+  planId?: string;
+  planName?: string;
+  status?: string;
+  seatsPurchased?: number;
+  currentPeriodEnd?: string;
+  trialEndsAt?: string;
+}
+
 export default function SuperAdminOrganizations() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [availablePlans, setAvailablePlans] = useState<Plan[]>([
+    { id: "cfd6baf1-0d19-488e-8024-6d7a5649fbc6", name: "Basic Plan", description: "Essential features for small teams", seatLimit: 25, priceCents: 1500, features: {reports: true, gptCoach: false, communications: true, changeArtifacts: false, readinessSurveys: true} },
+    { id: "e7a7a24f-66e5-476f-bc59-3e3f99afc32f", name: "Professional Plan", description: "Advanced features for growing organizations", seatLimit: 100, priceCents: 2500, features: {reports: true, gptCoach: true, communications: true, changeArtifacts: true, readinessSurveys: true} },
+    { id: "ae7fbc6c-5e80-45b6-9429-311966558bc6", name: "Enterprise Plan", description: "Full feature set for large organizations", seatLimit: 500, priceCents: 3500, features: {reports: true, gptCoach: true, communications: true, changeArtifacts: true, readinessSurveys: true, customBranding: true, apiAccess: true} }
+  ]);
+  const [selectedPlan, setSelectedPlan] = useState<string>("");
+  const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
   const { isAuthenticated } = useSuperAdmin();
   const { toast } = useToast();
 
@@ -171,6 +200,9 @@ export default function SuperAdminOrganizations() {
         maxUsers: data.maxUsers,
         taxId: data.taxId,
         status: data.isActive ? "active" : "inactive", // Map isActive to status
+        // Include selected plan information
+        planId: selectedPlan || undefined,
+        planName: selectedPlan ? availablePlans.find(p => p.id === selectedPlan)?.name : undefined
       };
       
       const response = await fetch(`/api/super-admin/organizations/${id}`, {
@@ -191,6 +223,8 @@ export default function SuperAdminOrganizations() {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/organizations"] });
       setIsEditDialogOpen(false);
       setSelectedOrg(null);
+      setSelectedPlan("");
+      setSubscriptionInfo(null);
       editForm.reset();
       toast({
         title: "Success",
@@ -295,6 +329,18 @@ export default function SuperAdminOrganizations() {
       billingEmail: org.billingEmail,
       taxId: org.taxId || "",
     });
+    
+    // Find and set current plan if organization has one
+    const orgPlan = availablePlans.find(plan => plan.name === org.planName);
+    if (orgPlan) {
+      setSelectedPlan(orgPlan.id);
+    } else {
+      setSelectedPlan("");
+    }
+    
+    // Reset subscription info for now (could be loaded from API in future)
+    setSubscriptionInfo(null);
+    
     setIsEditDialogOpen(true);
   };
 
@@ -644,45 +690,327 @@ export default function SuperAdminOrganizations() {
           </DialogHeader>
           {selectedOrg && (
             <Form {...editForm}>
-              <form onSubmit={editForm.handleSubmit((data) => updateOrgMutation.mutate({ id: selectedOrg.id, data }))} className="space-y-4">
-                {/* Same form fields as create form... */}
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={editForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Organization Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Acme Corporation" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+              <form onSubmit={editForm.handleSubmit((data) => updateOrgMutation.mutate({ id: selectedOrg.id, data }))} className="space-y-6">
+                <Tabs defaultValue="basic" className="space-y-4">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                    <TabsTrigger value="subscription">Subscription</TabsTrigger>
+                    <TabsTrigger value="billing">Billing</TabsTrigger>
+                  </TabsList>
                   
-                  <FormField
-                    control={editForm.control}
-                    name="domain"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Domain</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="acme-corp" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                  <TabsContent value="basic" className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={editForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Organization Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Acme Corporation" data-testid="input-edit-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="domain"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Domain</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="acme-corp" data-testid="input-edit-domain" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={updateOrgMutation.isPending} data-testid="button-submit-edit-org">
-                    {updateOrgMutation.isPending ? "Updating..." : "Update Organization"}
-                  </Button>
+                    <FormField
+                      control={editForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Brief description of the organization..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={editForm.control}
+                        name="contactEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contact Email</FormLabel>
+                            <FormControl>
+                              <Input {...field} type="email" placeholder="admin@acme.com" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="contactPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contact Phone</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="+1 (555) 123-4567" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={editForm.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Address</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Full business address..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={editForm.control}
+                        name="website"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Website</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="https://acme.com" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="maxUsers"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Max Users</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="1" 
+                                max="10000"
+                                onChange={e => field.onChange(Number(e.target.value))}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={editForm.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base">Active Organization</FormLabel>
+                            <div className="text-sm text-muted-foreground">
+                              Allow users to access this organization
+                            </div>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="subscription" className="space-y-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Package className="h-5 w-5" />
+                        <h3 className="text-lg font-semibold">Customer Tier Selection</h3>
+                      </div>
+                      
+                      <div className="grid gap-4">
+                        {availablePlans.map((plan) => (
+                          <Card key={plan.id} className={`cursor-pointer transition-all ${selectedPlan === plan.id ? 'ring-2 ring-primary' : ''}`} onClick={() => setSelectedPlan(plan.id)}>
+                            <CardContent className="pt-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <h4 className="font-semibold">{plan.name}</h4>
+                                    <Badge variant="outline">
+                                      ${(plan.priceCents / 100).toFixed(2)}/seat/month
+                                    </Badge>
+                                    <Badge variant="secondary">
+                                      Up to {plan.seatLimit} seats
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mb-2">{plan.description}</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {Object.entries(plan.features).map(([feature, enabled]) => enabled && (
+                                      <Badge key={feature} variant="outline" className="text-xs">
+                                        {feature}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="flex items-center">
+                                  <input
+                                    type="radio"
+                                    name="plan"
+                                    value={plan.id}
+                                    checked={selectedPlan === plan.id}
+                                    onChange={() => setSelectedPlan(plan.id)}
+                                    className="h-4 w-4"
+                                  />
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+
+                      {selectedPlan && (
+                        <Card className="bg-muted/50">
+                          <CardContent className="pt-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <CreditCard className="h-4 w-4" />
+                              <h4 className="font-medium">Subscription Details</h4>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">Selected Plan:</span>
+                                <div className="font-medium">{availablePlans.find(p => p.id === selectedPlan)?.name}</div>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Price per Seat:</span>
+                                <div className="font-medium">${(availablePlans.find(p => p.id === selectedPlan)?.priceCents || 0) / 100}/month</div>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Max Seats:</span>
+                                <div className="font-medium">{availablePlans.find(p => p.id === selectedPlan)?.seatLimit}</div>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Current Users:</span>
+                                <div className="font-medium">{selectedOrg?.userCount || 0}</div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="billing" className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <DollarSign className="h-5 w-5" />
+                      <h3 className="text-lg font-semibold">Billing Information</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={editForm.control}
+                        name="billingEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Billing Email</FormLabel>
+                            <FormControl>
+                              <Input {...field} type="email" placeholder="billing@acme.com" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="taxId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tax ID</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Tax identification number" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {subscriptionInfo && (
+                      <Card>
+                        <CardContent className="pt-4">
+                          <h4 className="font-medium mb-3">Current Subscription Status</h4>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Status:</span>
+                              <div className="font-medium">
+                                <Badge variant={subscriptionInfo.status === 'active' ? 'default' : 'secondary'}>
+                                  {subscriptionInfo.status}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Seats Purchased:</span>
+                              <div className="font-medium">{subscriptionInfo.seatsPurchased}</div>
+                            </div>
+                            {subscriptionInfo.currentPeriodEnd && (
+                              <div>
+                                <span className="text-muted-foreground">Next Billing:</span>
+                                <div className="font-medium">{new Date(subscriptionInfo.currentPeriodEnd).toLocaleDateString()}</div>
+                              </div>
+                            )}
+                            {subscriptionInfo.trialEndsAt && (
+                              <div>
+                                <span className="text-muted-foreground">Trial Ends:</span>
+                                <div className="font-medium">{new Date(subscriptionInfo.trialEndsAt).toLocaleDateString()}</div>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </TabsContent>
+                </Tabs>
+
+                <div className="flex justify-between">
+                  <div>
+                    {selectedPlan && selectedPlan !== selectedOrg?.planName && (
+                      <p className="text-sm text-muted-foreground">
+                        Plan will be updated to: <strong>{availablePlans.find(p => p.id === selectedPlan)?.name}</strong>
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={updateOrgMutation.isPending} data-testid="button-submit-edit-org">
+                      {updateOrgMutation.isPending ? "Updating..." : "Update Organization"}
+                    </Button>
+                  </div>
                 </div>
               </form>
             </Form>

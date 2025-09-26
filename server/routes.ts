@@ -33,7 +33,7 @@ import {
   coachContextPayloadSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload,
   // Add missing schema imports
-  users, organizationMemberships
+  users, organizationMemberships, plans, subscriptions
 } from "@shared/schema";
 import { db } from "./db"; // Import db from correct location
 import { and, eq, or, sql } from "drizzle-orm"; // Add missing drizzle operators
@@ -1687,6 +1687,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error during session cleanup:", error);
       res.status(500).json({ error: "Session cleanup failed" });
+    }
+  });
+
+  // ===== SUPER ADMIN PLAN MANAGEMENT =====
+  
+  // GET /api/super-admin/plans - List all subscription plans
+  app.get("/api/super-admin/plans", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const allPlans = await db.select().from(plans).where(eq(plans.isActive, true)).orderBy(plans.priceCents);
+      res.json(allPlans);
+    } catch (error) {
+      console.error("Error fetching plans:", error);
+      res.status(500).json({ error: "Failed to fetch plans" });
+    }
+  });
+
+  // GET /api/super-admin/plans/:id - Get specific plan details
+  app.get("/api/super-admin/plans/:id", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const [plan] = await db.select().from(plans).where(eq(plans.id, id));
+      
+      if (!plan) {
+        return res.status(404).json({ error: "Plan not found" });
+      }
+      
+      res.json(plan);
+    } catch (error) {
+      console.error("Error fetching plan:", error);
+      res.status(500).json({ error: "Failed to fetch plan" });
+    }
+  });
+
+  // GET /api/super-admin/organizations/:orgId/subscription - Get organization's subscription details
+  app.get("/api/super-admin/organizations/:orgId/subscription", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { orgId } = req.params;
+      
+      // Get current subscription with plan details
+      const [subscription] = await db.select({
+        id: subscriptions.id,
+        organizationId: subscriptions.organizationId,
+        planId: subscriptions.planId,
+        status: subscriptions.status,
+        seatsPurchased: subscriptions.seatsPurchased,
+        trialEndsAt: subscriptions.trialEndsAt,
+        currentPeriodStart: subscriptions.currentPeriodStart,
+        currentPeriodEnd: subscriptions.currentPeriodEnd,
+        stripeCustomerId: subscriptions.stripeCustomerId,
+        stripeSubscriptionId: subscriptions.stripeSubscriptionId,
+        createdAt: subscriptions.createdAt,
+        planName: plans.name,
+        planDescription: plans.description,
+        planPriceCents: plans.priceCents,
+        planMaxSeats: plans.maxSeats,
+        planFeatures: plans.features
+      })
+      .from(subscriptions)
+      .leftJoin(plans, eq(subscriptions.planId, plans.id))
+      .where(eq(subscriptions.organizationId, orgId))
+      .orderBy(sql`${subscriptions.createdAt} DESC`)
+      .limit(1);
+      
+      res.json(subscription || null);
+    } catch (error) {
+      console.error("Error fetching organization subscription:", error);
+      res.status(500).json({ error: "Failed to fetch subscription" });
+    }
+  });
+
+  // POST /api/super-admin/organizations/:orgId/subscription - Create or update organization subscription
+  app.post("/api/super-admin/organizations/:orgId/subscription", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { orgId } = req.params;
+      const { planId, seatsPurchased } = req.body;
+      
+      if (!planId || !seatsPurchased) {
+        return res.status(400).json({ error: "Plan ID and seats purchased are required" });
+      }
+      
+      // Verify the plan exists
+      const [plan] = await db.select().from(plans).where(eq(plans.id, planId));
+      if (!plan) {
+        return res.status(404).json({ error: "Plan not found" });
+      }
+      
+      // Check if organization already has a subscription
+      const [existingSubscription] = await db.select().from(subscriptions).where(eq(subscriptions.organizationId, orgId));
+      
+      if (existingSubscription) {
+        // Update existing subscription
+        const [updatedSubscription] = await db.update(subscriptions)
+          .set({
+            planId,
+            seatsPurchased,
+            updatedAt: new Date()
+          })
+          .where(eq(subscriptions.id, existingSubscription.id))
+          .returning();
+          
+        res.json(updatedSubscription);
+      } else {
+        // Create new subscription
+        const [newSubscription] = await db.insert(subscriptions).values({
+          organizationId: orgId,
+          planId,
+          status: 'trialing',
+          seatsPurchased,
+          trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 day trial
+        }).returning();
+        
+        res.status(201).json(newSubscription);
+      }
+    } catch (error) {
+      console.error("Error managing organization subscription:", error);
+      res.status(500).json({ error: "Failed to manage subscription" });
     }
   });
 
