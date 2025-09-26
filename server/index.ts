@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import cookieParser from "cookie-parser";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import ConnectPgSimple from "connect-pg-simple";
 import ws from "ws";
@@ -33,6 +34,7 @@ app.use(session({
   }
 }));
 
+app.use(cookieParser()); // SECURITY: Enable cookie parsing for secure Super Admin sessions
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

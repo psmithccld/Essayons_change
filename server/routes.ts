@@ -830,7 +830,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Super Admin authentication middleware - completely separate from tenant auth
   const requireSuperAdminAuth = async (req: Request & { superAdminUser?: any }, res: Response, next: NextFunction) => {
     try {
-      const sessionId = req.headers['x-super-admin-session'] as string;
+      // SECURITY: Read session ID from secure HttpOnly cookie instead of custom header
+      const sessionId = req.cookies?.superAdminSessionId;
       
       if (!sessionId) {
         return res.status(401).json({ error: "Super admin authentication required" });
@@ -839,14 +840,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify session exists and is valid
       const session = await storage.getSuperAdminSession(sessionId);
       if (!session) {
+        // Clean up invalid cookie
+        res.clearCookie('superAdminSessionId', { 
+          path: '/api/super-admin',
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict'
+        });
         return res.status(401).json({ error: "Invalid or expired super admin session" });
       }
 
       // Get super admin user
       const user = await storage.getSuperAdminUser(session.superAdminUserId);
       if (!user || !user.isActive) {
-        // Clean up invalid session
+        // Clean up invalid session and cookie
         await storage.deleteSuperAdminSession(sessionId);
+        res.clearCookie('superAdminSessionId', { 
+          path: '/api/super-admin',
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict'
+        });
         return res.status(401).json({ error: "Invalid or inactive super admin account" });
       }
 
@@ -900,9 +914,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create super admin session
       const session = await storage.createSuperAdminSession(user.id);
 
+      // SECURITY: Set secure, HttpOnly cookie for Super Admin session
+      res.cookie('superAdminSessionId', session.id, {
+        httpOnly: true, // Prevent XSS attacks - cookie not accessible via JavaScript
+        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+        sameSite: 'strict', // CSRF protection - strict same-site policy
+        maxAge: 2 * 60 * 60 * 1000, // 2 hours - shorter session for high-privilege access
+        path: '/api/super-admin' // Restrict cookie to Super Admin endpoints only
+      });
+
       res.json({
         user,
-        sessionId: session.id,
         expiresAt: session.expiresAt,
         message: "Super admin login successful"
       });
@@ -929,11 +951,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Super Admin Logout
   app.post("/api/super-admin/auth/logout", async (req: Request, res: Response) => {
     try {
-      const sessionId = req.headers['x-super-admin-session'] as string;
+      // SECURITY: Read session ID from secure cookie
+      const sessionId = req.cookies?.superAdminSessionId;
       
       if (sessionId) {
         await storage.deleteSuperAdminSession(sessionId);
       }
+      
+      // Clear the secure cookie
+      res.clearCookie('superAdminSessionId', { 
+        path: '/api/super-admin',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict'
+      });
       
       res.json({ message: "Logged out successfully" });
     } catch (error) {

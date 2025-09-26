@@ -11,10 +11,9 @@ interface SuperAdminUser {
 
 interface SuperAdminContextType {
   user: SuperAdminUser | null;
-  sessionId: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (sessionId: string) => void;
+  login: () => void;
   logout: () => void;
   checkAuthStatus: () => Promise<void>;
 }
@@ -35,67 +34,49 @@ interface SuperAdminProviderProps {
 
 export function SuperAdminProvider({ children }: SuperAdminProviderProps) {
   const [user, setUser] = useState<SuperAdminUser | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAuthenticated = !!user && !!sessionId;
+  const isAuthenticated = !!user;
 
   const checkAuthStatus = async () => {
     try {
-      const storedSessionId = localStorage.getItem("superAdminSessionId");
-      if (!storedSessionId) {
-        setIsLoading(false);
-        return;
-      }
-
+      // SECURITY: No need to send headers - cookies are automatically included
       const response = await fetch("/api/super-admin/auth/status", {
-        headers: {
-          "x-super-admin-session": storedSessionId,
-        },
+        credentials: 'include' // Ensure cookies are included in the request
       });
 
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
-        setSessionId(storedSessionId);
       } else {
-        // Invalid session, clear storage
-        localStorage.removeItem("superAdminSessionId");
+        // Invalid session, user will be redirected to login
         setUser(null);
-        setSessionId(null);
       }
     } catch (error) {
       console.error("Error checking super admin auth status:", error);
-      localStorage.removeItem("superAdminSessionId");
       setUser(null);
-      setSessionId(null);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const login = (newSessionId: string) => {
-    setSessionId(newSessionId);
-    localStorage.setItem("superAdminSessionId", newSessionId);
+  const login = () => {
+    // SECURITY: No sessionId needed - cookies handle session automatically
     checkAuthStatus();
   };
 
   const logout = async () => {
     try {
-      if (sessionId) {
-        await fetch("/api/super-admin/auth/logout", {
-          method: "POST",
-          headers: {
-            "x-super-admin-session": sessionId,
-          },
-        });
-      }
+      // SECURITY: No headers needed - cookies are automatically included
+      await fetch("/api/super-admin/auth/logout", {
+        method: "POST",
+        credentials: 'include' // Ensure cookies are included
+      });
     } catch (error) {
       console.error("Error during super admin logout:", error);
     } finally {
-      localStorage.removeItem("superAdminSessionId");
+      // Cookie is cleared on server side, just clear local state
       setUser(null);
-      setSessionId(null);
     }
   };
 
@@ -105,7 +86,6 @@ export function SuperAdminProvider({ children }: SuperAdminProviderProps) {
 
   const value: SuperAdminContextType = {
     user,
-    sessionId,
     isAuthenticated,
     isLoading,
     login,

@@ -19,7 +19,7 @@ const superAdminLoginSchema = z.object({
 type SuperAdminLoginForm = z.infer<typeof superAdminLoginSchema>;
 
 interface SuperAdminLoginPageProps {
-  onAuthSuccess: (sessionId: string) => void;
+  onAuthSuccess: () => void;
 }
 
 export function SuperAdminLoginPage({ onAuthSuccess }: SuperAdminLoginPageProps) {
@@ -40,11 +40,13 @@ export function SuperAdminLoginPage({ onAuthSuccess }: SuperAdminLoginPageProps)
     setError(null);
 
     try {
+      // SECURITY: Cookies are automatically included with credentials: 'include'
       const response = await fetch("/api/super-admin/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include', // Ensure cookies are included
         body: JSON.stringify(data),
       });
 
@@ -54,16 +56,13 @@ export function SuperAdminLoginPage({ onAuthSuccess }: SuperAdminLoginPageProps)
         throw new Error(result.error || "Authentication failed");
       }
 
-      // Store session ID and notify parent
-      const sessionId = result.sessionId;
-      localStorage.setItem("superAdminSessionId", sessionId);
-      
+      // SECURITY: No localStorage needed - authentication handled via secure cookies
       toast({
         title: "Login Successful",
         description: "Welcome to Super Admin panel",
       });
 
-      onAuthSuccess(sessionId);
+      onAuthSuccess();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Authentication failed";
       setError(errorMessage);
