@@ -82,7 +82,7 @@ interface Plan {
   id: string;
   name: string;
   description?: string;
-  seatLimit: number;
+  maxSeats: number;
   priceCents: number;
   features: Record<string, boolean>;
 }
@@ -103,15 +103,17 @@ export default function SuperAdminOrganizations() {
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [availablePlans, setAvailablePlans] = useState<Plan[]>([
-    { id: "cfd6baf1-0d19-488e-8024-6d7a5649fbc6", name: "Basic Plan", description: "Essential features for small teams", seatLimit: 25, priceCents: 1500, features: {reports: true, gptCoach: false, communications: true, changeArtifacts: false, readinessSurveys: true} },
-    { id: "e7a7a24f-66e5-476f-bc59-3e3f99afc32f", name: "Professional Plan", description: "Advanced features for growing organizations", seatLimit: 100, priceCents: 2500, features: {reports: true, gptCoach: true, communications: true, changeArtifacts: true, readinessSurveys: true} },
-    { id: "ae7fbc6c-5e80-45b6-9429-311966558bc6", name: "Enterprise Plan", description: "Full feature set for large organizations", seatLimit: 500, priceCents: 3500, features: {reports: true, gptCoach: true, communications: true, changeArtifacts: true, readinessSurveys: true, customBranding: true, apiAccess: true} }
-  ]);
   const [selectedPlan, setSelectedPlan] = useState<string>("");
   const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
   const { isAuthenticated } = useSuperAdmin();
   const { toast } = useToast();
+  
+  // Fetch available plans from API
+  const { data: plansData } = useQuery({
+    queryKey: ["/api/super-admin/plans"],
+    enabled: isAuthenticated
+  });
+  const availablePlans = plansData?.plans || [];
 
   // Fetch organizations
   const { data: organizations = [], isLoading, refetch } = useQuery({
@@ -864,7 +866,7 @@ export default function SuperAdminOrganizations() {
                                       ${(plan.priceCents / 100).toFixed(2)}/seat/month
                                     </Badge>
                                     <Badge variant="secondary">
-                                      Up to {plan.seatLimit} seats
+                                      Up to {plan.maxSeats} seats
                                     </Badge>
                                   </div>
                                   <p className="text-sm text-muted-foreground mb-2">{plan.description}</p>

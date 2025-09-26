@@ -1511,8 +1511,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { insertOrganizationSchema } = await import("@shared/schema");
       
-      // Partial validation since this is an update
-      const validation = insertOrganizationSchema.partial().safeParse(req.body);
+      // Extract and validate planId separately for security
+      const { planId, planName, ...orgData } = req.body;
+      
+      // Validate plan if provided
+      let validatedPlanId = undefined;
+      if (planId) {
+        const [plan] = await db.select({ id: plans.id, name: plans.name })
+          .from(plans)
+          .where(and(eq(plans.id, planId), eq(plans.isActive, true)));
+        
+        if (!plan) {
+          return res.status(400).json({ error: "Invalid plan selected" });
+        }
+        validatedPlanId = planId;
+      }
+      
+      // Partial validation since this is an update (ignoring planName from client)
+      const validation = insertOrganizationSchema.partial().safeParse(orgData);
       if (!validation.success) {
         return res.status(400).json({ 
           error: "Invalid organization data", 
@@ -1520,7 +1536,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const organization = await storage.updateOrganization(id, validation.data);
+      // Include validated planId in update data
+      const updateData = {
+        ...validation.data,
+        ...(validatedPlanId && { planId: validatedPlanId })
+      };
+
+      const organization = await storage.updateOrganization(id, updateData);
       if (!organization) {
         return res.status(404).json({ error: "Organization not found" });
       }
@@ -1695,8 +1717,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/super-admin/plans - List all subscription plans
   app.get("/api/super-admin/plans", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
-      const allPlans = await db.select().from(plans).where(eq(plans.isActive, true)).orderBy(plans.priceCents);
-      res.json(allPlans);
+      const allPlans = await db
+        .select({
+          id: plans.id,
+          name: plans.name,
+          description: plans.description,
+          priceCents: plans.priceCents,
+          maxSeats: plans.maxSeats,
+          features: plans.features,
+          isActive: plans.isActive
+        })
+        .from(plans)
+        .where(eq(plans.isActive, true))
+        .orderBy(plans.priceCents);
+      
+      res.json({ plans: allPlans });
     } catch (error) {
       console.error("Error fetching plans:", error);
       res.status(500).json({ error: "Failed to fetch plans" });
