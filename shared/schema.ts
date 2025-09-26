@@ -246,6 +246,13 @@ export const organizations = pgTable("organizations", {
   description: text("description"),
   status: text("status").notNull().default("active"), // active, suspended, trial
   ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
+  enabledFeatures: jsonb("enabled_features").default({
+    readinessSurveys: true,
+    gptCoach: true,
+    communications: true,
+    changeArtifacts: true,
+    reports: true
+  }), // Feature flags for this organization
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

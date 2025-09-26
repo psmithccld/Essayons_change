@@ -5806,6 +5806,32 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
+  // Organization Features API Endpoint
+  app.get("/api/organization/features", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+    try {
+      const organizationId = req.organizationId!;
+      const organization = await storage.getOrganization(organizationId);
+      
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Return enabled features or defaults if none exist
+      const defaultFeatures = {
+        readinessSurveys: true,
+        gptCoach: true,
+        communications: true,
+        changeArtifacts: true,
+        reports: true
+      };
+      
+      res.json(organization.enabledFeatures || defaultFeatures);
+    } catch (error) {
+      console.error("Error fetching organization features:", error);
+      res.status(500).json({ error: "Failed to fetch organization features" });
+    }
+  });
+
   // ===============================================
   // HELPDESK GPT AGENT API ROUTES
   // ===============================================

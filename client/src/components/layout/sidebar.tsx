@@ -30,6 +30,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useFeatures } from "@/hooks/use-features";
 import type { Permissions } from "@shared/schema";
 
 type NavigationItem = {
@@ -40,6 +41,7 @@ type NavigationItem = {
   permissions?: (keyof Permissions)[];
   requireAll?: boolean; // If true, user must have ALL permissions. If false, user needs ANY permission
   customCheck?: () => boolean;
+  featureFlag?: string; // Feature flag name to check for this navigation item
 };
 
 // All navigation items with permission requirements
@@ -49,16 +51,15 @@ const allNavigationItems: NavigationItem[] = [
   { id: "checklist-templates", icon: ListChecks, label: "Checklist Templates", path: "/checklist-templates" },
   { id: "gantt", icon: ChartGantt, label: "Initiative Timeline", path: "/gantt" },
   { id: "raid-logs", icon: AlertTriangle, label: "RAID Logs", path: "/raid-logs" },
-  { id: "reports", icon: ChartBar, label: "Reports", path: "/reports", permissions: ["canSeeReports"] },
-  { id: "communications", icon: Megaphone, label: "Communications", path: "/communications" },
+  { id: "reports", icon: ChartBar, label: "Reports", path: "/reports", permissions: ["canSeeReports"], featureFlag: "reports" },
+  { id: "communications", icon: Megaphone, label: "Communications", path: "/communications", featureFlag: "communications" },
   { id: "stakeholders", icon: Building, label: "Stakeholders", path: "/stakeholders" },
-  { id: "surveys", icon: ClipboardCheck, label: "Readiness Surveys", path: "/surveys" },
-  { id: "change-artifacts", icon: FileText, label: "Change Artifacts", path: "/change-artifacts" },
-  { id: "gpt-coach", icon: Bot, label: "GPT Coach", path: "/gpt-coach" },
+  { id: "surveys", icon: ClipboardCheck, label: "Readiness Surveys", path: "/surveys", featureFlag: "readinessSurveys" },
+  { id: "change-artifacts", icon: FileText, label: "Change Artifacts", path: "/change-artifacts", featureFlag: "changeArtifacts" },
+  { id: "gpt-coach", icon: Bot, label: "GPT Coach", path: "/gpt-coach", featureFlag: "gptCoach" },
   { id: "fishbone", icon: Fish, label: "Change Process Flow", path: "/change-process-flow" },
   { id: "process-mapping", icon: GitBranch, label: "Development Maps", path: "/process-mapping", permissions: ["canSeeAllProjects", "canModifyProjects"], requireAll: false },
   { id: "organization", icon: Settings, label: "Organization Settings", path: "/organization", permissions: ["canModifyOrganizationSettings"] },
-  { id: "super-admin", icon: Crown, label: "Super Admin", path: "/super-admin", permissions: ["canManageSystem"] }
 ];
 
 const SIDEBAR_ORDER_KEY = "sidebarOrder";
@@ -77,6 +78,7 @@ export default function Sidebar() {
   });
   const { toast } = useToast();
   const { isLoading: permissionsLoading, hasAllPermissions, hasAnyPermission } = usePermissions();
+  const { hasFeature, isLoading: featuresLoading } = useFeatures();
 
   // Toggle sidebar collapse state
   const toggleCollapsed = useCallback(() => {
@@ -146,6 +148,21 @@ export default function Sidebar() {
     }
   }, [hasAllPermissions, hasAnyPermission]);
 
+  // Check if user has access to a navigation item (permissions AND features)
+  const hasAccessToItem = useCallback((item: NavigationItem): boolean => {
+    // Check permissions first
+    if (!hasPermissionForItem(item)) {
+      return false;
+    }
+    
+    // Check feature flag if specified
+    if (item.featureFlag) {
+      return hasFeature(item.featureFlag as any);
+    }
+    
+    return true;
+  }, [hasPermissionForItem, hasFeature]);
+
   // Keyboard shortcuts for navigation
   useEffect(() => {
     const handleKeydown = (e: KeyboardEvent) => {
@@ -161,7 +178,7 @@ export default function Sidebar() {
           e.preventDefault();
           const items = [allNavigationItems[0], ...orderedDraggableItems]; // Include overview
           const targetItem = items[keyNum - 1];
-          if (targetItem && hasPermissionForItem(targetItem)) {
+          if (targetItem && hasAccessToItem(targetItem)) {
             navigate(targetItem.path);
             toast({
               title: `Navigated to ${targetItem.label}`,
@@ -174,7 +191,7 @@ export default function Sidebar() {
 
     window.addEventListener('keydown', handleKeydown);
     return () => window.removeEventListener('keydown', handleKeydown);
-  }, [navigate, orderedDraggableItems, hasPermissionForItem, toast]);
+  }, [navigate, orderedDraggableItems, hasAccessToItem, toast]);
 
   // Handle drag end event
   const handleDragEnd = (result: DropResult) => {
@@ -195,8 +212,8 @@ export default function Sidebar() {
 
   // Render a draggable navigation item
   const renderDraggableItem = (item: NavigationItem, index: number) => {
-    // Check permissions at render time
-    if (!hasPermissionForItem(item) && !permissionsLoading) {
+    // Check permissions and features at render time
+    if (!hasAccessToItem(item) && !permissionsLoading && !featuresLoading) {
       return null;
     }
 
@@ -281,8 +298,8 @@ export default function Sidebar() {
 
   // Render a regular (non-draggable) navigation item
   const renderNavigationItem = (item: NavigationItem) => {
-    // Check permissions at render time
-    if (!hasPermissionForItem(item) && !permissionsLoading) {
+    // Check permissions and features at render time
+    if (!hasAccessToItem(item) && !permissionsLoading && !featuresLoading) {
       return null;
     }
 
