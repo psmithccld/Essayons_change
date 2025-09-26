@@ -56,7 +56,7 @@ export function SuperAdminUserManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { sessionId } = useSuperAdmin();
+  const { isAuthenticated } = useSuperAdmin();
   const { toast } = useToast();
 
   const form = useForm<CreateAdminForm>({
@@ -73,14 +73,12 @@ export function SuperAdminUserManagement() {
     queryKey: ["/api/super-admin/users"],
     queryFn: async () => {
       const response = await fetch("/api/super-admin/users", {
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include'
       });
       if (!response.ok) throw new Error("Failed to fetch admin users");
       return response.json() as Promise<SuperAdminUser[]>;
     },
-    enabled: !!sessionId,
+    enabled: isAuthenticated,
   });
 
   // Create new Super Admin user
@@ -90,8 +88,8 @@ export function SuperAdminUserManagement() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-super-admin-session": sessionId!,
         },
+        credentials: 'include',
         body: JSON.stringify({
           username: data.username,
           password: data.password,
@@ -128,9 +126,7 @@ export function SuperAdminUserManagement() {
     mutationFn: async ({ userId, action }: { userId: string; action: "activate" | "deactivate" }) => {
       const response = await fetch(`/api/super-admin/users/${userId}/${action}`, {
         method: "POST",
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -161,9 +157,7 @@ export function SuperAdminUserManagement() {
     mutationFn: async (userId: string) => {
       const response = await fetch(`/api/super-admin/users/${userId}/force-password-reset`, {
         method: "POST",
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include',
       });
 
       if (!response.ok) {

@@ -26,21 +26,19 @@ interface DashboardStats {
 }
 
 export default function SuperAdminDashboard() {
-  const { sessionId } = useSuperAdmin();
+  const { isAuthenticated } = useSuperAdmin();
 
   // Fetch dashboard statistics
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/super-admin/dashboard/stats"],
     queryFn: async () => {
       const response = await fetch("/api/super-admin/dashboard/stats", {
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include'
       });
       if (!response.ok) throw new Error("Failed to fetch dashboard stats");
       return response.json() as Promise<DashboardStats>;
     },
-    enabled: !!sessionId,
+    enabled: isAuthenticated,
   });
 
   // Fetch recent organizations
@@ -48,14 +46,12 @@ export default function SuperAdminDashboard() {
     queryKey: ["/api/super-admin/organizations", "recent"],
     queryFn: async () => {
       const response = await fetch("/api/super-admin/organizations?limit=5&sort=recent", {
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include'
       });
       if (!response.ok) throw new Error("Failed to fetch recent organizations");
       return response.json();
     },
-    enabled: !!sessionId,
+    enabled: isAuthenticated,
   });
 
   const statCards = [
