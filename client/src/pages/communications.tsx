@@ -113,6 +113,8 @@ function EmailsExecutionModule() {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [emailContent, setEmailContent] = useState({ title: '', content: '', callToAction: '' });
   const [currentEmail, setCurrentEmail] = useState<Communication | null>(null);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
@@ -130,6 +132,52 @@ function EmailsExecutionModule() {
   const [relationship, setRelationship] = useState('colleague');
   const [visibility, setVisibility] = useState('private');
   const { toast } = useToast();
+
+  // Update communication mutation for emails
+  const updateEmailMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Communication> }) => 
+      apiRequest('PUT', `/api/communications/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      toast({
+        title: "Email updated successfully",
+        description: "Your email has been updated and saved."
+      });
+      setShowEditModal(false);
+      setCurrentEmail(null);
+    },
+    onError: (error) => {
+      console.error('Error updating email:', error);
+      toast({
+        title: "Failed to update email",
+        description: "Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete communication mutation for emails
+  const deleteEmailMutation = useMutation({
+    mutationFn: async (id: string) => 
+      apiRequest('DELETE', `/api/communications/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      toast({
+        title: "Email deleted successfully",
+        description: "The email has been permanently removed."
+      });
+      setShowDeleteModal(false);
+      setCurrentEmail(null);
+    },
+    onError: (error) => {
+      console.error('Error deleting email:', error);
+      toast({
+        title: "Failed to delete email",
+        description: "Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
 
   // Fetch communication templates based on email type
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
@@ -469,6 +517,28 @@ function EmailsExecutionModule() {
                             data-testid={`button-preview-p2p-${email.id}`}
                           >
                             <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setCurrentEmail(email);
+                              setShowEditModal(true);
+                            }}
+                            data-testid={`button-edit-p2p-${email.id}`}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setCurrentEmail(email);
+                              setShowDeleteModal(true);
+                            }}
+                            data-testid={`button-delete-p2p-${email.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
@@ -1113,6 +1183,95 @@ function EmailsExecutionModule() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Edit Email Modal */}
+        <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Email</DialogTitle>
+            </DialogHeader>
+            {currentEmail && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="edit-email-title">Title</Label>
+                  <Input
+                    id="edit-email-title"
+                    defaultValue={currentEmail.title}
+                    onChange={(e) => setEmailContent(prev => ({ ...prev, title: e.target.value }))}
+                    data-testid="input-edit-email-title"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-email-content">Content</Label>
+                  <textarea
+                    id="edit-email-content"
+                    className="w-full h-32 p-3 border rounded-md resize-none"
+                    defaultValue={currentEmail.content}
+                    onChange={(e) => setEmailContent(prev => ({ ...prev, content: e.target.value }))}
+                    data-testid="textarea-edit-email-content"
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowEditModal(false)}
+                    data-testid="button-cancel-edit-email"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      updateEmailMutation.mutate({
+                        id: currentEmail.id,
+                        data: {
+                          title: emailContent.title || currentEmail.title,
+                          content: emailContent.content || currentEmail.content
+                        }
+                      });
+                    }}
+                    disabled={updateEmailMutation.isPending}
+                    data-testid="button-save-edit-email"
+                  >
+                    {updateEmailMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Email Confirmation Modal */}
+        <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Email</DialogTitle>
+            </DialogHeader>
+            {currentEmail && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Are you sure you want to delete "{currentEmail.title}"? This action cannot be undone.
+                </p>
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDeleteModal(false)}
+                    data-testid="button-cancel-delete-email"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => deleteEmailMutation.mutate(currentEmail.id)}
+                    disabled={deleteEmailMutation.isPending}
+                    data-testid="button-confirm-delete-email"
+                  >
+                    {deleteEmailMutation.isPending ? "Deleting..." : "Delete"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
@@ -1132,7 +1291,55 @@ function MeetingsExecutionModule() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedRaidLogs, setSelectedRaidLogs] = useState<string[]>([]);
+  const [showEditMeetingModal, setShowEditMeetingModal] = useState(false);
+  const [showDeleteMeetingModal, setShowDeleteMeetingModal] = useState(false);
   const { toast } = useToast();
+
+  // Update communication mutation for meetings
+  const updateMeetingMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Communication> }) => 
+      apiRequest('PUT', `/api/communications/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      toast({
+        title: "Meeting updated successfully",
+        description: "Your meeting has been updated and saved."
+      });
+      setShowEditMeetingModal(false);
+      setCurrentMeeting(null);
+    },
+    onError: (error) => {
+      console.error('Error updating meeting:', error);
+      toast({
+        title: "Failed to update meeting",
+        description: "Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete communication mutation for meetings
+  const deleteMeetingMutation = useMutation({
+    mutationFn: async (id: string) => 
+      apiRequest('DELETE', `/api/communications/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
+      toast({
+        title: "Meeting deleted successfully",
+        description: "The meeting has been permanently removed."
+      });
+      setShowDeleteMeetingModal(false);
+      setCurrentMeeting(null);
+    },
+    onError: (error) => {
+      console.error('Error deleting meeting:', error);
+      toast({
+        title: "Failed to delete meeting",
+        description: "Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
 
   // Helper function to format meeting details for copying - defined early to avoid initialization issues
   const formatMeetingForCopy = (meeting: Communication) => {
@@ -1637,36 +1844,64 @@ function MeetingsExecutionModule() {
                       </div>
 
                       <div className="flex items-center justify-between pt-2 border-t">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setCurrentMeeting(meeting);
-                            setShowAgendaModal(true);
-                          }}
-                          data-testid={`view-agenda-${meeting.id}`}
-                        >
-                          <Eye className="h-3 w-3 mr-1" />
-                          View
-                        </Button>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setCurrentMeeting(meeting);
+                              setShowAgendaModal(true);
+                            }}
+                            data-testid={`view-agenda-${meeting.id}`}
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setCurrentMeeting(meeting);
+                              setShowEditMeetingModal(true);
+                            }}
+                            data-testid={`edit-meeting-${meeting.id}`}
+                          >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
+                        </div>
                         
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const meetingDetails = `Meeting: ${meeting.title}\nDate: ${new Date(meeting.scheduledDateTime || '').toLocaleDateString()}\nTime: ${new Date(meeting.scheduledDateTime || '').toLocaleTimeString()}\nDuration: ${meeting.meetingDuration || 60} minutes\nLocation: ${meeting.meetingLocation || 'TBD'}\n\nAgenda:\n${meeting.content || 'No agenda set'}`;
-                            navigator.clipboard.writeText(meetingDetails).then(() => {
-                              toast({
-                                title: "Meeting details copied!",
-                                description: "Meeting invitation details copied to clipboard for sharing."
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const meetingDetails = `Meeting: ${meeting.title}\nDate: ${new Date(meeting.scheduledDateTime || '').toLocaleDateString()}\nTime: ${new Date(meeting.scheduledDateTime || '').toLocaleTimeString()}\nDuration: ${meeting.meetingDuration || 60} minutes\nLocation: ${meeting.meetingLocation || 'TBD'}\n\nAgenda:\n${meeting.content || 'No agenda set'}`;
+                              navigator.clipboard.writeText(meetingDetails).then(() => {
+                                toast({
+                                  title: "Meeting details copied!",
+                                  description: "Meeting invitation details copied to clipboard for sharing."
+                                });
                               });
-                            });
-                          }}
-                          data-testid={`copy-meeting-${meeting.id}`}
-                        >
-                          <Copy className="h-3 w-3 mr-1" />
-                          Copy Details
-                        </Button>
+                            }}
+                            data-testid={`copy-meeting-${meeting.id}`}
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            Copy
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setCurrentMeeting(meeting);
+                              setShowDeleteMeetingModal(true);
+                            }}
+                            data-testid={`delete-meeting-${meeting.id}`}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -2537,6 +2772,119 @@ function MeetingsExecutionModule() {
                     data-testid="close-meeting-modal"
                   >
                     Close
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Meeting Modal */}
+        <Dialog open={showEditMeetingModal} onOpenChange={setShowEditMeetingModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Meeting</DialogTitle>
+            </DialogHeader>
+            {currentMeeting && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="edit-meeting-title">Title</Label>
+                  <Input
+                    id="edit-meeting-title"
+                    defaultValue={currentMeeting.title}
+                    data-testid="input-edit-meeting-title"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-meeting-content">Description</Label>
+                  <textarea
+                    id="edit-meeting-content"
+                    className="w-full h-32 p-3 border rounded-md resize-none"
+                    defaultValue={currentMeeting.content}
+                    data-testid="textarea-edit-meeting-content"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-meeting-location">Location</Label>
+                    <Input
+                      id="edit-meeting-location"
+                      defaultValue={currentMeeting.meetingWhere || ''}
+                      data-testid="input-edit-meeting-location"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-meeting-duration">Duration (minutes)</Label>
+                    <Input
+                      id="edit-meeting-duration"
+                      type="number"
+                      defaultValue={currentMeeting.meetingDuration || 60}
+                      data-testid="input-edit-meeting-duration"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowEditMeetingModal(false)}
+                    data-testid="button-cancel-edit-meeting"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const titleInput = document.getElementById('edit-meeting-title') as HTMLInputElement;
+                      const contentInput = document.getElementById('edit-meeting-content') as HTMLTextAreaElement;
+                      const locationInput = document.getElementById('edit-meeting-location') as HTMLInputElement;
+                      const durationInput = document.getElementById('edit-meeting-duration') as HTMLInputElement;
+                      
+                      updateMeetingMutation.mutate({
+                        id: currentMeeting.id,
+                        data: {
+                          title: titleInput?.value || currentMeeting.title,
+                          content: contentInput?.value || currentMeeting.content,
+                          meetingWhere: locationInput?.value || currentMeeting.meetingWhere,
+                          meetingDuration: parseInt(durationInput?.value) || currentMeeting.meetingDuration
+                        }
+                      });
+                    }}
+                    disabled={updateMeetingMutation.isPending}
+                    data-testid="button-save-edit-meeting"
+                  >
+                    {updateMeetingMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Meeting Confirmation Modal */}
+        <Dialog open={showDeleteMeetingModal} onOpenChange={setShowDeleteMeetingModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Meeting</DialogTitle>
+            </DialogHeader>
+            {currentMeeting && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Are you sure you want to delete "{currentMeeting.title}"? This action cannot be undone.
+                </p>
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDeleteMeetingModal(false)}
+                    data-testid="button-cancel-delete-meeting"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => deleteMeetingMutation.mutate(currentMeeting.id)}
+                    disabled={deleteMeetingMutation.isPending}
+                    data-testid="button-confirm-delete-meeting"
+                  >
+                    {deleteMeetingMutation.isPending ? "Deleting..." : "Delete"}
                   </Button>
                 </div>
               </div>
