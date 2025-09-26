@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -42,7 +42,9 @@ import {
   Archive,
   Check,
   Copy,
-  Download
+  Download,
+  Shield,
+  Lightbulb
 } from "lucide-react";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1123,7 +1125,7 @@ function MeetingsExecutionModule() {
   const { currentProject } = useCurrentProject();
   const [activeView, setActiveView] = useState<'repository' | 'create' | 'manage'>('repository');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  // Invite modal removed per Phase 1 requirements
   const [showAgendaModal, setShowAgendaModal] = useState(false);
   const [currentMeeting, setCurrentMeeting] = useState<Communication | null>(null);
   const [isGeneratingAgenda, setIsGeneratingAgenda] = useState(false);
@@ -1190,7 +1192,7 @@ function MeetingsExecutionModule() {
   };
 
   // Helper function to format meeting invite for copying - defined early to avoid initialization issues
-  const formatMeetingInvite = (meeting: Communication) => {
+  const formatMeetingDetails = (meeting: Communication) => {
     const lines = [
       `Subject: Meeting Invitation - ${meeting.title}`,
       '',
@@ -1354,39 +1356,7 @@ function MeetingsExecutionModule() {
     }
   });
 
-  // Send meeting invites mutation
-  const sendInvitesMutation = useMutation({
-    mutationFn: ({ meetingId, recipients, meetingData, dryRun }: {
-      meetingId: string;
-      recipients: Array<{ email: string; name: string; role?: string }>;
-      meetingData: any;
-      dryRun?: boolean;
-    }) => apiRequest('POST', `/api/communications/${meetingId}/send-meeting-invites`, {
-      recipients, meetingData, dryRun: dryRun || false
-    }),
-    onSuccess: (data, { dryRun }) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
-      
-      if (dryRun) {
-        toast({ 
-          title: "Dry Run Complete", 
-          description: "Meeting invites preview generated successfully. No invites were actually sent.",
-          variant: "default"
-        });
-      } else {
-        toast({ 
-          title: "Meeting Invites Sent", 
-          description: `Invites successfully sent to ${data.distributionResult?.sent || 0} participants.`
-        });
-      }
-      
-      setShowInviteModal(false);
-      setCurrentMeeting(null);
-    },
-    onError: () => {
-      toast({ title: "Failed to send meeting invites", variant: "destructive" });
-    }
-  });
+  // Send functionality completely removed per Phase 1 requirements - copy functionality only
 
   const handleAddExternalParticipant = () => {
     if (!externalParticipantName.trim() || !externalParticipantEmail.trim()) {
@@ -1677,18 +1647,23 @@ function MeetingsExecutionModule() {
                           View
                         </Button>
                         
-                        {meeting.status === 'draft' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSendInvites(meeting)}
-                            className="text-red-600 border-red-200 hover:bg-red-50"
-                            data-testid={`send-invites-${meeting.id}`}
-                          >
-                            <Send className="h-3 w-3 mr-1" />
-                            Send Invites
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const meetingDetails = `Meeting: ${meeting.title}\nDate: ${new Date(meeting.scheduledDateTime || '').toLocaleDateString()}\nTime: ${new Date(meeting.scheduledDateTime || '').toLocaleTimeString()}\nDuration: ${meeting.meetingDuration || 60} minutes\nLocation: ${meeting.meetingLocation || 'TBD'}\n\nAgenda:\n${meeting.content || 'No agenda set'}`;
+                            navigator.clipboard.writeText(meetingDetails).then(() => {
+                              toast({
+                                title: "Meeting details copied!",
+                                description: "Meeting invitation details copied to clipboard for sharing."
+                              });
+                            });
+                          }}
+                          data-testid={`copy-meeting-${meeting.id}`}
+                        >
+                          <Copy className="h-3 w-3 mr-1" />
+                          Copy Details
+                        </Button>
                       </div>
                     </div>
                   </Card>
@@ -3205,10 +3180,201 @@ export default function Communications() {
 
             {/* Strategy Tab Content */}
             <TabsContent value="strategy" className="space-y-6" data-testid="strategy-content">
-              <PhaseGuidance />
-              <StakeholderMapping />
-              <ResistanceIdentification />
-              <ChannelPreferences />
+              <div className="grid gap-6">
+                {/* Phase Alignment Guidance */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Target className="w-5 h-5" />
+                      <span>Phase Alignment</span>
+                    </CardTitle>
+                    <CardDescription>Align your communications with each phase of change</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4">
+                      <div className="flex items-start space-x-3">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                        <div>
+                          <h4 className="font-medium">Need to Change</h4>
+                          <p className="text-sm text-muted-foreground">Explain urgency and vision</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-3">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                        <div>
+                          <h4 className="font-medium">Stakeholders</h4>
+                          <p className="text-sm text-muted-foreground">Engage influencers and listen</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-3">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
+                        <div>
+                          <h4 className="font-medium">Develop</h4>
+                          <p className="text-sm text-muted-foreground">Clarify roles, resources, and expectations</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-3">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
+                        <div>
+                          <h4 className="font-medium">Implement</h4>
+                          <p className="text-sm text-muted-foreground">Reinforce, celebrate short-term wins, address blockers</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-3">
+                        <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                        <div>
+                          <h4 className="font-medium">Reinforce</h4>
+                          <p className="text-sm text-muted-foreground">Embed lessons, recognize success</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Stakeholder Communication */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Users className="w-5 h-5" />
+                      <span>Stakeholder Strategy</span>
+                    </CardTitle>
+                    <CardDescription>Identify and engage key stakeholders effectively</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-3">
+                      <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <h4 className="font-medium text-blue-800 dark:text-blue-200">Key Questions</h4>
+                        <ul className="text-sm text-blue-700 dark:text-blue-300 mt-1 space-y-1">
+                          <li>• Who needs what message?</li>
+                          <li>• Who resists, who champions?</li>
+                          <li>• How do teams want to hear from leadership?</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Resistance Handling */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Shield className="w-5 h-5" />
+                      <span>Resistance Handling</span>
+                    </CardTitle>
+                    <CardDescription>Address resistance with clear, empathetic communication</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-3">
+                      <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                        <h4 className="font-medium text-green-800 dark:text-green-200">Three-Step Approach</h4>
+                        <div className="text-sm text-green-700 dark:text-green-300 mt-1 space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium">1. Listen</span>
+                            <span>→ Acknowledge concerns</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium">2. Acknowledge</span>
+                            <span>→ Validate feelings</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium">3. Respond</span>
+                            <span>→ Provide clarity</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Communication Channels */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Settings className="w-5 h-5" />
+                      <span>Channel Strategy</span>
+                    </CardTitle>
+                    <CardDescription>Choose the right channels for your message</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <FileText className="w-4 h-4 text-blue-500" />
+                          <span className="font-medium">Flyers</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground pl-6">Company-approved templates for announcements</p>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <Mail className="w-4 h-4 text-green-500" />
+                          <span className="font-medium">Group Emails</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground pl-6">All-hands or defined group communications</p>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <Send className="w-4 h-4 text-purple-500" />
+                          <span className="font-medium">P2P Emails</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground pl-6">Individual stakeholder outreach</p>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-4 h-4 text-orange-500" />
+                          <span className="font-medium">Meetings</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground pl-6">Face-to-face engagement with agendas</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Leadership Principles */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Lightbulb className="w-5 h-5" />
+                      <span>Leadership Principles</span>
+                    </CardTitle>
+                    <CardDescription>Every communication should follow these principles</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-3">
+                      <div className="flex items-start space-x-3">
+                        <CheckCircle className="w-4 h-4 text-green-500 mt-0.5" />
+                        <div>
+                          <span className="font-medium">Be Clear</span>
+                          <p className="text-sm text-muted-foreground">No jargon, simple language</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-3">
+                        <CheckCircle className="w-4 h-4 text-green-500 mt-0.5" />
+                        <div>
+                          <span className="font-medium">Be Consistent</span>
+                          <p className="text-sm text-muted-foreground">Aligned across all leaders</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-3">
+                        <CheckCircle className="w-4 h-4 text-green-500 mt-0.5" />
+                        <div>
+                          <span className="font-medium">Create Accountability</span>
+                          <p className="text-sm text-muted-foreground">Clear who, what, when</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-3">
+                        <CheckCircle className="w-4 h-4 text-green-500 mt-0.5" />
+                        <div>
+                          <span className="font-medium">Empower the Receiver</span>
+                          <p className="text-sm text-muted-foreground">Invite input, encourage ownership</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             {/* Execution Tab Content (Meetings, P2P Emails, Group Emails, and Flyers Implementation) */}
