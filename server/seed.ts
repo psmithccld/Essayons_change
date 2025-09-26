@@ -85,7 +85,10 @@ export async function seedDatabase() {
     }
 
     // Check if Super Admin users exist
-    const existingSuperAdmins = await db.select().from(superAdminUsers);
+    const existingSuperAdmins = await db.select({
+      id: superAdminUsers.id,
+      username: superAdminUsers.username
+    }).from(superAdminUsers);
     
     if (existingSuperAdmins.length === 0) {
       console.log('Creating default Super Admin user...');

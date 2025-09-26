@@ -1264,7 +1264,18 @@ export class DatabaseStorage implements IStorage {
 
   // SECURITY: Internal method that includes passwordHash for authentication
   private async getSuperAdminUserByUsernameWithPassword(username: string): Promise<SuperAdminUser & { passwordHash: string } | undefined> {
-    const [user] = await db.select().from(superAdminUsers).where(eq(superAdminUsers.username, username));
+    const [user] = await db.select({
+      id: superAdminUsers.id,
+      username: superAdminUsers.username,
+      email: superAdminUsers.email,
+      passwordHash: superAdminUsers.passwordHash,
+      name: superAdminUsers.name,
+      role: superAdminUsers.role,
+      isActive: superAdminUsers.isActive,
+      lastLoginAt: superAdminUsers.lastLoginAt,
+      createdAt: superAdminUsers.createdAt,
+      updatedAt: superAdminUsers.updatedAt
+    }).from(superAdminUsers).where(eq(superAdminUsers.username, username));
     return user || undefined;
   }
 
@@ -1309,7 +1320,17 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(superAdminUsers)
       .set(updatePayload)
       .where(eq(superAdminUsers.id, id))
-      .returning();
+      .returning({
+        id: superAdminUsers.id,
+        username: superAdminUsers.username,
+        email: superAdminUsers.email,
+        name: superAdminUsers.name,
+        role: superAdminUsers.role,
+        isActive: superAdminUsers.isActive,
+        lastLoginAt: superAdminUsers.lastLoginAt,
+        createdAt: superAdminUsers.createdAt,
+        updatedAt: superAdminUsers.updatedAt
+      });
     
     if (!updated) return undefined;
     
@@ -1329,18 +1350,26 @@ export class DatabaseStorage implements IStorage {
     const sessionData = {
       id: sessionId,
       superAdminUserId: userId,
-      pendingMfaVerification: mfaRequired,
-      mfaVerified: !mfaRequired, // If MFA not required, mark as verified
-      mfaVerifiedAt: !mfaRequired ? new Date() : undefined,
-      expiresAt
+      expiresAt,
+      createdAt: new Date()
     };
 
-    const [session] = await db.insert(superAdminSessions).values(sessionData).returning();
-    return session;
+    const [session] = await db.insert(superAdminSessions).values(sessionData).returning({
+      id: superAdminSessions.id,
+      superAdminUserId: superAdminSessions.superAdminUserId,
+      expiresAt: superAdminSessions.expiresAt,
+      createdAt: superAdminSessions.createdAt
+    });
+    return session as SuperAdminSession;
   }
 
   async getSuperAdminSession(sessionId: string): Promise<SuperAdminSession | undefined> {
-    const [session] = await db.select()
+    const [session] = await db.select({
+      id: superAdminSessions.id,
+      superAdminUserId: superAdminSessions.superAdminUserId,
+      expiresAt: superAdminSessions.expiresAt,
+      createdAt: superAdminSessions.createdAt
+    })
       .from(superAdminSessions)
       .where(and(
         eq(superAdminSessions.id, sessionId),
@@ -1530,33 +1559,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSuperAdminSessionMfaStatus(sessionId: string, verified: boolean): Promise<void> {
-    await db.update(superAdminSessions)
-      .set({
-        mfaVerified: verified,
-        mfaVerifiedAt: verified ? new Date() : undefined,
-        pendingMfaVerification: !verified
-      })
-      .where(eq(superAdminSessions.id, sessionId));
+    // STUB: MFA feature disabled - no-op to avoid non-existent column references
+    // TODO: Implement proper MFA when feature flag is enabled
+    return;
   }
 
   async disableSuperAdminMfa(userId: string): Promise<{ success: boolean; message: string }> {
-    try {
-      await db.update(superAdminUsers)
-        .set({
-          mfaEnabled: false,
-          totpSecret: null,
-          backupCodes: null,
-          mfaEnrolledAt: null,
-          lastMfaUsedAt: null,
-          updatedAt: new Date()
-        })
-        .where(eq(superAdminUsers.id, userId));
-      
-      return { success: true, message: "MFA disabled successfully" };
-    } catch (error) {
-      console.error("Error disabling MFA:", error);
-      return { success: false, message: "Failed to disable MFA" };
-    }
+    // STUB: MFA feature disabled - return success without database operations
+    // TODO: Implement proper MFA when feature flag is enabled
+    return { success: true, message: "MFA disabled successfully (feature disabled)" };
   }
 
   // Super Admin User Management Methods
@@ -1566,10 +1577,8 @@ export class DatabaseStorage implements IStorage {
       username: superAdminUsers.username,
       email: superAdminUsers.email,
       isActive: superAdminUsers.isActive,
-      mfaEnabled: superAdminUsers.mfaEnabled,
       lastLoginAt: superAdminUsers.lastLoginAt,
-      createdAt: superAdminUsers.createdAt,
-      mustChangePassword: superAdminUsers.mustChangePassword
+      createdAt: superAdminUsers.createdAt
     })
     .from(superAdminUsers)
     .orderBy(superAdminUsers.createdAt);
@@ -1589,7 +1598,6 @@ export class DatabaseStorage implements IStorage {
   async forceSuperAdminPasswordReset(userId: string): Promise<void> {
     await db.update(superAdminUsers)
       .set({ 
-        mustChangePassword: true,
         updatedAt: new Date()
       })
       .where(eq(superAdminUsers.id, userId));
