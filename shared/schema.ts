@@ -246,6 +246,15 @@ export const organizations = pgTable("organizations", {
   description: text("description"),
   status: text("status").notNull().default("active"), // active, suspended, trial
   ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
+  // Contact Information
+  contactEmail: text("contact_email").notNull(),
+  billingEmail: text("billing_email").notNull(), 
+  contactPhone: text("contact_phone"),
+  address: text("address"),
+  website: text("website"),
+  // Subscription and Limits
+  maxUsers: integer("max_users").notNull().default(10),
+  taxId: text("tax_id"),
   enabledFeatures: jsonb("enabled_features").default({
     readinessSurveys: true,
     gptCoach: true,
