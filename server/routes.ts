@@ -38,7 +38,7 @@ import {
 import { db } from "./db"; // Import db from correct location
 import { and, eq, or, sql } from "drizzle-orm"; // Add missing drizzle operators
 import * as openaiService from "./openai";
-import { sendTaskAssignmentNotification, sendBulkGroupEmail, sendP2PEmail } from "./services/emailService";
+import { sendTaskAssignmentNotification } from "./services/emailService";
 import { z } from "zod";
 
 // Input validation schemas
@@ -2464,323 +2464,29 @@ Return the refined content in JSON format:
     }
   });
 
-  // Flyer Distribution - SECURITY: Requires bulk email permission and proper auth
+  // Flyer Distribution - DISABLED for Phase 1 (copy/paste only workflow)
   app.post("/api/communications/:id/distribute", requireAuthAndPermission('canSendBulkEmails'), async (req: AuthenticatedRequest, res) => {
-    try {
-      // SECURITY: Input validation with Zod
-      const validatedInput = distributionRequestSchema.parse(req.body);
-      const { distributionMethod, recipients, dryRun } = validatedInput;
-      
-      // SECURITY: Rate limiting check
-      if (!checkRateLimit(req.userId!, 5, 300000)) { // 5 distributions per 5 minutes
-        return res.status(429).json({ 
-          error: "Rate limit exceeded. Please wait before sending more distributions." 
-        });
-      }
-      
-      // DRY RUN mode - short-circuit before environment safety checks
-      if (dryRun) {
-        // Skip all safety checks for dry runs - they should always succeed
-        console.log(`[DRY RUN] User ${req.userId} initiating DRY RUN distribution - bypassing environment checks`);
-      } else {
-        // SECURITY: Environment safety check (only for live distributions)
-        const safetyCheck = checkEnvironmentSafety('bulk_email');
-        if (!safetyCheck.safe) {
-          return res.status(403).json({ 
-            error: safetyCheck.message,
-            hint: "Set ALLOW_PRODUCTION_EMAIL=true if you intend to send emails in production"
-          });
-        }
-      }
-
-      const communication = await storage.getCommunication(req.params.id);
-      if (!communication) {
-        return res.status(404).json({ error: "Communication not found" });
-      }
-
-      const project = await storage.getProject(communication.projectId);
-      if (!project) {
-        return res.status(404).json({ error: "Project not found" });
-      }
-
-      let distributionResult = { sent: 0, failed: 0, results: [] as any[] };
-
-      if (distributionMethod === 'email') {
-        // Get recipient list
-        let emailList: string[] = [];
-        
-        if (recipients && Array.isArray(recipients)) {
-          emailList = recipients;
-        } else if (communication.targetAudience && communication.targetAudience.length > 0) {
-          // For demo purposes, generate email addresses from target audience
-          // In production, this would be resolved from stakeholder database
-          emailList = communication.targetAudience.map(audience => 
-            `${audience.toLowerCase().replace(/\s+/g, '.')}@company.com`
-          );
-        } else {
-          return res.status(400).json({ error: "No recipients specified for email distribution" });
-        }
-        
-        // SECURITY: Log distribution attempt
-        console.log(`[DISTRIBUTION] User ${req.userId} initiating ${dryRun ? 'DRY RUN' : 'LIVE'} email distribution`, {
-          communicationId: req.params.id,
-          recipientCount: emailList.length,
-          projectId: communication.projectId,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Handle DRY RUN mode - simulate without sending
-        if (dryRun) {
-          distributionResult = {
-            sent: emailList.length,
-            failed: 0,
-            results: emailList.map(email => ({ email, success: true, note: 'DRY RUN - not actually sent' }))
-          };
-          console.log(`[DRY RUN] Would distribute to ${emailList.length} recipients:`, emailList);
-        } else {
-          // LIVE distribution - choose appropriate email service based on communication type
-          if (communication.type === 'group_email') {
-            // Get RAID log context if referenced
-            let raidLogInfo: { title: string; type: string; description: string }[] = [];
-            if (communication.raidLogReferences && communication.raidLogReferences.length > 0) {
-              try {
-                const raidLogs = await Promise.all(
-                  communication.raidLogReferences.map(id => storage.getRaidLog(id))
-                );
-                raidLogInfo = raidLogs
-                  .filter(log => log !== undefined)
-                  .map(log => ({
-                    title: log!.title,
-                    type: log!.type,
-                    description: log!.description
-                  }));
-              } catch (error) {
-                console.warn('Error fetching RAID logs for email context:', error);
-              }
-            }
-            
-            distributionResult = await sendBulkGroupEmail(
-              emailList,
-              communication.title,
-              communication.content,
-              project.name,
-              raidLogInfo.length > 0 ? raidLogInfo : undefined
-            );
-          } else {
-            // Import and use flyer distribution service for backward compatibility
-            const { sendBulkFlyerDistribution } = await import("./services/emailService");
-            
-            distributionResult = await sendBulkFlyerDistribution(
-              emailList,
-              communication.title,
-              communication.content,
-              project.name,
-              distributionMethod
-            );
-          }
-        }
-      }
-
-      // Update communication with distribution method and status (only for live runs)
-      const updatedCommunication = await storage.updateCommunication(req.params.id, {
-        distributionMethod,
-        status: dryRun ? 'draft' : (distributionResult.sent > 0 ? 'sent' : 'failed'),
-        sendDate: dryRun ? undefined : new Date()
-      });
-      
-      // SECURITY: Log distribution result
-      console.log(`[DISTRIBUTION RESULT] User ${req.userId}`, {
-        communicationId: req.params.id,
-        success: distributionResult.sent > 0,
-        sent: distributionResult.sent,
-        failed: distributionResult.failed,
-        dryRun,
-        timestamp: new Date().toISOString()
-      });
-
-      res.json({ 
-        success: distributionResult.sent > 0,
-        dryRun,
-        message: dryRun 
-          ? `DRY RUN: Would distribute to ${distributionResult.sent} recipients via ${distributionMethod}`
-          : `Flyer distributed via ${distributionMethod}. Sent: ${distributionResult.sent}, Failed: ${distributionResult.failed}`,
-        communication: updatedCommunication,
-        distributionResult,
-        environmentInfo: {
-          nodeEnv: process.env.NODE_ENV,
-          emailConfigured: !!process.env.SENDGRID_API_KEY
-        }
-      });
-    } catch (error) {
-      console.error("Error distributing flyer:", error);
-      res.status(500).json({ error: "Failed to distribute flyer" });
-    }
+    // PHASE 1: Send functionality disabled - return 410 Gone
+    return res.status(410).json({ 
+      error: "Send functionality has been disabled. Use copy/paste workflow instead.",
+      phase: "copy-paste-only"
+    });
   });
 
-  // P2P Email Sending - SECURITY: Requires individual email permission and proper auth
+  // All orphaned distribute implementation code removed - route returns 410 above
+
+  // P2P Email Sending - DISABLED for Phase 1 (copy/paste only workflow)
   app.post("/api/communications/:id/send-p2p", requireAuthAndPermission('canSendEmails'), async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      console.log(`[SEND-P2P] Route hit for communication ID: ${req.params.id}, user: ${req.userId}`);
-      const { recipientEmail, recipientName, visibility, dryRun, senderEmail } = req.body;
-
-      // Validate input
-      if (!recipientEmail || !recipientName) {
-        return res.status(400).json({ error: "Recipient email and name are required" });
-      }
-
-      // Validate visibility setting
-      const validVisibilityOptions = ['private', 'team', 'archive'];
-      if (visibility && !validVisibilityOptions.includes(visibility)) {
-        return res.status(400).json({ 
-          error: "Invalid visibility setting. Must be 'private', 'team', or 'archive'" 
-        });
-      }
-
-      // SECURITY: Rate limiting check for P2P emails
-      if (!checkRateLimit(req.userId!, 10, 300000)) { // 10 P2P emails per 5 minutes
-        return res.status(429).json({ 
-          error: "Rate limit exceeded. Please wait before sending more personal emails." 
-        });
-      }
-
-      // Get communication
-      console.log(`[SEND-P2P] Looking for communication: id=${req.params.id}, orgId=${req.organizationId}`);
-      const communication = await storage.getCommunication(req.params.id, req.organizationId!);
-      console.log(`[SEND-P2P] Communication found:`, communication ? 'YES' : 'NO');
-      if (!communication) {
-        return res.status(404).json({ error: "Communication not found" });
-      }
-
-      // Validate communication type
-      if (communication.type !== 'point_to_point_email') {
-        return res.status(400).json({ error: "Communication must be a point-to-point email" });
-      }
-
-      // Get project
-      console.log(`[SEND-P2P] Looking for project: id=${communication.projectId}`);
-      const project = await storage.getProject(communication.projectId, req.organizationId!);
-      console.log(`[SEND-P2P] Project found:`, project ? 'YES' : 'NO');
-      if (!project) {
-        return res.status(404).json({ error: "Project not found" });
-      }
-
-      // Get sender info
-      console.log(`[SEND-P2P] Looking for sender: userId=${req.userId}`);
-      const sender = await storage.getUser(req.userId!);
-      console.log(`[SEND-P2P] Sender found:`, sender ? 'YES' : 'NO');
-      if (!sender) {
-        return res.status(404).json({ error: "Sender not found" });
-      }
-
-      // Handle DRY RUN mode
-      if (dryRun) {
-        console.log(`[DRY RUN] P2P Email - Would send "${communication.title}" to ${recipientName} (${recipientEmail})`);
-        return res.json({
-          success: true,
-          dryRun: true,
-          message: `DRY RUN: Would send personal email to ${recipientName}`,
-          emailPreview: {
-            subject: `Personal Communication: ${communication.title}`,
-            recipient: { name: recipientName, email: recipientEmail },
-            sender: sender.name,
-            visibility,
-            content: communication.content
-          }
-        });
-      }
-
-      // SECURITY: Environment safety check for live sending
-      const safetyCheck = checkEnvironmentSafety('email');
-      if (!safetyCheck.safe) {
-        return res.status(403).json({ 
-          error: safetyCheck.message,
-          hint: "Email service not configured properly"
-        });
-      }
-
-      // Get RAID log context if referenced
-      let raidLogInfo: { title: string; type: string; description: string }[] = [];
-      if (communication.raidLogReferences && communication.raidLogReferences.length > 0) {
-        try {
-          const raidLogs = await Promise.all(
-            communication.raidLogReferences.map(id => storage.getRaidLog(id))
-          );
-          raidLogInfo = raidLogs
-            .filter(log => log !== undefined)
-            .map(log => ({
-              title: log!.title,
-              type: log!.type,
-              description: log!.description
-            }));
-        } catch (error) {
-          console.warn('Error fetching RAID logs for P2P email context:', error);
-        }
-      }
-
-      // Send P2P email with CC to sender
-      const emailSent = await sendP2PEmail(
-        recipientEmail,
-        recipientName,
-        communication.title,
-        communication.content,
-        project.name,
-        sender.name,
-        visibility as 'private' | 'team' | 'archive',
-        raidLogInfo.length > 0 ? raidLogInfo : undefined,
-        senderEmail || sender.email // CC the sender
-      );
-
-      if (!emailSent) {
-        return res.status(500).json({ error: "Failed to send personal email" });
-      }
-
-      // Update communication status
-      const updatedCommunication = await storage.updateCommunication(req.params.id, {
-        status: 'sent',
-        sendDate: new Date(),
-        distributionMethod: 'email'
-      });
-
-      // TODO: Implement communication recipient tracking
-      // await storage.createCommunicationRecipient({
-      //   communicationId: communication.id,
-      //   recipientType: 'external_email',
-      //   recipientEmail,
-      //   recipientName,
-      //   recipientRole: communication.metadata?.recipientRole || undefined,
-      //   deliveryStatus: 'sent'
-      // });
-
-      // SECURITY: Log P2P email sending
-      console.log(`[P2P EMAIL SENT] User ${req.userId}`, {
-        communicationId: req.params.id,
-        recipientEmail,
-        recipientName,
-        visibility,
-        projectId: communication.projectId,
-        timestamp: new Date().toISOString()
-      });
-
-      res.json({
-        success: true,
-        dryRun: false,
-        message: `Personal email sent successfully to ${recipientName}`,
-        communication: updatedCommunication,
-        recipient: {
-          name: recipientName,
-          email: recipientEmail
-        },
-        environmentInfo: {
-          nodeEnv: process.env.NODE_ENV,
-          emailConfigured: !!process.env.SENDGRID_API_KEY
-        }
-      });
-
-    } catch (error) {
-      console.error("Error sending P2P email:", error);
-      res.status(500).json({ error: "Failed to send personal email" });
-    }
+    // PHASE 1: Send functionality disabled - return 410 Gone
+    return res.status(410).json({ 
+      error: "P2P email sending has been disabled. Use copy/paste workflow instead.",
+      phase: "copy-paste-only"
+    });
   });
+
+  // Communication export route (preserved as it doesn't send emails)
+
+  // Communication export route (preserved as it doesn't send emails)
 
   // Flyer Export - SECURITY: Requires communication permissions and proper auth
   app.post("/api/communications/:id/export", requireAuthAndPermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
@@ -3455,52 +3161,13 @@ Return the refined content in JSON format:
     }
   });
 
-  // Send survey reminders
+  // Survey reminders - DISABLED for Phase 1 (copy/paste only workflow)
   app.post("/api/surveys/:id/reminders", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
-    try {
-      console.log(`Looking for survey with ID: ${req.params.id}, org: ${req.organizationId}`);
-      const survey = await storage.getSurvey(req.params.id, req.organizationId!);
-      console.log(`Found survey:`, survey ? { id: survey.id, status: survey.status, title: survey.title } : null);
-      
-      if (!survey) {
-        return res.status(404).json({ error: "Survey not found" });
-      }
-      
-      if (survey.status !== 'active') {
-        return res.status(400).json({ error: `Survey is not active. Current status: ${survey.status}` });
-      }
-
-      const { sendBulkSurveyReminders } = await import('./services/surveyNotificationService.js');
-      // Get all stakeholders for the project and filter by target stakeholder IDs
-      const allStakeholders = await storage.getStakeholdersByProject(survey.projectId, req.organizationId!);
-      const targetStakeholderIds = survey.targetStakeholders || [];
-      const stakeholders = allStakeholders.filter(s => targetStakeholderIds.includes(s.id));
-      const project = await storage.getProject(survey.projectId, req.organizationId!);
-      
-      // Filter stakeholders who haven't responded yet
-      const responses = await storage.getResponsesBySurvey(survey.id);
-      const respondentEmails = responses.map(r => r.respondentEmail);
-      const stakeholdersToRemind = stakeholders.filter(s => 
-        s.email && !respondentEmails.includes(s.email)
-      );
-
-      const baseUrl = process.env.APP_BASE_URL || 'http://localhost:5000';
-      
-      const results = await sendBulkSurveyReminders(
-        survey,
-        stakeholdersToRemind,
-        baseUrl,
-        project?.name
-      );
-
-      res.json({
-        message: `Sent ${results.sent} reminders`,
-        ...results
-      });
-    } catch (error) {
-      console.error("Error sending survey reminders:", error);
-      res.status(500).json({ error: "Failed to send reminders" });
-    }
+    // PHASE 1: Email reminders disabled - return 410 Gone
+    return res.status(410).json({ 
+      error: "Survey email reminders have been disabled. Use copy/paste workflow for stakeholder communication.",
+      phase: "copy-paste-only"
+    });
   });
 
   // Survey Responses
