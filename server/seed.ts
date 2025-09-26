@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import { db } from './db';
-import { roles, users, DEFAULT_PERMISSIONS } from '@shared/schema';
+import { roles, users, superAdminUsers, DEFAULT_PERMISSIONS } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
 const SALT_ROUNDS = 12;
@@ -82,6 +82,34 @@ export async function seedDatabase() {
       console.log('   ⚠️  IMPORTANT: Change this password on first login!');
     } else {
       console.log('Users already exist, skipping default user creation.');
+    }
+
+    // Check if Super Admin users exist
+    const existingSuperAdmins = await db.select().from(superAdminUsers);
+    
+    if (existingSuperAdmins.length === 0) {
+      console.log('Creating default Super Admin user...');
+      
+      // Create default Super Admin user
+      const superAdminPassword = 'admin123'; // Should be changed on first login
+      const hashedSuperAdminPassword = await bcrypt.hash(superAdminPassword, SALT_ROUNDS);
+      
+      await db.insert(superAdminUsers).values({
+        username: 'superadmin',
+        email: 'superadmin@platform.com',
+        passwordHash: hashedSuperAdminPassword,
+        name: 'Super Administrator',
+        role: 'super_admin',
+        isActive: true,
+      });
+      
+      console.log('✅ Created default Super Admin user');
+      console.log('   Username: superadmin');
+      console.log('   Email: superadmin@platform.com');
+      console.log('   Password: admin123');
+      console.log('   ⚠️  IMPORTANT: Change this password on first login!');
+    } else {
+      console.log('Super Admin users already exist, skipping Super Admin creation.');
     }
 
     console.log('🎉 Database seeding completed successfully!');
