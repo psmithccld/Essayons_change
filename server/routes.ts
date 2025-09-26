@@ -2896,7 +2896,7 @@ Return the refined content in JSON format:
   app.put("/api/communications/:id", requireAuthAndPermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       // Get existing communication to check type for specific permission
-      const existingCommunication = await storage.getCommunication(req.params.id);
+      const existingCommunication = await storage.getCommunication(req.params.id, req.organizationId!);
       if (!existingCommunication) {
         return res.status(404).json({ error: "Communication not found" });
       }
@@ -2923,7 +2923,7 @@ Return the refined content in JSON format:
   app.delete("/api/communications/:id", requireAuthAndPermission('canDeleteCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       // Get existing communication to check type for specific permission
-      const existingCommunication = await storage.getCommunication(req.params.id);
+      const existingCommunication = await storage.getCommunication(req.params.id, req.organizationId!);
       if (!existingCommunication) {
         return res.status(404).json({ error: "Communication not found" });
       }
@@ -2939,7 +2939,7 @@ Return the refined content in JSON format:
         }
       }
 
-      const success = await storage.deleteCommunication(req.params.id);
+      const success = await storage.deleteCommunication(req.params.id, req.organizationId!);
       if (!success) {
         return res.status(404).json({ error: "Communication not found" });
       }

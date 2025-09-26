@@ -566,14 +566,14 @@ export default function CommunicationRepository({ onCreateNew, onViewCommunicati
                   <div className="space-y-2">
                     <Label>Status</Label>
                     <Select
-                      value={searchFilters.statuses[0] || ''}
-                      onValueChange={(value) => updateFilter('statuses', value ? [value] : [])}
+                      value={searchFilters.statuses[0] || 'all'}
+                      onValueChange={(value) => updateFilter('statuses', value === 'all' ? [] : [value])}
                     >
                       <SelectTrigger data-testid="select-status-filter">
                         <SelectValue placeholder="All statuses" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All statuses</SelectItem>
+                        <SelectItem value="all">All statuses</SelectItem>
                         {availableStatuses.map((status) => (
                           <SelectItem key={status} value={status}>
                             {status.charAt(0).toUpperCase() + status.slice(1)}
