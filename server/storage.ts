@@ -1239,27 +1239,48 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSuperAdminUser(id: string): Promise<SuperAdminUser | undefined> {
-    const [user] = await db.select().from(superAdminUsers).where(eq(superAdminUsers.id, id));
-    if (!user) return undefined;
-    // Remove passwordHash from response for security
-    const { passwordHash, ...userWithoutHash } = user;
-    return userWithoutHash as SuperAdminUser;
+    const [user] = await db.select({
+      id: superAdminUsers.id,
+      username: superAdminUsers.username,
+      email: superAdminUsers.email,
+      name: superAdminUsers.name,
+      role: superAdminUsers.role,
+      isActive: superAdminUsers.isActive,
+      lastLoginAt: superAdminUsers.lastLoginAt,
+      createdAt: superAdminUsers.createdAt,
+      updatedAt: superAdminUsers.updatedAt
+    }).from(superAdminUsers).where(eq(superAdminUsers.id, id));
+    return user || undefined;
   }
 
   async getSuperAdminUserByUsername(username: string): Promise<SuperAdminUser | undefined> {
-    const [user] = await db.select().from(superAdminUsers).where(eq(superAdminUsers.username, username));
-    if (!user) return undefined;
-    // Remove passwordHash from response for security
-    const { passwordHash, ...userWithoutHash } = user;
-    return userWithoutHash as SuperAdminUser;
+    const [user] = await db.select({
+      id: superAdminUsers.id,
+      username: superAdminUsers.username,
+      email: superAdminUsers.email,
+      name: superAdminUsers.name,
+      role: superAdminUsers.role,
+      isActive: superAdminUsers.isActive,
+      lastLoginAt: superAdminUsers.lastLoginAt,
+      createdAt: superAdminUsers.createdAt,
+      updatedAt: superAdminUsers.updatedAt
+    }).from(superAdminUsers).where(eq(superAdminUsers.username, username));
+    return user || undefined;
   }
 
   async getSuperAdminUserByEmail(email: string): Promise<SuperAdminUser | undefined> {
-    const [user] = await db.select().from(superAdminUsers).where(eq(superAdminUsers.email, email));
-    if (!user) return undefined;
-    // Remove passwordHash from response for security
-    const { passwordHash, ...userWithoutHash } = user;
-    return userWithoutHash as SuperAdminUser;
+    const [user] = await db.select({
+      id: superAdminUsers.id,
+      username: superAdminUsers.username,
+      email: superAdminUsers.email,
+      name: superAdminUsers.name,
+      role: superAdminUsers.role,
+      isActive: superAdminUsers.isActive,
+      lastLoginAt: superAdminUsers.lastLoginAt,
+      createdAt: superAdminUsers.createdAt,
+      updatedAt: superAdminUsers.updatedAt
+    }).from(superAdminUsers).where(eq(superAdminUsers.email, email));
+    return user || undefined;
   }
 
   // SECURITY: Internal method that includes passwordHash for authentication
@@ -1339,8 +1360,8 @@ export class DatabaseStorage implements IStorage {
     return userWithoutHash as SuperAdminUser;
   }
 
-  // Super Admin Session Management with MFA support
-  async createSuperAdminSession(userId: string, mfaRequired: boolean = false): Promise<SuperAdminSession> {
+  // Super Admin Session Management
+  async createSuperAdminSession(userId: string): Promise<SuperAdminSession> {
     // Generate cryptographically secure session ID
     const sessionId = crypto.randomBytes(32).toString('hex');
     

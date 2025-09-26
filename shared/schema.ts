@@ -1991,20 +1991,15 @@ export const superAdminUsers = pgTable("super_admin_users", {
   mfaEnabledIdx: index("super_admin_users_mfa_enabled_idx").on(table.mfaEnabled),
 }));
 
-// Super Admin Sessions - separate session management with MFA tracking
+// Super Admin Sessions - separate session management
 export const superAdminSessions = pgTable("super_admin_sessions", {
   id: text("id").primaryKey(), // Session ID
   superAdminUserId: uuid("super_admin_user_id").references(() => superAdminUsers.id, { onDelete: "cascade" }).notNull(),
-  // MFA verification tracking
-  mfaVerified: boolean("mfa_verified").notNull().default(false), // Whether MFA was completed for this session
-  mfaVerifiedAt: timestamp("mfa_verified_at"), // When MFA verification was completed
-  pendingMfaVerification: boolean("pending_mfa_verification").notNull().default(false), // Session requires MFA verification
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   userIdx: index("super_admin_sessions_user_idx").on(table.superAdminUserId),
   expiresIdx: index("super_admin_sessions_expires_idx").on(table.expiresAt),
-  mfaVerifiedIdx: index("super_admin_sessions_mfa_verified_idx").on(table.mfaVerified),
 }));
 
 // Super Admin MFA Setup - temporary storage during MFA enrollment
