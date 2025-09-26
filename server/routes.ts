@@ -390,6 +390,46 @@ interface AuthenticatedRequest extends SessionRequest {
   };
 }
 
+// SECURITY: Feature gate middleware factory - protects API routes based on organization feature flags
+function requireFeature(featureName: 'readinessSurveys' | 'gptCoach' | 'communications' | 'changeArtifacts' | 'reports') {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = req.organizationId;
+      if (!organizationId) {
+        return res.status(401).json({ error: "Organization context required" });
+      }
+      
+      const organization = await storage.getOrganization(organizationId);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // SECURITY: Default features - all DISABLED by default (fail closed)
+      const defaultFeatures = {
+        readinessSurveys: false,
+        gptCoach: false,
+        communications: false,
+        changeArtifacts: false,
+        reports: false
+      };
+      
+      const enabledFeatures = organization.enabledFeatures || defaultFeatures;
+      
+      if (!enabledFeatures[featureName]) {
+        return res.status(403).json({ 
+          error: `Feature '${featureName}' is not enabled for your organization`,
+          feature: featureName 
+        });
+      }
+      
+      next();
+    } catch (error) {
+      console.error(`Error checking feature ${featureName}:`, error);
+      res.status(500).json({ error: "Failed to verify feature access" });
+    }
+  };
+}
+
 // SECURITY: Authentication middleware - uses secure session-based authentication
 const requireAuth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -2506,7 +2546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Repository API Endpoints
   
   // Basic Communications CRUD
-  app.get("/api/communications", requireAuthAndPermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.get("/api/communications", requireAuthAndOrg, requireFeature('communications'), requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       const communications = await storage.getCommunications();
       res.json(communications);
@@ -2516,7 +2556,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/communications/personal-emails", requireAuthAndPermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.get("/api/communications/personal-emails", requireAuthAndOrg, requireFeature('communications'), requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       const personalEmails = await storage.getPersonalEmails();
       res.json(personalEmails);
@@ -2526,7 +2566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/communications", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/communications", requireAuthAndOrg, requireFeature('communications'), async (req: AuthenticatedRequest, res) => {
     try {
       const processedData = {
         ...req.body,
@@ -2547,7 +2587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Advanced search for communications
-  app.post('/api/communications/search', requireAuthAndOrg, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/communications/search', requireAuthAndOrg, requireFeature('communications'), requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const searchParams = req.body;
       
@@ -2579,7 +2619,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get communication metrics and analytics
-  app.get('/api/communications/metrics', requireAuthAndOrg, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/communications/metrics', requireAuthAndOrg, requireFeature('communications'), requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId, type } = req.query;
       
@@ -2605,7 +2645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get communication version history
-  app.get('/api/communications/:id/versions', requireAuthAndOrg, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/communications/:id/versions', requireAuthAndOrg, requireFeature('communications'), requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params;
       
@@ -2632,7 +2672,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Archive communications (bulk action)
-  app.post('/api/communications/archive', requireAuthAndOrg, requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/communications/archive', requireAuthAndOrg, requireFeature('communications'), requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { ids } = req.body;
       if (!Array.isArray(ids) || ids.length === 0) {
@@ -2672,7 +2712,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get communications by stakeholder
-  app.get('/api/communications/by-stakeholder/:stakeholderId', requireAuthAndOrg, requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/communications/by-stakeholder/:stakeholderId', requireAuthAndOrg, requireFeature('communications'), requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { stakeholderId } = req.params;
       const { projectId } = req.query;
@@ -2697,7 +2737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GPT Content Generation for Flyers
-  app.post("/api/gpt/generate-flyer-content", requireAuthAndOrg, requirePermission('canModifyCommunications'), async (req, res) => {
+  app.post("/api/gpt/generate-flyer-content", requireAuthAndOrg, requireFeature('gptCoach'), requirePermission('canModifyCommunications'), async (req, res) => {
     try {
       const { projectName, changeDescription, targetAudience, keyMessages, template } = req.body;
       
@@ -2720,7 +2760,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GPT Content Refinement for Flyers
-  app.post("/api/gpt/refine-flyer-content", requireAuthAndOrg, requirePermission('canModifyCommunications'), async (req, res) => {
+  app.post("/api/gpt/refine-flyer-content", requireAuthAndOrg, requireFeature('gptCoach'), requirePermission('canModifyCommunications'), async (req, res) => {
     try {
       const { currentContent, refinementRequest, context } = req.body;
       
@@ -2762,7 +2802,7 @@ Return the refined content in JSON format:
   });
 
   // GPT Content Generation for Group Emails
-  app.post("/api/gpt/generate-group-email-content", requireAuthAndOrg, requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/generate-group-email-content", requireAuthAndOrg, requireFeature('gptCoach'), requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       // SECURITY: Input validation with Zod
       const validatedInput = generateGroupEmailContentSchema.parse(req.body);
@@ -2787,7 +2827,7 @@ Return the refined content in JSON format:
   });
 
   // GPT Content Refinement for Group Emails
-  app.post("/api/gpt/refine-group-email-content", requireAuthAndOrg, requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/refine-group-email-content", requireAuthAndOrg, requireFeature('gptCoach'), requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       // SECURITY: Input validation with Zod
       const validatedInput = refineGroupEmailContentSchema.parse(req.body);
@@ -2835,7 +2875,7 @@ Return the refined content in JSON format:
   });
 
   // GPT Content Generation for P2P Emails
-  app.post("/api/gpt/generate-p2p-email-content", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/generate-p2p-email-content", requireAuthAndOrg, requireFeature('gptCoach'), async (req: AuthenticatedRequest, res) => {
     try {
       // SECURITY: Input validation with Zod
       const validatedInput = generateP2PEmailContentSchema.parse(req.body);
@@ -2925,7 +2965,7 @@ Return the content in JSON format:
   });
 
   // GPT Content Refinement for P2P Emails
-  app.post("/api/gpt/refine-p2p-email-content", requireAuthAndPermission('canSendEmails'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/refine-p2p-email-content", requireAuthAndOrg, requireFeature('gptCoach'), requirePermission('canSendEmails'), async (req: AuthenticatedRequest, res) => {
     try {
       // SECURITY: Input validation with Zod
       const validatedInput = refineP2PEmailContentSchema.parse(req.body);
@@ -2990,7 +3030,7 @@ Return the refined content in JSON format:
   });
 
   // Flyer Distribution - DISABLED for Phase 1 (copy/paste only workflow)
-  app.post("/api/communications/:id/distribute", requireAuthAndPermission('canSendBulkEmails'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/communications/:id/distribute", requireAuthAndOrg, requireFeature('communications'), requirePermission('canSendBulkEmails'), async (req: AuthenticatedRequest, res) => {
     // PHASE 1: Send functionality disabled - return 410 Gone
     return res.status(410).json({ 
       error: "Send functionality has been disabled. Use copy/paste workflow instead.",
@@ -3001,7 +3041,7 @@ Return the refined content in JSON format:
   // All orphaned distribute implementation code removed - route returns 410 above
 
   // P2P Email Sending - DISABLED for Phase 1 (copy/paste only workflow)
-  app.post("/api/communications/:id/send-p2p", requireAuthAndPermission('canSendEmails'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post("/api/communications/:id/send-p2p", requireAuthAndOrg, requireFeature('communications'), requirePermission('canSendEmails'), async (req: AuthenticatedRequest, res: Response) => {
     // PHASE 1: Send functionality disabled - return 410 Gone
     return res.status(410).json({ 
       error: "P2P email sending has been disabled. Use copy/paste workflow instead.",
@@ -3014,7 +3054,7 @@ Return the refined content in JSON format:
   // Communication export route (preserved as it doesn't send emails)
 
   // Flyer Export - SECURITY: Requires communication permissions and proper auth
-  app.post("/api/communications/:id/export", requireAuthAndPermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/communications/:id/export", requireAuthAndOrg, requireFeature('communications'), requirePermission('canSeeCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       // SECURITY: Input validation with Zod
       const validatedInput = exportRequestSchema.parse(req.body);
@@ -3418,7 +3458,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.put("/api/communications/:id", requireAuthAndPermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.put("/api/communications/:id", requireAuthAndOrg, requireFeature('communications'), requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       // Get existing communication to check type for specific permission
       const existingCommunication = await storage.getCommunication(req.params.id, req.organizationId!);
@@ -3445,7 +3485,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.delete("/api/communications/:id", requireAuthAndPermission('canDeleteCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/communications/:id", requireAuthAndOrg, requireFeature('communications'), requirePermission('canDeleteCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       // Get existing communication to check type for specific permission
       const existingCommunication = await storage.getCommunication(req.params.id, req.organizationId!);
@@ -3544,7 +3584,7 @@ Return the refined content in JSON format:
   });
 
   // Surveys
-  app.get("/api/projects/:projectId/surveys", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/projects/:projectId/surveys", requireAuthAndOrg, requireFeature('readinessSurveys'), async (req: AuthenticatedRequest, res) => {
     try {
       const surveys = await storage.getSurveysByProject(req.params.projectId, req.organizationId!);
       res.json(surveys);
@@ -3554,7 +3594,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/projects/:projectId/surveys", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/projects/:projectId/surveys", requireAuthAndOrg, requireFeature('readinessSurveys'), async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertSurveySchema.parse({
         ...req.body,
@@ -3596,7 +3636,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.put("/api/surveys/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/surveys/:id", requireAuthAndOrg, requireFeature('readinessSurveys'), async (req: AuthenticatedRequest, res) => {
     try {
       // Validate the update data using a partial schema (omit required fields like projectId and createdById)
       const updateSchema = baseSurveySchema.omit({ projectId: true, createdById: true }).partial();
@@ -3613,7 +3653,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.delete("/api/surveys/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/surveys/:id", requireAuthAndOrg, requireFeature('readinessSurveys'), async (req: AuthenticatedRequest, res) => {
     try {
       const success = await storage.deleteSurvey(req.params.id, req.organizationId!);
       if (!success) {
@@ -3627,7 +3667,7 @@ Return the refined content in JSON format:
   });
 
   // Get individual survey
-  app.get("/api/surveys/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/surveys/:id", requireAuthAndOrg, requireFeature('readinessSurveys'), async (req: AuthenticatedRequest, res) => {
     try {
       const survey = await storage.getSurvey(req.params.id, req.organizationId!);
       if (!survey) {
@@ -3687,7 +3727,7 @@ Return the refined content in JSON format:
   });
 
   // Survey reminders - DISABLED for Phase 1 (copy/paste only workflow)
-  app.post("/api/surveys/:id/reminders", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/surveys/:id/reminders", requireAuthAndOrg, requireFeature('readinessSurveys'), async (req: AuthenticatedRequest, res) => {
     // PHASE 1: Email reminders disabled - return 410 Gone
     return res.status(410).json({ 
       error: "Survey email reminders have been disabled. Use copy/paste workflow for stakeholder communication.",
@@ -3696,7 +3736,7 @@ Return the refined content in JSON format:
   });
 
   // Survey Responses
-  app.get("/api/surveys/:surveyId/responses", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/surveys/:surveyId/responses", requireAuthAndOrg, requireFeature('readinessSurveys'), async (req: AuthenticatedRequest, res) => {
     try {
       // Validate survey exists and user has access
       const survey = await storage.getSurvey(req.params.surveyId, req.organizationId!);
@@ -3712,7 +3752,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/surveys/:surveyId/responses", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/surveys/:surveyId/responses", requireAuthAndOrg, requireFeature('readinessSurveys'), async (req: AuthenticatedRequest, res) => {
     try {
       // Validate survey exists and is active
       const survey = await storage.getSurvey(req.params.surveyId, req.organizationId!);
@@ -3791,7 +3831,7 @@ Return the refined content in JSON format:
   });
 
   // GPT Coach endpoints
-  app.post("/api/gpt/communication-plan", requireAuthAndPermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/communication-plan", requireAuthAndOrg, requireFeature('gptCoach'), requirePermission('canModifyCommunications'), async (req: AuthenticatedRequest, res) => {
     try {
       // Input validation
       const parseResult = gptCommunicationPlanSchema.safeParse(req.body);
@@ -3835,7 +3875,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/gpt/readiness-analysis", requireAuthAndPermission('canSeeSurveys'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/readiness-analysis", requireAuthAndOrg, requireFeature('gptCoach'), requirePermission('canSeeSurveys'), async (req: AuthenticatedRequest, res) => {
     try {
       // Input validation
       const parseResult = gptReadinessAnalysisSchema.safeParse(req.body);
@@ -3878,7 +3918,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/gpt/risk-mitigation", requireAuthAndPermission('canSeeRaidLogs'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/risk-mitigation", requireAuthAndOrg, requireFeature('gptCoach'), requirePermission('canSeeRaidLogs'), async (req: AuthenticatedRequest, res) => {
     try {
       // Input validation
       const parseResult = gptRiskMitigationSchema.safeParse(req.body);
@@ -3918,7 +3958,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/gpt/stakeholder-tips", requireAuthAndPermission('canSeeStakeholders'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/stakeholder-tips", requireAuthAndOrg, requireFeature('gptCoach'), requirePermission('canSeeStakeholders'), async (req: AuthenticatedRequest, res) => {
     try {
       // Input validation
       const parseResult = gptStakeholderTipsSchema.safeParse(req.body);
@@ -3959,7 +3999,7 @@ Return the refined content in JSON format:
   });
 
   // Context-Aware AI Coach Chat Endpoint
-  app.post("/api/coach/chat", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/coach/chat", requireAuthAndOrg, requireFeature('gptCoach'), async (req: AuthenticatedRequest, res) => {
     try {
       // SECURITY: Input validation with Zod
       const chatRequestSchema = z.object({
@@ -4924,7 +4964,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // Meeting Invites Sending - SECURITY: Requires meeting invite permission and proper auth
-  app.post("/api/communications/:id/send-meeting-invites", requireAuthAndPermission('canSendMeetingInvites'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/communications/:id/send-meeting-invites", requireAuthAndOrg, requireFeature('communications'), requirePermission('canSendMeetingInvites'), async (req: AuthenticatedRequest, res) => {
     try {
       // SECURITY: Input validation with Zod
       const validatedInput = sendMeetingInviteSchema.parse(req.body);
@@ -5096,7 +5136,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // A. User Reports
-  app.post('/api/reports/users/login-activity', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/users/login-activity', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5118,7 +5158,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/users/role-assignment', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/users/role-assignment', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5134,7 +5174,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/users/initiatives-participation', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/users/initiatives-participation', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5151,7 +5191,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // B. Task Reports
-  app.post('/api/reports/tasks/status', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/tasks/status', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5171,7 +5211,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/tasks/upcoming-deadlines', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/tasks/upcoming-deadlines', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5190,7 +5230,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/tasks/overdue', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/tasks/overdue', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5206,7 +5246,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/tasks/completion-trend', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/tasks/completion-trend', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5227,7 +5267,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // C. RAID Reports
-  app.post('/api/reports/raid/items', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/raid/items', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5247,7 +5287,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/raid/high-severity-risks', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/raid/high-severity-risks', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5263,7 +5303,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/raid/open-issues', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/raid/open-issues', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5279,7 +5319,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/raid/dependencies-at-risk', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/raid/dependencies-at-risk', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5299,7 +5339,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // D. Stakeholder Reports
-  app.post('/api/reports/stakeholders/directory', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/stakeholders/directory', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5315,7 +5355,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/stakeholders/cross-initiative-load', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/stakeholders/cross-initiative-load', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5331,7 +5371,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/stakeholders/engagement', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/stakeholders/engagement', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5352,7 +5392,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // E. Readiness & Surveys Reports
-  app.post('/api/reports/readiness/phase-scores', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/readiness/phase-scores', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5368,7 +5408,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/surveys/responses', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/surveys/responses', requireAuthAndOrg, requireFeature('readinessSurveys'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5388,7 +5428,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/surveys/sentiment-trend', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/surveys/sentiment-trend', requireAuthAndOrg, requireFeature('readinessSurveys'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5408,7 +5448,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/surveys/understanding-gaps', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/surveys/understanding-gaps', requireAuthAndOrg, requireFeature('readinessSurveys'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5424,7 +5464,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/surveys/post-mortem-success', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/surveys/post-mortem-success', requireAuthAndOrg, requireFeature('readinessSurveys'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5440,7 +5480,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/surveys/response-rates', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/surveys/response-rates', requireAuthAndOrg, requireFeature('readinessSurveys'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5461,7 +5501,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // F. Cross-Cutting Reports
-  app.post('/api/reports/cross-cutting/change-health', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/cross-cutting/change-health', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5477,7 +5517,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/cross-cutting/org-readiness-heatmap', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/cross-cutting/org-readiness-heatmap', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5493,7 +5533,7 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  app.post('/api/reports/cross-cutting/stakeholder-sentiment', requireAuthAndOrg, requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/reports/cross-cutting/stakeholder-sentiment', requireAuthAndOrg, requireFeature('reports'), requirePermission('canSeeReports'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const params = req.body;
       
@@ -5557,7 +5597,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // Create Change Artifact entry after upload
-  app.post('/api/projects/:projectId/change-artifacts', requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/projects/:projectId/change-artifacts', requireAuthAndOrg, requireFeature('changeArtifacts'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId } = req.params;
       const userId = req.userId!;
@@ -5603,7 +5643,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // Get Change Artifacts by project
-  app.get('/api/projects/:projectId/change-artifacts', requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/projects/:projectId/change-artifacts', requireAuthAndOrg, requireFeature('changeArtifacts'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId } = req.params;
       const userId = req.userId!;
@@ -5623,7 +5663,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // Search Change Artifacts
-  app.post('/api/change-artifacts/search', requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/change-artifacts/search', requireAuthAndOrg, requireFeature('changeArtifacts'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.userId!;
       
@@ -5646,7 +5686,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // Get single Change Artifact
-  app.get('/api/change-artifacts/:id', requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/change-artifacts/:id', requireAuthAndOrg, requireFeature('changeArtifacts'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params;
       const artifact = await storage.getChangeArtifact(id);
@@ -5669,7 +5709,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // Update Change Artifact
-  app.put('/api/change-artifacts/:id', requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
+  app.put('/api/change-artifacts/:id', requireAuthAndOrg, requireFeature('changeArtifacts'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params;
       const userId = req.userId!;
@@ -5706,7 +5746,7 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
   // Delete Change Artifact
-  app.delete('/api/change-artifacts/:id', requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
+  app.delete('/api/change-artifacts/:id', requireAuthAndOrg, requireFeature('changeArtifacts'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params;
       const userId = req.userId!;
@@ -5816,13 +5856,13 @@ Please provide coaching guidance based on their question and current context.`;
         return res.status(404).json({ error: "Organization not found" });
       }
       
-      // Return enabled features or defaults if none exist
+      // SECURITY: Return enabled features or secure defaults if none exist (fail closed)
       const defaultFeatures = {
-        readinessSurveys: true,
-        gptCoach: true,
-        communications: true,
-        changeArtifacts: true,
-        reports: true
+        readinessSurveys: false,
+        gptCoach: false,
+        communications: false,
+        changeArtifacts: false,
+        reports: false
       };
       
       res.json(organization.enabledFeatures || defaultFeatures);

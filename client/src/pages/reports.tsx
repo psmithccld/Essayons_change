@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { FeatureGate } from "@/components/auth/FeatureGate";
 import { 
   Card, 
   CardContent, 
@@ -1587,7 +1588,8 @@ export default function Reports() {
   const [activeTab, setActiveTab] = useState("user-reports");
 
   return (
-    <div className="flex-1 space-y-6 p-6 pt-20">
+    <FeatureGate feature="reports" redirectTo="/">
+      <div className="flex-1 space-y-6 p-6 pt-20">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0">
         <div>
           <h2 className="text-3xl font-bold tracking-tight" style={{ color: ESSAYONS_COLORS.primary }}>
@@ -1658,5 +1660,6 @@ export default function Reports() {
         </TabsContent>
       </Tabs>
     </div>
+    </FeatureGate>
   );
 }

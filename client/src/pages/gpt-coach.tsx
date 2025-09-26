@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bot, Lightbulb, Clock } from "lucide-react";
+import { FeatureGate } from "@/components/auth/FeatureGate";
 
 interface ChatSession {
   id: string;
@@ -31,7 +32,8 @@ export default function GptCoach() {
 
 
   return (
-    <div className="space-y-6" data-testid="gpt-coach-page">
+    <FeatureGate feature="gptCoach" redirectTo="/">
+      <div className="space-y-6" data-testid="gpt-coach-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground flex items-center space-x-2">
@@ -129,5 +131,6 @@ export default function GptCoach() {
         </Card>
       </div>
     </div>
+    </FeatureGate>
   );
 }

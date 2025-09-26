@@ -18,20 +18,14 @@ export const useFeatures = () => {
       }
       return response.json();
     },
-    // Default to all features enabled during loading/error states
-    initialData: {
-      readinessSurveys: true,
-      gptCoach: true,
-      communications: true,
-      changeArtifacts: true,
-      reports: true
-    } as OrganizationFeatures
+    // SECURITY: No initial data - fail closed during loading/error states
   });
 
   return {
     features: features || {},
     hasFeature: (featureName: keyof OrganizationFeatures) => {
-      return features?.[featureName] || false;
+      // SECURITY: Only return true if explicitly enabled and data is loaded
+      return !isLoading && features?.[featureName] === true;
     },
     isLoading,
     error

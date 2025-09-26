@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { FeatureGate } from "@/components/auth/FeatureGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -356,7 +357,8 @@ export default function Surveys() {
   };
 
   return (
-    <div className="space-y-6" data-testid="surveys-page">
+    <FeatureGate feature="readinessSurveys" redirectTo="/">
+      <div className="space-y-6" data-testid="surveys-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Readiness Surveys</h1>
@@ -1183,5 +1185,6 @@ export default function Surveys() {
         </Card>
       )}
     </div>
+    </FeatureGate>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { FeatureGate } from "@/components/auth/FeatureGate";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -204,7 +205,8 @@ export default function ChangeArtifacts() {
   });
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <FeatureGate feature="changeArtifacts" redirectTo="/">
+      <div className="container mx-auto p-6 space-y-6">
       <div className="flex flex-col space-y-4">
         <div>
           <h1 className="text-3xl font-bold" data-testid="heading-change-artifacts">Change Artifacts</h1>
@@ -440,5 +442,6 @@ export default function ChangeArtifacts() {
         </div>
       </div>
     </div>
+    </FeatureGate>
   );
 }

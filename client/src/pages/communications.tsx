@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { FeatureGate } from "@/components/auth/FeatureGate";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -3482,7 +3483,8 @@ export default function Communications() {
   const { currentProject } = useCurrentProject();
 
   return (
-    <div className="space-y-6" data-testid="communications-page">
+    <FeatureGate feature="communications" redirectTo="/">
+      <div className="space-y-6" data-testid="communications-page">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -3756,5 +3758,6 @@ export default function Communications() {
         </CardContent>
       </Card>
     </div>
+    </FeatureGate>
   );
 }
