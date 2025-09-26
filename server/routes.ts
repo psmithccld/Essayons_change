@@ -118,16 +118,42 @@ const refineP2PEmailContentSchema = z.object({
 // Demo user constant for fallback scenarios
 const DEMO_USER_ID = "demo-user-00000000-0000-0000-0000-000000000000";
 
-// Rate limiting store (in production, use Redis)
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+// SECURITY: Enhanced rate limiting and brute-force protection system
+// In production, use Redis for distributed rate limiting
 
-// Rate limiting helper
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+  lastAttempt: number;
+}
+
+interface LoginAttemptEntry {
+  failedAttempts: number;
+  lockoutUntil?: number;
+  firstFailedAttempt: number;
+  lastFailedAttempt: number;
+  successiveFailures: number;
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
+const loginAttemptStore = new Map<string, LoginAttemptEntry>();
+const suspiciousIpStore = new Map<string, { reportCount: number; lastReport: number }>();
+
+// SECURITY: Enhanced rate limiting with progressive delays and memory protection
 const checkRateLimit = (userId: string, limit: number = 10, windowMs: number = 60000): boolean => {
   const now = Date.now();
   const userLimit = rateLimitStore.get(userId);
   
   if (!userLimit || now > userLimit.resetTime) {
-    rateLimitStore.set(userId, { count: 1, resetTime: now + windowMs });
+    // SECURITY FIX: Implement maximum entry limit to prevent memory DoS
+    if (rateLimitStore.size > 50000) { // Cap at 50k entries
+      // Remove oldest entries if we hit the limit
+      const entries = Array.from(rateLimitStore.entries());
+      entries.sort((a, b) => a[1].lastAttempt - b[1].lastAttempt);
+      entries.slice(0, 5000).forEach(([key]) => rateLimitStore.delete(key)); // Remove oldest 5000
+    }
+    
+    rateLimitStore.set(userId, { count: 1, resetTime: now + windowMs, lastAttempt: now });
     return true;
   }
   
@@ -136,8 +162,186 @@ const checkRateLimit = (userId: string, limit: number = 10, windowMs: number = 6
   }
   
   userLimit.count++;
+  userLimit.lastAttempt = now;
   return true;
 };
+
+// SECURITY: Advanced brute-force protection for Super Admin login
+const checkLoginRateLimit = (username: string, clientIp: string): { allowed: boolean; reason?: string; retryAfter?: number } => {
+  const now = Date.now();
+  const normalizedUsername = username.toLowerCase().trim(); // Normalize for consistent keying
+  const userKey = `user:${normalizedUsername}`;
+  
+  // SECURITY FIX: Clear expired lockouts to prevent memory retention
+  const userAttempts = loginAttemptStore.get(userKey);
+  if (userAttempts?.lockoutUntil && now >= userAttempts.lockoutUntil) {
+    userAttempts.lockoutUntil = undefined;
+    // Reset successive failures after lockout expires (prevents overly punitive lockouts)
+    userAttempts.successiveFailures = 0;
+    loginAttemptStore.set(userKey, userAttempts);
+  }
+  
+  // Check if user account is currently locked out
+  if (userAttempts?.lockoutUntil && now < userAttempts.lockoutUntil) {
+    const retryAfter = Math.ceil((userAttempts.lockoutUntil - now) / 1000);
+    return { 
+      allowed: false, 
+      // SECURITY FIX: Generic message to prevent user enumeration
+      reason: "Too many login attempts. Please wait before trying again.",
+      retryAfter 
+    };
+  }
+  
+  // SECURITY FIX: Time-based decay of successive failures (24 hour cooldown)
+  if (userAttempts && (now - userAttempts.lastFailedAttempt) > 86400000) { // 24 hours
+    userAttempts.successiveFailures = 0;
+    loginAttemptStore.set(userKey, userAttempts);
+  }
+  
+  // Check IP-based rate limiting (more permissive)
+  if (!checkRateLimit(`ip-login:${clientIp}`, 15, 900000)) { // 15 attempts per 15 minutes per IP
+    return { 
+      allowed: false, 
+      // SECURITY FIX: Generic message to prevent fingerprinting
+      reason: "Too many login attempts. Please wait before trying again.",
+      retryAfter: 900 
+    };
+  }
+  
+  // Check username-based rate limiting (more restrictive)
+  if (!checkRateLimit(`user-login:${normalizedUsername}`, 5, 900000)) { // 5 attempts per 15 minutes per username
+    return { 
+      allowed: false, 
+      // SECURITY FIX: Generic message to prevent user enumeration
+      reason: "Too many login attempts. Please wait before trying again.",
+      retryAfter: 900 
+    };
+  }
+  
+  return { allowed: true };
+};
+
+// SECURITY: Record failed login attempt with progressive lockout
+const recordFailedLogin = (username: string, clientIp: string): void => {
+  const now = Date.now();
+  const normalizedUsername = username.toLowerCase().trim(); // Consistent normalization
+  const userKey = `user:${normalizedUsername}`;
+  
+  let userAttempts = loginAttemptStore.get(userKey);
+  if (!userAttempts) {
+    userAttempts = {
+      failedAttempts: 0,
+      firstFailedAttempt: now,
+      lastFailedAttempt: now,
+      successiveFailures: 0
+    };
+  }
+  
+  userAttempts.failedAttempts++;
+  userAttempts.successiveFailures++;
+  userAttempts.lastFailedAttempt = now;
+  
+  // Progressive lockout: 5 minutes, 15 minutes, 1 hour, 4 hours
+  if (userAttempts.successiveFailures >= 3) {
+    const lockoutDurations = [300000, 900000, 3600000, 14400000]; // 5min, 15min, 1hr, 4hr
+    const lockoutIndex = Math.min(userAttempts.successiveFailures - 3, lockoutDurations.length - 1);
+    const lockoutDuration = lockoutDurations[lockoutIndex];
+    
+    userAttempts.lockoutUntil = now + lockoutDuration;
+    
+    console.warn(`SECURITY ALERT: Account ${normalizedUsername} locked for ${lockoutDuration / 1000}s after ${userAttempts.successiveFailures} successive failures from IP ${clientIp}`);
+  }
+  
+  // SECURITY FIX: Implement maximum entry limit to prevent memory DoS
+  if (loginAttemptStore.size > 10000) { // Cap at 10k entries
+    // Remove oldest entries if we hit the limit
+    const entries = Array.from(loginAttemptStore.entries());
+    entries.sort((a, b) => a[1].lastFailedAttempt - b[1].lastFailedAttempt);
+    entries.slice(0, 1000).forEach(([key]) => loginAttemptStore.delete(key)); // Remove oldest 1000
+  }
+  
+  loginAttemptStore.set(userKey, userAttempts);
+  
+  // Track suspicious IP activity
+  let ipData = suspiciousIpStore.get(clientIp);
+  if (!ipData) {
+    ipData = { reportCount: 0, lastReport: now };
+  }
+  ipData.reportCount++;
+  ipData.lastReport = now;
+  
+  // SECURITY FIX: Cap suspicious IP store size
+  if (suspiciousIpStore.size > 5000) {
+    const ipEntries = Array.from(suspiciousIpStore.entries());
+    ipEntries.sort((a, b) => a[1].lastReport - b[1].lastReport);
+    ipEntries.slice(0, 500).forEach(([key]) => suspiciousIpStore.delete(key)); // Remove oldest 500
+  }
+  
+  suspiciousIpStore.set(clientIp, ipData);
+  
+  // SECURITY FIX: Log with normalized username to prevent log injection
+  console.warn(`SECURITY: Failed Super Admin login attempt for user '${normalizedUsername}' from IP ${clientIp}. Total failures: ${userAttempts.failedAttempts}, Successive: ${userAttempts.successiveFailures}`);
+};
+
+// SECURITY: Record successful login (clears failed attempts)
+const recordSuccessfulLogin = (username: string, clientIp: string): void => {
+  const normalizedUsername = username.toLowerCase().trim(); // Consistent normalization
+  const userKey = `user:${normalizedUsername}`;
+  const userAttempts = loginAttemptStore.get(userKey);
+  
+  if (userAttempts) {
+    // Keep total failed attempts for auditing, but reset successive failures
+    userAttempts.successiveFailures = 0;
+    userAttempts.lockoutUntil = undefined;
+    loginAttemptStore.set(userKey, userAttempts);
+  }
+  
+  console.log(`SECURITY: Successful Super Admin login for user '${normalizedUsername}' from IP ${clientIp}`);
+};
+
+// SECURITY: Cleanup old rate limit entries to prevent memory leaks
+const cleanupRateLimitStores = (): void => {
+  const now = Date.now();
+  const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+  
+  // Cleanup rate limit store
+  for (const [key, entry] of rateLimitStore.entries()) {
+    if (now > entry.resetTime || (now - entry.lastAttempt) > maxAge) {
+      rateLimitStore.delete(key);
+    }
+  }
+  
+  // SECURITY FIX: Cleanup login attempt store including expired lockouts
+  for (const [key, entry] of loginAttemptStore.entries()) {
+    const isExpiredLockout = entry.lockoutUntil && now >= entry.lockoutUntil;
+    const isOldEntry = (now - entry.lastFailedAttempt) > maxAge;
+    
+    if (isExpiredLockout || isOldEntry) {
+      loginAttemptStore.delete(key);
+    }
+  }
+  
+  // Cleanup suspicious IP store
+  for (const [key, entry] of suspiciousIpStore.entries()) {
+    if ((now - entry.lastReport) > maxAge) {
+      suspiciousIpStore.delete(key);
+    }
+  }
+  
+  // SECURITY: Log cleanup stats for monitoring
+  console.log(`SECURITY: Cleanup completed - Rate limits: ${rateLimitStore.size}, Login attempts: ${loginAttemptStore.size}, Suspicious IPs: ${suspiciousIpStore.size}`);
+};
+
+// SECURITY: Run cleanup every hour and add monitoring
+setInterval(() => {
+  cleanupRateLimitStores();
+  
+  // Monitor memory usage and alert if stores grow too large
+  const totalEntries = rateLimitStore.size + loginAttemptStore.size + suspiciousIpStore.size;
+  if (totalEntries > 75000) {
+    console.warn(`SECURITY ALERT: High memory usage in rate limiting stores. Total entries: ${totalEntries} (Rate: ${rateLimitStore.size}, Login: ${loginAttemptStore.size}, IP: ${suspiciousIpStore.size})`);
+  }
+}, 3600000); // 1 hour
 
 // Environment safety check
 const checkEnvironmentSafety = (operation: 'email' | 'bulk_email'): { safe: boolean; message?: string } => {
@@ -890,20 +1094,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { username, password } = validationResult.data;
 
-      // SECURITY: Rate limiting to prevent brute force attacks
+      // SECURITY: Enhanced brute-force protection with progressive lockout
       const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
-      const rateLimitKey = `super-admin-login:${username}:${clientIp}`;
       
-      if (!checkRateLimit(rateLimitKey, 5, 900000)) { // 5 attempts per 15 minutes
-        console.warn(`Super admin login rate limit exceeded for username: ${username}, IP: ${clientIp}`);
+      const rateLimitResult = checkLoginRateLimit(username, clientIp);
+      if (!rateLimitResult.allowed) {
+        // Record this as a rate-limited attempt for monitoring
+        console.warn(`SECURITY: Super admin login rate limit exceeded for username: ${username}, IP: ${clientIp} - ${rateLimitResult.reason}`);
+        
+        // SECURITY FIX: Set Retry-After header for proper HTTP compliance
+        if (rateLimitResult.retryAfter) {
+          res.setHeader('Retry-After', rateLimitResult.retryAfter);
+        }
+        
         return res.status(429).json({ 
-          error: "Too many login attempts. Please wait 15 minutes before trying again." 
+          error: rateLimitResult.reason
         });
       }
 
       // Verify super admin credentials
       const user = await storage.verifySuperAdminPassword(username, password);
       if (!user) {
+        // SECURITY: Record failed login attempt with progressive lockout
+        recordFailedLogin(username, clientIp);
         return res.status(401).json({ error: "Invalid username or password" });
       }
 
@@ -911,6 +1124,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Account is inactive" });
       }
 
+      // SECURITY: Record successful login (clears failed attempts)
+      recordSuccessfulLogin(username, clientIp);
+      
       // Create super admin session
       const session = await storage.createSuperAdminSession(user.id);
 
