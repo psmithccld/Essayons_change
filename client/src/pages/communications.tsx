@@ -180,12 +180,12 @@ function EmailsExecutionModule() {
   });
 
   // Fetch communication templates based on email type
-  const { data: templates = [], isLoading: templatesLoading } = useQuery({
+  const { data: templates = [], isLoading: templatesLoading } = useQuery<CommunicationTemplate[]>({
     queryKey: ['/api/communication-templates/category', emailType === 'point_to_point_email' ? 'p2p_email' : 'email']
   });
 
   // Fetch created P2P emails
-  const { data: communications = [], isLoading: communicationsLoading } = useQuery({
+  const { data: communications = [], isLoading: communicationsLoading } = useQuery<Communication[]>({
     queryKey: ['/api/projects', currentProject?.id, 'communications'],
     enabled: !!currentProject?.id
   });
@@ -195,18 +195,18 @@ function EmailsExecutionModule() {
   const allEmails = [...p2pEmails, ...groupEmails].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // Fetch stakeholders for recipient selection
-  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useQuery({
+  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useQuery<any[]>({
     queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
     enabled: !!currentProject?.id
   });
 
   // Fetch users for recipient selection
-  const { data: users = [], isLoading: usersLoading } = useQuery({
+  const { data: users = [], isLoading: usersLoading } = useQuery<any[]>({
     queryKey: ['/api/users']
   });
 
   // Fetch RAID logs for context integration
-  const { data: raidLogs = [], isLoading: raidLogsLoading } = useQuery({
+  const { data: raidLogs = [], isLoading: raidLogsLoading } = useQuery<any[]>({
     queryKey: ['/api/projects', currentProject?.id, 'raid-logs'],
     enabled: !!currentProject?.id
   });
@@ -1442,7 +1442,7 @@ function MeetingsExecutionModule() {
   };
 
   // Fetch users for participant selection
-  const { data: users = [], isLoading: usersLoading } = useQuery({
+  const { data: users = [], isLoading: usersLoading } = useQuery<any[]>({
     queryKey: ['/api/users']
   });
 
@@ -1512,7 +1512,7 @@ function MeetingsExecutionModule() {
   const [meetingType, setMeetingType] = useState<'status' | 'planning' | 'review' | 'decision' | 'brainstorming'>('status');
 
   // Fetch communications filtered for meetings
-  const { data: communications = [], isLoading: communicationsLoading } = useQuery({
+  const { data: communications = [], isLoading: communicationsLoading } = useQuery<Communication[]>({
     queryKey: ['/api/projects', currentProject?.id, 'communications'],
     enabled: !!currentProject?.id
   });
@@ -1520,13 +1520,13 @@ function MeetingsExecutionModule() {
   const meetings = communications.filter((comm: Communication) => comm.type === 'meeting');
 
   // Fetch stakeholders for participant selection
-  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useQuery({
+  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useQuery<any[]>({
     queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
     enabled: !!currentProject?.id
   });
 
   // Fetch RAID logs for context integration
-  const { data: raidLogs = [], isLoading: raidLogsLoading } = useQuery({
+  const { data: raidLogs = [], isLoading: raidLogsLoading } = useQuery<any[]>({
     queryKey: ['/api/projects', currentProject?.id, 'raid-logs'],
     enabled: !!currentProject?.id
   });
@@ -2921,7 +2921,7 @@ function FlyersExecutionModule() {
   const { toast } = useToast();
 
   // Fetch communication templates
-  const { data: templates = [], isLoading: templatesLoading } = useQuery({
+  const { data: templates = [], isLoading: templatesLoading } = useQuery<CommunicationTemplate[]>({
     queryKey: ['/api/communication-templates/category/flyer']
   });
 
@@ -2932,13 +2932,13 @@ function FlyersExecutionModule() {
   });
 
   // Fetch stakeholders for recipient selection
-  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useQuery({
+  const { data: stakeholders = [], isLoading: stakeholdersLoading } = useQuery<any[]>({
     queryKey: ['/api/projects', currentProject?.id, 'stakeholders'],
     enabled: !!currentProject?.id
   });
 
   // Fetch RAID logs for content context
-  const { data: raidLogs = [], isLoading: raidLogsLoading } = useQuery({
+  const { data: raidLogs = [], isLoading: raidLogsLoading } = useQuery<any[]>({
     queryKey: ['/api/projects', currentProject?.id, 'raid-logs'],
     enabled: !!currentProject?.id
   });
