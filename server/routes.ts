@@ -19,6 +19,20 @@ declare module 'express-session' {
 interface SessionRequest extends Request {
   session: Session & SessionData;
 }
+
+interface AuthenticatedSuperAdminRequest extends Request {
+  superAdminUser: {
+    id: string;
+    username: string;
+    email: string;
+    name: string;
+    role: string;
+    isActive: boolean;
+    lastLoginAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+}
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
@@ -36,7 +50,7 @@ import {
   users, organizationMemberships, plans, subscriptions
 } from "@shared/schema";
 import { db } from "./db"; // Import db from correct location
-import { and, eq, or, sql } from "drizzle-orm"; // Add missing drizzle operators
+import { and, eq, or, sql, count } from "drizzle-orm"; // Add missing drizzle operators
 import * as openaiService from "./openai";
 import { sendTaskAssignmentNotification } from "./services/emailService";
 import { z } from "zod";
@@ -1399,7 +1413,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all organizations with admin details (Platform Overview)
   app.get("/api/super-admin/organizations", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
-      const organizations = await storage.getOrganizations();
+      // Parse query parameters
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const sort = req.query.sort as string;
+      
+      let organizations = await storage.getOrganizations();
+      
+      // Apply sorting
+      if (sort === 'recent') {
+        organizations = organizations.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      }
+      
+      // Apply limit
+      if (limit && limit > 0) {
+        organizations = organizations.slice(0, limit);
+      }
       
       // Enhance with admin and membership info
       const enhancedOrgs = await Promise.all(organizations.map(async (org) => {
@@ -1414,7 +1444,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...org,
           memberCount: members.length,
           adminCount: adminMembers.length,
-          setupComplete: settings?.isConsultationComplete || false
+          setupComplete: settings?.isConsultationComplete || false,
+          // Add domain mapping for frontend compatibility
+          domain: org.slug,
+          isActive: org.status === 'active'
         };
       }));
       
@@ -1951,6 +1984,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error forcing password reset:", error);
       res.status(500).json({ error: "Failed to force password reset" });
+    }
+  });
+
+  // GET /api/super-admin/dashboard/stats - Platform-wide metrics aggregation
+  app.get("/api/super-admin/dashboard/stats", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      // Get all organizations
+      const organizations = await storage.getOrganizations();
+      const totalOrganizations = organizations.length;
+      const activeOrganizations = organizations.filter(org => org.status === 'active').length;
+
+      // Calculate platform users as active members across all organizations
+      const activeMemberships = await db.select({
+        count: count()
+      }).from(organizationMemberships)
+      .where(eq(organizationMemberships.isActive, true));
+      
+      const totalUsers = activeMemberships[0]?.count || 0;
+
+      // Calculate active subscriptions across all organizations
+      const activeSubscriptions = await db.select({
+        count: count()
+      }).from(subscriptions)
+      .where(eq(subscriptions.status, 'active'));
+      
+      const activeSubscriptionCount = activeSubscriptions[0]?.count || 0;
+
+      // Calculate monthly revenue from active subscriptions with correct column reference
+      const monthlyRevenueResult = await db.select({
+        totalRevenue: sql<number>`COALESCE(SUM(CASE WHEN ${subscriptions.status} = 'active' THEN plans.price_per_seat_cents ELSE 0 END), 0)`
+      })
+      .from(subscriptions)
+      .leftJoin(plans, eq(subscriptions.planId, plans.id));
+      
+      const monthlyRevenueCents = Number(monthlyRevenueResult[0]?.totalRevenue) || 0;
+      const monthlyRevenue = Math.round(monthlyRevenueCents / 100); // Convert cents to dollars
+
+      // Count pending actions (this is a placeholder - can be expanded with specific business logic)
+      const pendingActions = 0; // TODO: Implement based on business requirements
+
+      const stats = {
+        totalOrganizations,
+        activeOrganizations,
+        totalUsers,
+        activeSubscriptions: activeSubscriptionCount,
+        monthlyRevenue,
+        pendingActions
+      };
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching super admin dashboard stats:", error);
+      res.status(500).json({ error: "Failed to fetch dashboard stats" });
     }
   });
 
