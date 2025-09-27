@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { CurrentProjectProvider } from "@/contexts/CurrentProjectContext";
 import { CoachContextProvider } from "@/contexts/CoachContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Tasks from "@/pages/tasks";
@@ -127,14 +128,16 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <CurrentProjectProvider>
-          <CoachContextProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-            </TooltipProvider>
-          </CoachContextProvider>
-        </CurrentProjectProvider>
+        <ImpersonationProvider>
+          <CurrentProjectProvider>
+            <CoachContextProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Router />
+              </TooltipProvider>
+            </CoachContextProvider>
+          </CurrentProjectProvider>
+        </ImpersonationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

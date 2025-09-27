@@ -943,6 +943,7 @@ export interface IStorage {
   // Support Session Management
   createSupportSession(data: InsertSupportSession): Promise<SupportSession>;
   getCurrentSupportSession(superAdminUserId: string): Promise<SupportSession | null>;
+  getAllActiveSupportSessions(): Promise<SupportSession[]>;
   endSupportSession(sessionId: string): Promise<boolean>;
   toggleSupportMode(sessionId: string, supportMode: boolean): Promise<SupportSession | null>;
   
@@ -5959,6 +5960,25 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return null;
+  }
+
+  async getAllActiveSupportSessions(): Promise<SupportSession[]> {
+    const activeSessions: SupportSession[] = [];
+    
+    for (const session of this.supportSessions.values()) {
+      if (session.isActive) {
+        // Check if session has expired
+        if (session.expiresAt && new Date() > new Date(session.expiresAt)) {
+          session.isActive = false;
+          session.endedAt = new Date().toISOString();
+          this.supportSessions.set(session.id, session);
+          continue; // Skip expired sessions
+        }
+        activeSessions.push(session);
+      }
+    }
+    
+    return activeSessions;
   }
 
   async endSupportSession(sessionId: string): Promise<boolean> {

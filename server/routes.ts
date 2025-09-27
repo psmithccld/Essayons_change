@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import type { Session, SessionData } from "express-session";
 import { createServer, type Server } from "http";
 
-// SECURITY: Session type declaration
+// SECURITY: Session type declaration with impersonation support
 declare module 'express-session' {
   interface SessionData {
     userId?: string;
@@ -13,6 +13,13 @@ declare module 'express-session' {
       roleId: string;
       isActive: boolean;
     };
+    impersonation?: {
+      sessionId: string;
+      organizationId: string;
+      mode: 'read' | 'write';
+      scopes: Record<string, any>;
+      boundAt: string;
+    };
   }
 }
 
@@ -22,6 +29,20 @@ interface SessionRequest extends Request {
 
 interface AuthenticatedSuperAdminRequest extends Request {
   superAdminUser: {
+    id: string;
+    username: string;
+    email: string;
+    name: string;
+    role: string;
+    isActive: boolean;
+    lastLoginAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+}
+
+interface AuthenticatedRequest extends SessionRequest {
+  superAdminUser?: {
     id: string;
     username: string;
     email: string;
@@ -54,6 +75,7 @@ import { and, eq, or, sql, count } from "drizzle-orm"; // Add missing drizzle op
 import * as openaiService from "./openai";
 import { sendTaskAssignmentNotification } from "./services/emailService";
 import { z } from "zod";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 
 // Input validation schemas
 const distributionRequestSchema = z.object({
@@ -79,6 +101,87 @@ const createSupportSessionSchema = z.object({
 const toggleSupportModeSchema = z.object({
   supportMode: z.boolean(),
 });
+
+// CRITICAL SECURITY: Cryptographic token system for secure impersonation binding
+const IMPERSONATION_SECRET = process.env.IMPERSONATION_SECRET || 
+  (process.env.NODE_ENV === 'development' ? 
+    'dev-fallback-32-char-hmac-secret-key-not-for-production-use-only' : 
+    null);
+
+if (!IMPERSONATION_SECRET) {
+  console.error('🚨 SECURITY ERROR: IMPERSONATION_SECRET environment variable is required for secure token validation');
+  console.error('Generate a secure key: openssl rand -hex 32');
+  console.error('Set it in production environment: IMPERSONATION_SECRET=your_generated_key');
+  process.exit(1);
+}
+
+if (process.env.NODE_ENV === 'development' && !process.env.IMPERSONATION_SECRET) {
+  console.warn('⚠️  DEVELOPMENT: Using fallback IMPERSONATION_SECRET. Set IMPERSONATION_SECRET env var for production!');
+}
+
+interface ImpersonationTokenPayload {
+  sessionId: string;
+  organizationId: string;
+  mode: 'read' | 'write';
+  exp: number; // expiration timestamp
+  iat: number; // issued at timestamp
+}
+
+// Generate a cryptographically signed impersonation token
+function generateImpersonationToken(payload: Omit<ImpersonationTokenPayload, 'exp' | 'iat'>): string {
+  const now = Math.floor(Date.now() / 1000);
+  const fullPayload: ImpersonationTokenPayload = {
+    ...payload,
+    iat: now,
+    exp: now + (5 * 60) // 5 minutes expiration
+  };
+  
+  const payloadJson = JSON.stringify(fullPayload);
+  const payloadBase64 = Buffer.from(payloadJson).toString('base64url');
+  
+  const signature = createHmac('sha256', IMPERSONATION_SECRET)
+    .update(payloadBase64)
+    .digest('base64url');
+  
+  return `${payloadBase64}.${signature}`;
+}
+
+// Validate and parse an impersonation token
+function validateImpersonationToken(token: string): ImpersonationTokenPayload | null {
+  try {
+    const [payloadBase64, signature] = token.split('.');
+    if (!payloadBase64 || !signature) return null;
+    
+    // Verify signature using timing-safe comparison
+    const expectedSignature = createHmac('sha256', IMPERSONATION_SECRET)
+      .update(payloadBase64)
+      .digest('base64url');
+    
+    const signatureBuffer = Buffer.from(signature, 'base64url');
+    const expectedBuffer = Buffer.from(expectedSignature, 'base64url');
+    
+    if (!timingSafeEqual(signatureBuffer, expectedBuffer)) {
+      console.warn('🚨 SECURITY: Invalid impersonation token signature');
+      return null;
+    }
+    
+    // Parse and validate payload
+    const payloadJson = Buffer.from(payloadBase64, 'base64url').toString('utf8');
+    const payload: ImpersonationTokenPayload = JSON.parse(payloadJson);
+    
+    // Check expiration
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp < now) {
+      console.warn('🚨 SECURITY: Expired impersonation token');
+      return null;
+    }
+    
+    return payload;
+  } catch (error) {
+    console.warn('🚨 SECURITY: Malformed impersonation token:', error);
+    return null;
+  }
+}
 
 // GPT Content Generation schema
 const generateGroupEmailContentSchema = z.object({
@@ -595,28 +698,62 @@ const requireAuthAndPermission = (permission: keyof Permissions) => {
 const requireAuthAndOrg = [requireAuth, requireOrgContext];
 
 // CRITICAL SECURITY: Global read-only enforcement middleware for support session impersonation
-const enforceReadOnlyImpersonation = async (req: any, res: Response, next: NextFunction) => {
+const enforceReadOnlyImpersonation = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    // Only check for super admin support sessions
-    if (!req.superAdminUser?.id) {
-      return next(); // No super admin context, proceed normally
-    }
+    // CRITICAL FIX: Check for impersonation via server session instead of URL parameters
+    // This ensures enforcement works for API calls, not just page loads
+    const sessionImpersonation = req.session?.impersonation;
     
-    // Get current support session for this super admin
-    const supportSession = await storage.getCurrentSupportSession(req.superAdminUser.id);
-    
-    // If no active support session, proceed normally
-    if (!supportSession || !supportSession.isActive) {
+    // If no session impersonation and no super admin context, proceed normally
+    if (!sessionImpersonation && !req.superAdminUser?.id) {
       return next();
     }
     
-    // Check if session is in read-only mode
-    if (supportSession.sessionType !== "read_only") {
-      return next(); // Support mode allows writes, proceed normally
+    let supportSession = null;
+    let isReadOnlyMode = false;
+    
+    if (sessionImpersonation) {
+      // SESSION-BOUND IMPERSONATION: User is impersonating via bound session
+      const { sessionId, organizationId, mode } = sessionImpersonation;
+      
+      // Verify the bound session is still active
+      const allSessions = await storage.getAllActiveSupportSessions();
+      supportSession = allSessions.find(session => 
+        session.id === sessionId && session.organizationId === organizationId && session.isActive
+      );
+      
+      if (!supportSession) {
+        // Session expired or invalid - clear the bound state
+        delete req.session.impersonation;
+        console.warn(`SECURITY: Bound impersonation session ${sessionId} for org ${organizationId} is no longer active`);
+        return res.status(403).json({ 
+          error: "Impersonation session expired",
+          details: "The support session has expired. Please refresh and start a new session."
+        });
+      }
+      
+      // CRITICAL SECURITY FIX: Always check FRESH database state, never trust stale session mode
+      // This ensures admin revocation is immediately enforced
+      isReadOnlyMode = (supportSession.sessionType === "read_only");
+      
+    } else if (req.superAdminUser?.id) {
+      // SUPER ADMIN CONTEXT: Direct super admin access (original logic)
+      supportSession = await storage.getCurrentSupportSession(req.superAdminUser.id);
+      
+      // If no active support session, proceed normally
+      if (!supportSession || !supportSession.isActive) {
+        return next();
+      }
+      
+      // CRITICAL SECURITY FIX: Always check fresh database state for super admin sessions too
+      isReadOnlyMode = (supportSession.sessionType === "read_only");
     }
     
-    // Block non-idempotent methods during read-only impersonation
-    const writeMethod = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method);
+    // If we have a support session, enforce read-only restrictions
+    if (supportSession && isReadOnlyMode) {
+    
+      // Block non-idempotent methods during read-only impersonation
+      const writeMethod = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method);
     
     if (writeMethod) {
       // Allow-list essential support routes that need to work during read-only mode
@@ -633,7 +770,7 @@ const enforceReadOnlyImpersonation = async (req: any, res: Response, next: NextF
         // Create audit log for blocked write attempt
         await storage.createSupportAuditLog({
           sessionId: supportSession.id,
-          superAdminUserId: req.superAdminUser.id,
+          superAdminUserId: supportSession.superAdminUserId, // Use session data instead of req context
           organizationId: supportSession.organizationId,
           action: "write_attempt_blocked",
           description: `Blocked ${req.method} request to ${req.path} during read-only impersonation`,
@@ -649,7 +786,7 @@ const enforceReadOnlyImpersonation = async (req: any, res: Response, next: NextF
           userAgent: req.get('User-Agent'),
         });
         
-        console.warn(`SECURITY: Blocked ${req.method} ${req.path} by super admin ${req.superAdminUser.username} during read-only impersonation of org ${supportSession.organizationId}`);
+        console.warn(`SECURITY: Blocked ${req.method} ${req.path} by super admin ${supportSession.superAdminUserId} during read-only impersonation of org ${supportSession.organizationId}`);
         
         return res.status(403).json({ 
           error: "Write operations are not allowed during read-only impersonation mode",
@@ -658,6 +795,7 @@ const enforceReadOnlyImpersonation = async (req: any, res: Response, next: NextF
           sessionType: supportSession.sessionType
         });
       }
+    }
     }
     
     // Add support session context to request for other middleware to use
@@ -821,7 +959,7 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
 export async function registerRoutes(app: Express): Promise<Server> {
   // CRITICAL SECURITY: Apply global read-only enforcement middleware
   // This must run early to block writes during read-only impersonation sessions
-  app.use('/api/*', enforceReadOnlyImpersonation);
+  app.use('/api', enforceReadOnlyImpersonation);
   
   // Roles
   app.get("/api/roles", requireAuthAndOrg, requirePermission('canSeeRoles'), async (req, res) => {
@@ -2621,6 +2759,179 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===============================================
   // CUSTOMER SUPPORT SESSION MANAGEMENT - Super Admin impersonation and audit logging
   // ===============================================
+
+  // CRITICAL SECURITY: Secure impersonation binding endpoint with cryptographic token validation
+  app.post("/api/support/impersonation/bind", async (req: SessionRequest, res) => {
+    try {
+      const { token } = req.body;
+      
+      // Validate token presence
+      if (!token) {
+        return res.status(400).json({ 
+          error: "Missing required token",
+          details: "Secure impersonation token is required"
+        });
+      }
+      
+      // Validate and parse the cryptographic token
+      const tokenPayload = validateImpersonationToken(token);
+      if (!tokenPayload) {
+        return res.status(403).json({ 
+          error: "Invalid or expired token",
+          details: "The impersonation token is invalid, expired, or tampered with"
+        });
+      }
+      
+      const { sessionId, organizationId, mode } = tokenPayload;
+      
+      // Verify the session referenced in the token is still active
+      const allSessions = await storage.getAllActiveSupportSessions();
+      const supportSession = allSessions.find(session => 
+        session.id === sessionId && 
+        session.organizationId === organizationId && 
+        session.isActive
+      );
+      
+      if (!supportSession) {
+        return res.status(403).json({ 
+          error: "Support session no longer active",
+          details: "The support session referenced in the token has expired or been terminated"
+        });
+      }
+      
+      // CRITICAL SECURITY: Regenerate session to prevent session fixation attacks
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => {
+          if (err) {
+            console.error('🚨 SECURITY: Failed to regenerate session during impersonation binding:', err);
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // Bind validated impersonation state to regenerated session
+      req.session.impersonation = {
+        sessionId,
+        organizationId,
+        mode,
+        scopes: supportSession.accessScopes || {},
+        boundAt: new Date().toISOString()
+      };
+      
+      // Log the secure binding for audit trail
+      await storage.createSupportAuditLog({
+        sessionId: supportSession.id,
+        superAdminUserId: supportSession.superAdminUserId,
+        organizationId,
+        action: "secure_impersonation_bound",
+        description: `Secure impersonation bound via cryptographic token: ${mode}`,
+        details: { 
+          mode,
+          sessionId,
+          tokenIssuedAt: new Date(tokenPayload.iat * 1000).toISOString(),
+          boundAt: req.session.impersonation.boundAt
+        },
+        accessLevel: "admin",
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+      });
+      
+      console.log(`🔒 SECURITY: Secure impersonation bound to session for org ${organizationId} in ${mode} mode via validated token`);
+      
+      res.json({ 
+        success: true,
+        impersonation: {
+          organizationId,
+          mode,
+          sessionId
+        }
+      });
+    } catch (error) {
+      console.error("Error in secure impersonation binding:", error);
+      res.status(500).json({ error: "Failed to bind impersonation mode securely" });
+    }
+  });
+
+  // CRITICAL SECURITY: Generate secure impersonation token for super admin dashboard
+  app.post("/api/super-admin/support/impersonation/token", requireSuperAdminAuth, async (req: any, res: Response) => {
+    try {
+      const { sessionId, organizationId, mode } = req.body;
+      
+      // Validate required parameters
+      if (!sessionId || !organizationId || !mode) {
+        return res.status(400).json({ 
+          error: "Missing required parameters",
+          details: "sessionId, organizationId, and mode are required"
+        });
+      }
+      
+      if (mode !== 'read' && mode !== 'write') {
+        return res.status(400).json({ 
+          error: "Invalid mode",
+          details: "Mode must be 'read' or 'write'"
+        });
+      }
+      
+      // Verify the super admin has an active session for this organization
+      const superAdminUserId = req.superAdminUser.id;
+      const allSessions = await storage.getAllActiveSupportSessions();
+      const supportSession = allSessions.find(session => 
+        session.id === sessionId &&
+        session.organizationId === organizationId && 
+        session.superAdminUserId === superAdminUserId &&
+        session.isActive
+      );
+      
+      if (!supportSession) {
+        return res.status(403).json({ 
+          error: "Invalid support session",
+          details: "No active support session found for the specified parameters"
+        });
+      }
+      
+      // Generate the cryptographically signed token
+      const token = generateImpersonationToken({
+        sessionId,
+        organizationId,
+        mode
+      });
+      
+      // Log token generation for audit trail
+      await storage.createSupportAuditLog({
+        sessionId: supportSession.id,
+        superAdminUserId,
+        organizationId,
+        action: "impersonation_token_generated",
+        description: `Secure impersonation token generated for ${mode} mode`,
+        details: { 
+          mode,
+          sessionId,
+          tokenExpiry: "5 minutes"
+        },
+        accessLevel: "admin",
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+      });
+      
+      console.log(`🔒 SECURITY: Impersonation token generated for org ${organizationId} in ${mode} mode`);
+      
+      res.json({ 
+        success: true,
+        token,
+        expiresIn: 300, // 5 minutes in seconds
+        sessionInfo: {
+          sessionId,
+          organizationId,
+          mode
+        }
+      });
+    } catch (error) {
+      console.error("Error generating impersonation token:", error);
+      res.status(500).json({ error: "Failed to generate impersonation token" });
+    }
+  });
 
   // POST /api/super-admin/support/session - Start support session
   app.post("/api/super-admin/support/session", requireSuperAdminAuth, async (req: any, res: Response) => {
