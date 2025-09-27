@@ -2340,12 +2340,83 @@ export const systemSettings = pgTable("system_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Organization defaults - templates for new organization settings
+export const organizationDefaults = pgTable("organization_defaults", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Default Features - template for organization features
+  features: jsonb("features").default({
+    reports: true,
+    gptCoach: true,
+    advancedAnalytics: false,
+    customBranding: false,
+    apiAccess: false,
+    ssoIntegration: false,
+    advancedSecurity: false,
+    customWorkflows: false,
+  }).notNull(),
+  
+  // Default Limits - template for organization limits
+  limits: jsonb("limits").default({
+    maxUsers: 100,
+    maxProjects: 50,
+    maxTasksPerProject: 1000,
+    maxFileUploadSizeMB: 10,
+    apiCallsPerMonth: 10000,
+    storageGB: 10,
+  }).notNull(),
+  
+  // Default Settings - template for organization settings
+  settings: jsonb("settings").default({
+    allowGuestAccess: false,
+    requireEmailVerification: true,
+    enableAuditLogs: true,
+    dataRetentionDays: 365,
+    autoBackup: true,
+  }).notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Support system types
 export type SupportSession = typeof supportSessions.$inferSelect;
 export type SupportAuditLog = typeof supportAuditLogs.$inferSelect;
 
 // Global system settings types
 export type SystemSettings = typeof systemSettings.$inferSelect;
+
+// Organization defaults types
+export type OrganizationDefaults = typeof organizationDefaults.$inferSelect;
+
+// Organization defaults validation schema
+export const organizationDefaultsUpdateSchema = z.object({
+  features: z.object({
+    reports: z.boolean().optional(),
+    gptCoach: z.boolean().optional(),
+    advancedAnalytics: z.boolean().optional(),
+    customBranding: z.boolean().optional(),
+    apiAccess: z.boolean().optional(),
+    ssoIntegration: z.boolean().optional(),
+    advancedSecurity: z.boolean().optional(),
+    customWorkflows: z.boolean().optional(),
+  }).optional(),
+  limits: z.object({
+    maxUsers: z.number().min(1).max(10000).optional(),
+    maxProjects: z.number().min(1).max(1000).optional(),
+    maxTasksPerProject: z.number().min(1).max(10000).optional(),
+    maxFileUploadSizeMB: z.number().min(1).max(500).optional(),
+    apiCallsPerMonth: z.number().min(100).max(1000000).optional(),
+    storageGB: z.number().min(1).max(1000).optional(),
+  }).optional(),
+  settings: z.object({
+    allowGuestAccess: z.boolean().optional(),
+    requireEmailVerification: z.boolean().optional(),
+    enableAuditLogs: z.boolean().optional(),
+    dataRetentionDays: z.number().min(30).max(2555).optional(), // 30 days to 7 years
+    autoBackup: z.boolean().optional(),
+  }).optional(),
+});
 
 // Support session insert schemas with Zod validation
 export const insertSupportSessionSchema = createInsertSchema(supportSessions, {
@@ -2364,5 +2435,6 @@ export type InsertSupportSession = z.infer<typeof insertSupportSessionSchema>;
 export type InsertSupportAuditLog = z.infer<typeof insertSupportAuditLogSchema>;
 
 export type SystemSettingsUpdate = z.infer<typeof systemSettingsUpdateSchema>;
+export type OrganizationDefaultsUpdate = z.infer<typeof organizationDefaultsUpdateSchema>;
 export type MaintenanceToggle = z.infer<typeof maintenanceToggleSchema>;
 export type AnalyticsRange = z.infer<typeof analyticsRangeSchema>;
