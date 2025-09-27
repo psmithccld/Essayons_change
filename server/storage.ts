@@ -23,7 +23,8 @@ import {
   type Plan, type InsertPlan, type Subscription, type InsertSubscription, type Invitation, type InsertInvitation,
   type SuperAdminUser, type InsertSuperAdminUser, type SuperAdminSession, type InsertSuperAdminSession, type SuperAdminMfaSetup, type InsertSuperAdminMfaSetup,
   type SuperAdminLoginRequest, type SuperAdminRegistrationRequest,
-  type SupportTicket, type InsertSupportTicket, type SupportConversation, type InsertSupportConversation, type GPTMessage
+  type SupportTicket, type InsertSupportTicket, type SupportConversation, type InsertSupportConversation, type GPTMessage,
+  type SupportSession, type InsertSupportSession, type SupportAuditLog, type InsertSupportAuditLog
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray, ne } from "drizzle-orm";
@@ -940,14 +941,14 @@ export interface IStorage {
   // ===============================================
   
   // Support Session Management
-  createSupportSession(data: { organizationId: string; sessionType: string; reason: string; accessScopes?: any; duration?: number; superAdminUserId: string; }): Promise<any>;
-  getCurrentSupportSession(superAdminUserId: string): Promise<any>;
+  createSupportSession(data: InsertSupportSession): Promise<SupportSession>;
+  getCurrentSupportSession(superAdminUserId: string): Promise<SupportSession | null>;
   endSupportSession(sessionId: string): Promise<boolean>;
-  toggleSupportMode(sessionId: string, supportMode: boolean): Promise<any>;
+  toggleSupportMode(sessionId: string, supportMode: boolean): Promise<SupportSession | null>;
   
   // Support Audit Logs
-  getSupportAuditLogs(organizationId?: string, sessionId?: string): Promise<any[]>;
-  createSupportAuditLog(data: { sessionId: string; action: string; details?: string; targetResource?: string; organizationId: string; }): Promise<any>;
+  getSupportAuditLogs(organizationId?: string, sessionId?: string): Promise<SupportAuditLog[]>;
+  createSupportAuditLog(data: InsertSupportAuditLog): Promise<SupportAuditLog>;
   
   // Analytics and insights for helpdesk improvement
   getHelpdeskAnalytics(organizationId: string, timeRange?: { from: Date; to: Date }): Promise<{
@@ -964,8 +965,8 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   // In-memory storage for support sessions and audit logs per development guidelines
-  private supportSessions: Map<string, any> = new Map();
-  private supportAuditLogs: any[] = [];
+  private supportSessions: Map<string, SupportSession> = new Map();
+  private supportAuditLogs: SupportAuditLog[] = [];
 
   // Roles
   async getRoles(): Promise<Role[]> {
@@ -5910,30 +5911,32 @@ export class DatabaseStorage implements IStorage {
   // CUSTOMER SUPPORT SESSIONS - Super Admin impersonation and audit logging
   // ===============================================
   
-  async createSupportSession(data: { organizationId: string; sessionType: string; reason: string; accessScopes?: any; duration?: number; superAdminUserId: string; }): Promise<any> {
+  async createSupportSession(data: InsertSupportSession): Promise<SupportSession> {
     const sessionId = crypto.randomUUID();
-    const expiresAt = data.duration ? new Date(Date.now() + data.duration * 60 * 1000) : new Date(Date.now() + 60 * 60 * 1000); // Default 1 hour
     
     // End any existing active session for this super admin user
     for (const [id, session] of this.supportSessions.entries()) {
       if (session.superAdminUserId === data.superAdminUserId && session.isActive) {
         session.isActive = false;
-        session.endedAt = new Date();
+        session.endedAt = new Date().toISOString();
         this.supportSessions.set(id, session);
       }
     }
     
-    const sessionData = {
+    const sessionData: SupportSession = {
       id: sessionId,
       organizationId: data.organizationId,
       superAdminUserId: data.superAdminUserId,
-      sessionType: data.sessionType,
+      sessionType: data.sessionType || "read_only",
       isActive: true,
-      supportMode: false,
-      reason: data.reason,
-      accessScopes: data.accessScopes,
-      expiresAt,
-      startedAt: new Date(),
+      reason: data.reason || null,
+      startedAt: new Date().toISOString(),
+      endedAt: null,
+      expiresAt: data.expiresAt,
+      ipAddress: data.ipAddress || null,
+      userAgent: data.userAgent || null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     // Store in-memory per development guidelines
@@ -5941,14 +5944,14 @@ export class DatabaseStorage implements IStorage {
     return sessionData;
   }
 
-  async getCurrentSupportSession(superAdminUserId: string): Promise<any> {
+  async getCurrentSupportSession(superAdminUserId: string): Promise<SupportSession | null> {
     // Find active session for the super admin user
     for (const session of this.supportSessions.values()) {
       if (session.superAdminUserId === superAdminUserId && session.isActive) {
         // Check if session has expired
-        if (session.expiresAt && new Date() > session.expiresAt) {
+        if (session.expiresAt && new Date() > new Date(session.expiresAt)) {
           session.isActive = false;
-          session.endedAt = new Date();
+          session.endedAt = new Date().toISOString();
           this.supportSessions.set(session.id, session);
           return null;
         }
@@ -5970,19 +5973,20 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  async toggleSupportMode(sessionId: string, supportMode: boolean): Promise<any> {
+  async toggleSupportMode(sessionId: string, supportMode: boolean): Promise<SupportSession | null> {
     const session = this.supportSessions.get(sessionId);
     if (!session) {
       return null;
     }
     
-    session.supportMode = supportMode;
-    session.updatedAt = new Date();
+    // Map supportMode to sessionType as per schema
+    session.sessionType = supportMode ? "support_mode" : "read_only";
+    session.updatedAt = new Date().toISOString();
     this.supportSessions.set(sessionId, session);
     return session;
   }
 
-  async getSupportAuditLogs(organizationId?: string, sessionId?: string): Promise<any[]> {
+  async getSupportAuditLogs(organizationId?: string, sessionId?: string): Promise<SupportAuditLog[]> {
     let filteredLogs = this.supportAuditLogs;
     
     if (organizationId && sessionId) {
@@ -5999,17 +6003,24 @@ export class DatabaseStorage implements IStorage {
     return filteredLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  async createSupportAuditLog(data: { sessionId: string; action: string; details?: string; targetResource?: string; organizationId: string; }): Promise<any> {
+  async createSupportAuditLog(data: InsertSupportAuditLog): Promise<SupportAuditLog> {
     const logId = crypto.randomUUID();
     
-    const logData = {
+    const logData: SupportAuditLog = {
       id: logId,
-      sessionId: data.sessionId,
-      action: data.action,
-      details: data.details,
-      targetResource: data.targetResource,
+      sessionId: data.sessionId || null,
+      superAdminUserId: data.superAdminUserId,
       organizationId: data.organizationId,
-      createdAt: new Date(),
+      action: data.action,
+      resource: data.resource || null,
+      resourceId: data.resourceId || null,
+      description: data.description,
+      details: data.details || null,
+      accessLevel: data.accessLevel || "read",
+      isCustomerVisible: data.isCustomerVisible !== false,
+      ipAddress: data.ipAddress || null,
+      userAgent: data.userAgent || null,
+      createdAt: new Date().toISOString(),
     };
     
     // Store in-memory per development guidelines
