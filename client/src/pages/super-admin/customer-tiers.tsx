@@ -122,7 +122,7 @@ export default function SuperAdminCustomerTiers() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
-  const { sessionId } = useSuperAdmin();
+  const { isAuthenticated } = useSuperAdmin();
   const { toast } = useToast();
 
   // Fetch plans
@@ -130,14 +130,12 @@ export default function SuperAdminCustomerTiers() {
     queryKey: ["/api/super-admin/plans"],
     queryFn: async () => {
       const response = await fetch("/api/super-admin/plans", {
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include', // Use cookies for authentication
       });
       if (!response.ok) throw new Error("Failed to fetch plans");
       return response.json() as Promise<Plan[]>;
     },
-    enabled: !!sessionId,
+    enabled: isAuthenticated,
   });
 
   // Create plan mutation
@@ -147,8 +145,8 @@ export default function SuperAdminCustomerTiers() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-super-admin-session": sessionId!,
         },
+        credentials: 'include', // Use cookies for authentication
         body: JSON.stringify(data),
       });
       if (!response.ok) {
@@ -182,8 +180,8 @@ export default function SuperAdminCustomerTiers() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "x-super-admin-session": sessionId!,
         },
+        credentials: 'include', // Use cookies for authentication
         body: JSON.stringify(data),
       });
       if (!response.ok) {
@@ -216,9 +214,7 @@ export default function SuperAdminCustomerTiers() {
     mutationFn: async (id: string) => {
       const response = await fetch(`/api/super-admin/plans/${id}`, {
         method: "DELETE",
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include', // Use cookies for authentication
       });
       if (!response.ok) {
         const error = await response.json();
@@ -548,27 +544,6 @@ export default function SuperAdminCustomerTiers() {
                         )}
                       />
                       
-                      <FormField
-                        control={createForm.control}
-                        name="isPopular"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                            <div className="space-y-0.5">
-                              <FormLabel className="text-base">Popular Plan</FormLabel>
-                              <div className="text-sm text-muted-foreground">
-                                Show "Popular" badge
-                              </div>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                data-testid="switch-plan-popular"
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
                     </div>
                   </TabsContent>
                   
@@ -576,18 +551,17 @@ export default function SuperAdminCustomerTiers() {
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={createForm.control}
-                        name="price"
+                        name="seatLimit"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Price</FormLabel>
+                            <FormLabel>Seat Limit</FormLabel>
                             <FormControl>
                               <Input 
                                 {...field} 
                                 type="number" 
-                                min="0" 
-                                step="0.01"
+                                min="1" 
                                 onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-plan-price"
+                                data-testid="input-seat-limit"
                               />
                             </FormControl>
                             <FormMessage />
@@ -597,50 +571,19 @@ export default function SuperAdminCustomerTiers() {
                       
                       <FormField
                         control={createForm.control}
-                        name="billingInterval"
+                        name="pricePerSeatCents"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Billing Interval</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-billing-interval">
-                                  <SelectValue placeholder="Select interval" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="monthly">Monthly</SelectItem>
-                                <SelectItem value="yearly">Yearly</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={createForm.control}
-                        name="stripeProductId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Stripe Product ID</FormLabel>
+                            <FormLabel>Price Per Seat (cents)</FormLabel>
                             <FormControl>
-                              <Input {...field} placeholder="prod_..." data-testid="input-stripe-product-id" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={createForm.control}
-                        name="stripePriceId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Stripe Price ID</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="price_..." data-testid="input-stripe-price-id" />
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="0"
+                                onChange={e => field.onChange(Number(e.target.value))}
+                                data-testid="input-price-per-seat-cents"
+                                placeholder="e.g. 2500 = $25.00"
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -650,69 +593,6 @@ export default function SuperAdminCustomerTiers() {
                   </TabsContent>
                   
                   <TabsContent value="features" className="space-y-4">
-                    {/* Numeric Features */}
-                    <div className="grid grid-cols-3 gap-4">
-                      <FormField
-                        control={createForm.control}
-                        name="features.maxProjects"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Max Projects</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                type="number" 
-                                min="0"
-                                onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-max-projects"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={createForm.control}
-                        name="features.maxUsers"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Max Users</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                type="number" 
-                                min="1"
-                                onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-max-users"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={createForm.control}
-                        name="features.maxStorage"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Max Storage (GB)</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                type="number" 
-                                min="0"
-                                onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-max-storage"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
                     {/* Boolean Features */}
                     <div className="grid grid-cols-2 gap-4">
                       {Object.entries(FEATURE_DEFINITIONS).map(([key, feature]) => {
