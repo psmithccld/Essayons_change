@@ -68,7 +68,7 @@ import {
   coachContextPayloadSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload,
   // Add missing schema imports
-  users, organizationMemberships, plans, subscriptions
+  users, projects, organizationMemberships, plans, subscriptions
 } from "@shared/schema";
 import { db } from "./db"; // Import db from correct location
 import { and, eq, or, sql, count } from "drizzle-orm"; // Add missing drizzle operators
@@ -2640,13 +2640,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalOrganizations = organizations.length;
       const activeOrganizations = organizations.filter(org => org.status === 'active').length;
 
-      // Calculate platform users as active members across all organizations
-      const activeMemberships = await db.select({
+      // Calculate total platform users
+      const allUsers = await db.select({
         count: count()
-      }).from(organizationMemberships)
-      .where(eq(organizationMemberships.isActive, true));
+      }).from(users);
       
-      const totalUsers = activeMemberships[0]?.count || 0;
+      const totalUsers = allUsers[0]?.count || 0;
+
+      // Calculate total projects
+      const allProjects = await db.select({
+        count: count()
+      }).from(projects);
+      
+      const totalProjects = allProjects[0]?.count || 0;
 
       // Calculate active subscriptions across all organizations
       const activeSubscriptions = await db.select({
@@ -2673,6 +2679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalOrganizations,
         activeOrganizations,
         totalUsers,
+        totalProjects,
         activeSubscriptions: activeSubscriptionCount,
         monthlyRevenue,
         pendingActions
