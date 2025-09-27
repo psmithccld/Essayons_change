@@ -2438,3 +2438,15 @@ export type SystemSettingsUpdate = z.infer<typeof systemSettingsUpdateSchema>;
 export type OrganizationDefaultsUpdate = z.infer<typeof organizationDefaultsUpdateSchema>;
 export type MaintenanceToggle = z.infer<typeof maintenanceToggleSchema>;
 export type AnalyticsRange = z.infer<typeof analyticsRangeSchema>;
+
+// Super Admin Activity Feed Types
+export const activitySchema = z.object({
+  id: z.string(),
+  type: z.enum(['organization_created', 'user_signup', 'subscription_changed', 'payment_failed', 'system_event']),
+  title: z.string(),
+  description: z.string(),
+  timestamp: z.string(), // ISO string to match JSON serialization
+  metadata: z.record(z.unknown()).optional()
+});
+
+export type Activity = z.infer<typeof activitySchema>;

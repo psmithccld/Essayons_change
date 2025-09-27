@@ -25,7 +25,8 @@ import {
   type SuperAdminLoginRequest, type SuperAdminRegistrationRequest,
   type SupportTicket, type InsertSupportTicket, type SupportConversation, type InsertSupportConversation, type GPTMessage,
   type SupportSession, type InsertSupportSession, type SupportAuditLog, type InsertSupportAuditLog,
-  type SystemSettings, type OrganizationDefaults, type OrganizationDefaultsUpdate
+  type SystemSettings, type OrganizationDefaults, type OrganizationDefaultsUpdate,
+  type Activity
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray, ne } from "drizzle-orm";
@@ -71,6 +72,9 @@ export interface IStorage {
   getSuperAdminSession(sessionId: string): Promise<SuperAdminSession | undefined>;
   deleteSuperAdminSession(sessionId: string): Promise<boolean>;
   cleanupExpiredSuperAdminSessions(): Promise<void>;
+  
+  // Super Admin Dashboard Activity
+  getRecentActivity(limit?: number): Promise<Activity[]>;
 
   // Projects - SECURITY: Organization-scoped for tenant isolation
   getProjects(userId: string, organizationId: string): Promise<Project[]>;
@@ -1446,6 +1450,97 @@ export class DatabaseStorage implements IStorage {
       await db.delete(superAdminMfaSetup).where(sql`expires_at < ${now}`);
     } catch (error) {
       console.error("Error cleaning up expired super admin sessions:", error);
+    }
+  }
+
+  async getRecentActivity(limit = 20): Promise<Activity[]> {
+    // Clamp limit to reasonable bounds (1-100)
+    const clampedLimit = Math.max(1, Math.min(limit, 100));
+    const activities: Activity[] = [];
+
+    try {
+      // Calculate per-source limits to distribute the total limit more fairly
+      const perSourceLimit = Math.ceil(clampedLimit / 3);
+
+      // Get recent organizations
+      const recentOrgs = await db.select({
+        id: organizations.id,
+        name: organizations.name,
+        createdAt: organizations.createdAt
+      })
+        .from(organizations)
+        .orderBy(desc(organizations.createdAt))
+        .limit(perSourceLimit);
+
+      // Get recent users
+      const recentUsers = await db.select({
+        id: users.id,
+        username: users.username,
+        createdAt: users.createdAt
+      })
+        .from(users)
+        .orderBy(desc(users.createdAt))
+        .limit(perSourceLimit);
+
+      // Get recent subscriptions
+      const recentSubscriptions = await db.select({
+        id: subscriptions.id,
+        organizationId: subscriptions.organizationId,
+        status: subscriptions.status,
+        updatedAt: subscriptions.updatedAt,
+        organizationName: organizations.name
+      })
+        .from(subscriptions)
+        .leftJoin(organizations, eq(subscriptions.organizationId, organizations.id))
+        .orderBy(desc(subscriptions.updatedAt))
+        .limit(perSourceLimit);
+
+      // Convert to activity format
+      for (const org of recentOrgs) {
+        activities.push({
+          id: `org-${org.id}`,
+          type: 'organization_created' as const,
+          title: 'New Organization Created',
+          description: `Organization "${org.name}" was created`,
+          timestamp: org.createdAt.toISOString(),
+          metadata: { organizationId: org.id, organizationName: org.name }
+        });
+      }
+
+      for (const user of recentUsers) {
+        activities.push({
+          id: `user-${user.id}`,
+          type: 'user_signup' as const,
+          title: 'New User Signup',
+          description: `User "${user.username}" signed up`,
+          timestamp: user.createdAt.toISOString(),
+          metadata: { userId: user.id, username: user.username }
+        });
+      }
+
+      for (const sub of recentSubscriptions) {
+        activities.push({
+          id: `sub-${sub.id}`,
+          type: 'subscription_changed' as const,
+          title: 'Subscription Updated',
+          description: `${sub.organizationName || 'Organization'} subscription status: ${sub.status}`,
+          timestamp: sub.updatedAt.toISOString(),
+          metadata: { 
+            subscriptionId: sub.id, 
+            organizationId: sub.organizationId,
+            organizationName: sub.organizationName,
+            status: sub.status 
+          }
+        });
+      }
+
+      // Sort all activities by timestamp (newest first) and apply final limit
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      return activities.slice(0, clampedLimit);
+
+    } catch (error) {
+      console.error("Error getting recent activity:", error);
+      return [];
     }
   }
 

@@ -11,9 +11,11 @@ import {
   AlertTriangle,
   Clock,
   CheckCircle,
-  XCircle
+  XCircle,
+  AlertCircle
 } from "lucide-react";
 import { useSuperAdmin } from "@/contexts/SuperAdminContext";
+import type { Activity as ActivityType } from "@shared/schema";
 
 interface DashboardStats {
   totalOrganizations: number;
@@ -51,6 +53,24 @@ export default function SuperAdminDashboard() {
       return response.json();
     },
     enabled: isAuthenticated,
+  });
+
+  // Fetch recent activity
+  const { data: recentActivity, isLoading: isActivityLoading, error: activityError } = useQuery({
+    queryKey: ["/api/super-admin/dashboard/recent-activity"],
+    queryFn: async (): Promise<ActivityType[]> => {
+      const response = await fetch("/api/super-admin/dashboard/recent-activity?limit=10", {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || "Failed to fetch recent activity");
+      }
+      return response.json();
+    },
+    enabled: isAuthenticated,
+    refetchInterval: 30000, // Refetch every 30 seconds for near real-time updates
+    staleTime: 10000, // Consider data stale after 10 seconds
   });
 
   const statCards = [
@@ -272,10 +292,66 @@ export default function SuperAdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Activity items will be populated from backend */}
-              <div className="text-center py-8 text-muted-foreground">
-                Activity feed will be implemented with real-time data
-              </div>
+              {isActivityLoading ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Loading activity...
+                </div>
+              ) : activityError ? (
+                <div className="text-center py-8">
+                  <div className="flex items-center justify-center gap-2 text-red-600 mb-2">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="font-medium">Failed to load activity</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {activityError instanceof Error ? activityError.message : "Unknown error occurred"}
+                  </p>
+                </div>
+              ) : recentActivity && recentActivity.length > 0 ? (
+                <div className="space-y-3">
+                  {recentActivity.map((activity: ActivityType) => (
+                    <div key={activity.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                      <div className="flex-shrink-0 mt-1">
+                        {activity.type === 'organization_created' && <Building2 className="h-4 w-4 text-blue-600" />}
+                        {activity.type === 'user_signup' && <Users className="h-4 w-4 text-green-600" />}
+                        {activity.type === 'subscription_changed' && <CreditCard className="h-4 w-4 text-purple-600" />}
+                        {activity.type === 'payment_failed' && <XCircle className="h-4 w-4 text-red-600" />}
+                        {activity.type === 'system_event' && <Activity className="h-4 w-4 text-gray-600" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-medium text-sm" data-testid={`activity-title-${activity.id}`}>
+                              {activity.title}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {activity.description}
+                            </p>
+                          </div>
+                          <Badge 
+                            variant={
+                              activity.type === 'organization_created' ? 'default' :
+                              activity.type === 'user_signup' ? 'secondary' :
+                              activity.type === 'subscription_changed' ? 'outline' :
+                              activity.type === 'payment_failed' ? 'destructive' :
+                              'secondary'
+                            }
+                            className="text-xs whitespace-nowrap ml-2"
+                          >
+                            {activity.type.replace(/_/g, ' ')}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(activity.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No recent activity found
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

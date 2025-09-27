@@ -2692,6 +2692,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/super-admin/dashboard/recent-activity - Platform activity feed
+  app.get("/api/super-admin/dashboard/recent-activity", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      // Safely parse and validate limit parameter
+      let limit = 20; // Default
+      if (req.query.limit) {
+        const parsedLimit = parseInt(req.query.limit as string, 10);
+        if (!isNaN(parsedLimit)) {
+          limit = Math.max(1, Math.min(parsedLimit, 100)); // Clamp to 1-100 range
+        }
+      }
+      
+      const activities = await storage.getRecentActivity(limit);
+      res.json(activities);
+    } catch (error) {
+      console.error("Error fetching recent activity:", error);
+      res.status(500).json({ 
+        error: "Failed to fetch recent activity",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // ===============================================
   // SUPER ADMIN BILLING API ROUTES
   // ===============================================
