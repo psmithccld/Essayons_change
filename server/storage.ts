@@ -4,7 +4,7 @@ import {
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
   organizations, organizationMemberships, organizationSettings, plans, subscriptions, invitations,
-  superAdminUsers, superAdminSessions, superAdminMfaSetup, supportTickets, supportConversations,
+  superAdminUsers, superAdminSessions, superAdminMfaSetup, supportTickets, supportConversations, systemSettings,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type CommunicationVersion, type InsertCommunicationVersion, type Survey, type InsertSurvey,
@@ -24,7 +24,8 @@ import {
   type SuperAdminUser, type InsertSuperAdminUser, type SuperAdminSession, type InsertSuperAdminSession, type SuperAdminMfaSetup, type InsertSuperAdminMfaSetup,
   type SuperAdminLoginRequest, type SuperAdminRegistrationRequest,
   type SupportTicket, type InsertSupportTicket, type SupportConversation, type InsertSupportConversation, type GPTMessage,
-  type SupportSession, type InsertSupportSession, type SupportAuditLog, type InsertSupportAuditLog
+  type SupportSession, type InsertSupportSession, type SupportAuditLog, type InsertSupportAuditLog,
+  type SystemSettings
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, isNull, inArray, ne } from "drizzle-orm";
@@ -962,6 +963,14 @@ export interface IStorage {
     ticketsByStatus: Record<string, number>;
     ticketsByPriority: Record<string, number>;
   }>;
+  
+  // ===============================================
+  // GLOBAL SYSTEM SETTINGS - Platform-wide configuration management
+  // ===============================================
+  
+  // System Settings Management
+  getSystemSettings(): Promise<SystemSettings | undefined>;
+  updateSystemSettings(settings: Partial<SystemSettings>): Promise<SystemSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -6401,6 +6410,60 @@ export class DatabaseStorage implements IStorage {
       artifacts,
       total: Number(count) || 0
     };
+  }
+
+  // ===============================================
+  // GLOBAL SYSTEM SETTINGS - Platform-wide configuration management
+  // ===============================================
+
+  async getSystemSettings(): Promise<SystemSettings | undefined> {
+    // Get the single global settings record (or create default if none exists)
+    const [settings] = await db.select().from(systemSettings).limit(1);
+    
+    if (!settings) {
+      // Create default settings if none exist
+      const [defaultSettings] = await db.insert(systemSettings).values({
+        globalFeatures: {
+          maintenanceMode: false,
+          newUserRegistration: true,
+          scheduledMaintenanceStart: null,
+          scheduledMaintenanceEnd: null,
+          maintenanceMessage: "The platform is currently undergoing maintenance. We'll be back shortly."
+        }
+      }).returning();
+      
+      return defaultSettings;
+    }
+    
+    return settings;
+  }
+
+  async updateSystemSettings(settings: Partial<SystemSettings>): Promise<SystemSettings> {
+    // First ensure we have a settings record
+    const existingSettings = await this.getSystemSettings();
+    
+    if (!existingSettings) {
+      throw new Error("Unable to create or retrieve system settings");
+    }
+
+    // Extract only the updatable fields, excluding auto-managed timestamps and ID
+    const { id, createdAt, updatedAt, ...updateableFields } = settings;
+
+    // Update the existing settings record
+    const [updatedSettings] = await db
+      .update(systemSettings)
+      .set({
+        ...updateableFields,
+        updatedAt: new Date()
+      })
+      .where(eq(systemSettings.id, existingSettings.id))
+      .returning();
+
+    if (!updatedSettings) {
+      throw new Error("Failed to update system settings");
+    }
+
+    return updatedSettings;
   }
 }
 

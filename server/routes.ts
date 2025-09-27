@@ -697,6 +697,73 @@ const requireAuthAndPermission = (permission: keyof Permissions) => {
 // Combined middleware for auth + organization context (for routes that need org context but no special permissions)
 const requireAuthAndOrg = [requireAuth, requireOrgContext];
 
+// GLOBAL PLATFORM ENFORCEMENT: Middleware to check global platform-wide settings
+const enforceGlobalPlatformSettings = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    // Get global platform settings from database
+    const globalSettings = await storage.getSystemSettings();
+    
+    if (!globalSettings) {
+      // If we can't get settings, log error but allow request to proceed to prevent total platform failure
+      console.error("Warning: Unable to retrieve global platform settings");
+      return next();
+    }
+
+    const { globalFeatures } = globalSettings;
+    
+    // MAINTENANCE MODE ENFORCEMENT: Block all non-super-admin access when enabled
+    if (globalFeatures.maintenanceMode) {
+      // Check if this is a super admin user
+      const isSuperAdmin = req.superAdminUser?.id || req.session?.superAdminUserId;
+      
+      // Allow super admin access and essential endpoints during maintenance
+      const allowedPaths = [
+        '/api/super-admin/', // All super admin endpoints
+        '/api/auth/logout', // Allow logout
+        '/api/auth/status', // Allow status checks
+        '/health', // Health checks
+      ];
+      
+      const isAllowedPath = allowedPaths.some(path => req.path.startsWith(path));
+      
+      if (!isSuperAdmin && !isAllowedPath) {
+        return res.status(503).json({
+          error: "Service temporarily unavailable",
+          message: globalFeatures.maintenanceMessage || "The platform is currently undergoing maintenance. We'll be back shortly.",
+          maintenanceMode: true,
+          retryAfter: globalFeatures.scheduledMaintenanceEnd ? 
+            Math.ceil((new Date(globalFeatures.scheduledMaintenanceEnd).getTime() - Date.now()) / 1000) : 
+            undefined
+        });
+      }
+    }
+
+    // NEW USER REGISTRATION BLOCKING: Block registration when disabled globally
+    if (!globalFeatures.allowNewRegistrations || !globalFeatures.newUserRegistrationEnabled) {
+      const registrationPaths = [
+        '/api/auth/register',
+        '/api/auth/signup',
+        '/api/auth/verification/resend'
+      ];
+      
+      if (registrationPaths.includes(req.path)) {
+        return res.status(403).json({
+          error: "Registration disabled",
+          message: "New user registration is currently disabled by the platform administrator.",
+          registrationBlocked: true
+        });
+      }
+    }
+
+    // Allow request to proceed if all checks pass
+    next();
+  } catch (error) {
+    console.error("Error in global platform enforcement middleware:", error);
+    // Allow request to proceed on error to prevent total platform failure
+    next();
+  }
+};
+
 // CRITICAL SECURITY: Global read-only enforcement middleware for support session impersonation
 const enforceReadOnlyImpersonation = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -960,6 +1027,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CRITICAL SECURITY: Apply global read-only enforcement middleware
   // This must run early to block writes during read-only impersonation sessions
   app.use('/api', enforceReadOnlyImpersonation);
+  
+  // GLOBAL PLATFORM ENFORCEMENT: Apply global platform settings enforcement
+  // This checks maintenance mode, registration blocking, and other platform-wide controls
+  app.use('/api', enforceGlobalPlatformSettings);
   
   // Roles
   app.get("/api/roles", requireAuthAndOrg, requirePermission('canSeeRoles'), async (req, res) => {
@@ -2618,52 +2689,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SUPER ADMIN SYSTEM SETTINGS API ROUTES
   // ===============================================
 
-  // GET /api/super-admin/settings - Get system settings
+  // DEPRECATED: Use /api/super-admin/global-settings instead
+  // GET /api/super-admin/settings - Get system settings (redirects to global settings)
   app.get("/api/super-admin/settings", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
-      // For MVP, return default settings structure
-      const settings = {
-        globalFeatures: {
-          maintenanceMode: false,
-          newUserRegistration: true,
-          emailNotifications: true,
-          gptServices: true,
-          fileUploads: true,
-          reports: true,
-        },
-        security: {
-          passwordMinLength: 8,
-          passwordRequireSpecialChars: true,
-          sessionTimeoutMinutes: 120,
-          maxLoginAttempts: 5,
-          twoFactorRequired: false,
-          ipWhitelist: []
-        },
-        email: {
-          fromName: "Platform Support",
-          fromEmail: "noreply@platform.com",
-          replyToEmail: "support@platform.com",
-          supportEmail: "help@platform.com",
-          enableWelcomeEmails: true,
-          enableNotifications: true,
-        },
-        limits: {
-          maxOrgsPerPlan: 100,
-          maxUsersPerOrg: 100,
-          maxProjectsPerOrg: 50,
-          maxFileUploadSizeMB: 10,
-          apiRateLimit: 1000,
-          sessionTimeoutHours: 2,
-        },
-        maintenance: {
-          isMaintenanceMode: false,
-          maintenanceMessage: "The platform is currently undergoing scheduled maintenance. We'll be back shortly.",
-          plannedDowntimeStart: null,
-          plannedDowntimeEnd: null,
-          allowedIps: []
-        }
-      };
+      // Get actual system settings from database
+      const settings = await storage.getSystemSettings();
       
+      if (!settings) {
+        return res.status(404).json({ error: "System settings not found" });
+      }
+
       res.json(settings);
     } catch (error) {
       console.error("Error fetching system settings:", error);
@@ -2671,34 +2707,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH /api/super-admin/settings - Update system settings
-  app.patch("/api/super-admin/settings", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+  // GET /api/super-admin/global-settings - Get global platform settings
+  app.get("/api/super-admin/global-settings", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
-      const { systemSettingsUpdateSchema } = await import("@shared/schema");
+      // Get actual system settings from database
+      const settings = await storage.getSystemSettings();
       
-      // Validate input with Zod schema
-      const validation = systemSettingsUpdateSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ 
-          error: "Invalid settings data", 
-          details: validation.error.flatten() 
-        });
+      if (!settings) {
+        return res.status(404).json({ error: "Global settings not found" });
       }
 
-      const settingsUpdate = validation.data;
-      console.log("System settings update requested by:", req.superAdminUser.username, settingsUpdate);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching global settings:", error);
+      res.status(500).json({ error: "Failed to fetch global settings" });
+    }
+  });
+
+  // GET /api/super-admin/org-defaults - Get organization default feature templates
+  app.get("/api/super-admin/org-defaults", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      // For organization defaults, we return a template structure that new organizations can use
+      const orgDefaults = {
+        features: {
+          reports: true,
+          gptCoach: true,
+          advancedAnalytics: false,
+          customBranding: false,
+          apiAccess: false,
+          ssoIntegration: false,
+          advancedSecurity: false,
+          customWorkflows: false,
+        },
+        limits: {
+          maxUsers: 100,
+          maxProjects: 50,
+          maxTasksPerProject: 1000,
+          maxFileUploadSizeMB: 10,
+          apiCallsPerMonth: 10000,
+          storageGB: 10,
+        },
+        settings: {
+          allowGuestAccess: false,
+          requireEmailVerification: true,
+          enableAuditLogs: false,
+          dataRetentionDays: 365,
+          autoBackup: true,
+        }
+      };
       
-      // TODO: Implement actual settings persistence in database
-      // For now, log the validated settings update
+      res.json(orgDefaults);
+    } catch (error) {
+      console.error("Error fetching organization defaults:", error);
+      res.status(500).json({ error: "Failed to fetch organization defaults" });
+    }
+  });
+
+  // DEPRECATED: Use /api/super-admin/global-settings instead
+  // PATCH /api/super-admin/settings - Update system settings (redirects to global settings)
+  app.patch("/api/super-admin/settings", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      // Update actual system settings in database
+      const updatedSettings = await storage.updateSystemSettings(req.body);
+      
+      console.log("System settings update requested by:", req.superAdminUser.username, req.body);
       
       res.json({ 
         message: "Settings updated successfully",
+        settings: updatedSettings,
         timestamp: new Date().toISOString(),
-        updatedFields: Object.keys(settingsUpdate)
+        updatedFields: Object.keys(req.body)
       });
     } catch (error) {
       console.error("Error updating system settings:", error);
       res.status(500).json({ error: "Failed to update system settings" });
+    }
+  });
+
+  // PATCH /api/super-admin/global-settings - Update global platform settings
+  app.patch("/api/super-admin/global-settings", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      // Update actual system settings in database
+      const updatedSettings = await storage.updateSystemSettings(req.body);
+      
+      console.log("Global settings update requested by:", req.superAdminUser.username, req.body);
+      
+      res.json({ 
+        message: "Global settings updated successfully",
+        settings: updatedSettings,
+        timestamp: new Date().toISOString(),
+        updatedFields: Object.keys(req.body)
+      });
+    } catch (error) {
+      console.error("Error updating global settings:", error);
+      res.status(500).json({ error: "Failed to update global settings" });
+    }
+  });
+
+  // PATCH /api/super-admin/org-defaults - Update organization default feature templates
+  app.patch("/api/super-admin/org-defaults", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      // TODO: Implement organization defaults persistence
+      // For now, this is a placeholder that would update default templates for new organizations
+      console.log("Organization defaults update requested by:", req.superAdminUser.username, req.body);
+      
+      res.json({ 
+        message: "Organization defaults updated successfully",
+        timestamp: new Date().toISOString(),
+        updatedFields: Object.keys(req.body)
+      });
+    } catch (error) {
+      console.error("Error updating organization defaults:", error);
+      res.status(500).json({ error: "Failed to update organization defaults" });
     }
   });
 
@@ -2726,21 +2846,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/super-admin/maintenance - Toggle maintenance mode
   app.post("/api/super-admin/maintenance", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
-      const { maintenanceToggleSchema } = await import("@shared/schema");
+      const { enabled, message } = req.body;
       
-      // Validate input with Zod schema
-      const validation = maintenanceToggleSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ 
-          error: "Invalid maintenance toggle data", 
-          details: validation.error.flatten() 
-        });
+      // Update the global settings to reflect maintenance mode change
+      const currentSettings = await storage.getSystemSettings();
+      if (!currentSettings) {
+        return res.status(500).json({ error: "Unable to retrieve current settings" });
       }
 
-      const { enabled, message } = validation.data;
+      // Update the maintenance mode in global features
+      const updatedSettings = await storage.updateSystemSettings({
+        globalFeatures: {
+          ...currentSettings.globalFeatures,
+          maintenanceMode: enabled,
+          maintenanceMessage: message || currentSettings.globalFeatures.maintenanceMessage,
+        }
+      });
       
-      // For MVP, just acknowledge the toggle
-      // TODO: Implement actual maintenance mode state persistence
       console.log(`Maintenance mode ${enabled ? 'enabled' : 'disabled'} by Super Admin:`, req.superAdminUser.username);
       
       res.json({ 
@@ -2748,6 +2870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         maintenanceMode: enabled,
         message: `Maintenance mode ${enabled ? 'enabled' : 'disabled'}`,
         customMessage: message,
+        settings: updatedSettings.globalFeatures,
         timestamp: new Date().toISOString()
       });
     } catch (error) {

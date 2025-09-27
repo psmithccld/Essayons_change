@@ -2288,9 +2288,64 @@ export const supportAuditLogs = pgTable("support_audit_logs", {
   createdAtIdx: index("support_audit_logs_created_at_idx").on(table.createdAt),
 }));
 
+// Global platform settings - single row table for platform-wide configuration
+export const systemSettings = pgTable("system_settings", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Global Feature Flags - platform-wide controls
+  globalFeatures: jsonb("global_features").default({
+    maintenanceMode: false,
+    newUserRegistration: true,
+    emailNotifications: true,
+    gptServices: true,
+    fileUploads: true,
+    reports: true,
+  }).notNull(),
+  
+  // Security Policies - platform-wide security settings
+  security: jsonb("security").default({
+    passwordMinLength: 8,
+    passwordRequireSpecialChars: true,
+    sessionTimeoutMinutes: 120,
+    maxLoginAttempts: 5,
+    twoFactorRequired: false,
+    ipWhitelist: []
+  }).notNull(),
+  
+  // Email Configuration - platform-wide email settings
+  email: jsonb("email").default({
+    fromName: "Platform Support",
+    fromEmail: "noreply@platform.com",
+    replyToEmail: "support@platform.com",
+    supportEmail: "help@platform.com",
+    maxDailyEmails: 10000
+  }).notNull(),
+  
+  // Platform Limits - global resource limits
+  limits: jsonb("limits").default({
+    maxOrganizations: 1000,
+    maxUsersPerOrganization: 500,
+    maxProjectsPerOrganization: 100,
+    maxStoragePerOrganizationMB: 5000
+  }).notNull(),
+  
+  // System Maintenance - maintenance and deployment settings
+  maintenance: jsonb("maintenance").default({
+    scheduledMaintenanceStart: null,
+    scheduledMaintenanceEnd: null,
+    maintenanceMessage: "The platform is currently undergoing maintenance. We'll be back shortly."
+  }).notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Support system types
 export type SupportSession = typeof supportSessions.$inferSelect;
 export type SupportAuditLog = typeof supportAuditLogs.$inferSelect;
+
+// Global system settings types
+export type SystemSettings = typeof systemSettings.$inferSelect;
 
 // Support session insert schemas with Zod validation
 export const insertSupportSessionSchema = createInsertSchema(supportSessions, {
