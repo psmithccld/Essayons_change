@@ -143,6 +143,12 @@ export default function SuperAdminCustomerSupport() {
   const selectedOrg = (organizations as Organization[] || []).find((org: Organization) => org.id === selectedOrganization);
   const session = (currentSession as SupportSession) || activeSession;
 
+  // Sync selectedOrganization with form field
+  const organizationId = form.watch("organizationId");
+  if (selectedOrganization && organizationId !== selectedOrganization) {
+    form.setValue("organizationId", selectedOrganization);
+  }
+
   const handleStartSession = (data: SessionCreationData) => {
     // Now send all the properties including accessScopes and duration
     startSessionMutation.mutate({
