@@ -64,7 +64,7 @@ import {
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema,
   insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
   insertUserGroupSchema, insertUserGroupMembershipSchema, insertUserPermissionSchema, insertNotificationSchema, insertChangeArtifactSchema,
-  insertOrganizationSettingsSchema,
+  insertOrganizationSettingsSchema, organizationDefaultsUpdateSchema,
   coachContextPayloadSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload,
   // Add missing schema imports
@@ -2813,8 +2813,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PATCH /api/super-admin/org-defaults - Update organization default feature templates
   app.patch("/api/super-admin/org-defaults", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
+      // Validate request body with Zod schema
+      const validatedData = organizationDefaultsUpdateSchema.parse(req.body);
+      
       // Update organization defaults in database
-      const updatedDefaults = await storage.updateOrganizationDefaults(req.body);
+      const updatedDefaults = await storage.updateOrganizationDefaults(validatedData);
       
       console.log("Organization defaults update requested by:", req.superAdminUser.username, req.body);
       
