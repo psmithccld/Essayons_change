@@ -39,11 +39,15 @@ import { useSuperAdmin } from "@/contexts/SuperAdminContext";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
-// Feature definitions
+// Feature definitions - including core application features
 const FEATURE_DEFINITIONS = {
-  maxProjects: { name: "Max Projects", description: "Maximum number of projects allowed", type: "number" },
-  maxUsers: { name: "Max Users", description: "Maximum number of users per organization", type: "number" },
-  maxStorage: { name: "Max Storage (GB)", description: "Storage limit in gigabytes", type: "number" },
+  // Core Application Features (connected to actual functionality)
+  communications: { name: "Communications", description: "Communication management and planning tools", type: "boolean" },
+  reports: { name: "Reporting", description: "Advanced reports and analytics dashboard", type: "boolean" },
+  gptCoach: { name: "GPT Integration", description: "AI-powered coaching and insights", type: "boolean" },
+  readinessSurveys: { name: "Surveys", description: "Survey creation and response management", type: "boolean" },
+  changeArtifacts: { name: "Change Artifacts", description: "Change artifact management", type: "boolean" },
+  // Enterprise Features (advanced tier features)
   hasAdvancedReporting: { name: "Advanced Reporting", description: "Access to advanced reports and analytics", type: "boolean" },
   hasAPIAccess: { name: "API Access", description: "REST API access for integrations", type: "boolean" },
   hasCustomBranding: { name: "Custom Branding", description: "Customize logos, colors, and themes", type: "boolean" },
@@ -55,31 +59,31 @@ const FEATURE_DEFINITIONS = {
   hasAuditLogs: { name: "Audit Logs", description: "Detailed activity and audit logging", type: "boolean" },
 } as const;
 
-// Plan schema for form validation
+// Plan schema for form validation - matches database structure
 const planSchema = z.object({
   name: z.string().min(1, "Plan name is required"),
   description: z.string().optional(),
-  price: z.number().min(0, "Price must be positive"),
-  billingInterval: z.enum(["monthly", "yearly"]),
-  currency: z.string().min(1, "Currency is required").default("USD"),
-  stripeProductId: z.string().optional(),
-  stripePriceId: z.string().optional(),
-  isActive: z.boolean().default(true),
-  isPopular: z.boolean().default(false),
+  seatLimit: z.number().min(1, "Seat limit must be at least 1"),
+  pricePerSeatCents: z.number().min(0, "Price must be positive"),
   features: z.object({
-    maxProjects: z.number().min(0),
-    maxUsers: z.number().min(1),
-    maxStorage: z.number().min(0),
-    hasAdvancedReporting: z.boolean(),
-    hasAPIAccess: z.boolean(),
-    hasCustomBranding: z.boolean(),
-    hasSSO: z.boolean(),
-    hasPrioritySupport: z.boolean(),
-    hasAdvancedSecurity: z.boolean(),
-    hasWorkflowAutomation: z.boolean(),
-    hasDataExport: z.boolean(),
-    hasAuditLogs: z.boolean(),
+    // Core Application Features (connected to actual functionality)
+    communications: z.boolean().default(false),
+    reports: z.boolean().default(false),
+    gptCoach: z.boolean().default(false),
+    readinessSurveys: z.boolean().default(false),
+    changeArtifacts: z.boolean().default(false),
+    // Enterprise Features (advanced tier features)
+    hasAdvancedReporting: z.boolean().default(false),
+    hasAPIAccess: z.boolean().default(false),
+    hasCustomBranding: z.boolean().default(false),
+    hasSSO: z.boolean().default(false),
+    hasPrioritySupport: z.boolean().default(false),
+    hasAdvancedSecurity: z.boolean().default(false),
+    hasWorkflowAutomation: z.boolean().default(false),
+    hasDataExport: z.boolean().default(false),
+    hasAuditLogs: z.boolean().default(false),
   }),
+  isActive: z.boolean().default(true),
 });
 
 type PlanFormData = z.infer<typeof planSchema>;
@@ -88,17 +92,17 @@ interface Plan {
   id: string;
   name: string;
   description?: string;
-  price: number;
-  billingInterval: string;
-  currency: string;
-  stripeProductId?: string;
-  stripePriceId?: string;
+  seatLimit: number;
+  pricePerSeatCents: number;
   isActive: boolean;
-  isPopular: boolean;
   features: {
-    maxProjects: number;
-    maxUsers: number;
-    maxStorage: number;
+    // Core Application Features
+    communications: boolean;
+    reports: boolean;
+    gptCoach: boolean;
+    readinessSurveys: boolean;
+    changeArtifacts: boolean;
+    // Enterprise Features
     hasAdvancedReporting: boolean;
     hasAPIAccess: boolean;
     hasCustomBranding: boolean;
@@ -109,7 +113,6 @@ interface Plan {
     hasDataExport: boolean;
     hasAuditLogs: boolean;
   };
-  organizationCount: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -287,20 +287,15 @@ export const organizationMemberships = pgTable("organization_memberships", {
 // Subscription plans - licensing tiers with features and limits
 export const plans = pgTable("plans", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  code: text("code").notNull().unique(), // basic, pro, enterprise
   name: text("name").notNull(), // "Basic Plan", "Professional", etc.
   description: text("description"),
-  maxSeats: integer("max_seats").notNull(), // Maximum users per organization
-  billingInterval: text("billing_interval").notNull(), // month, year
-  priceCents: integer("price_cents").notNull(), // Price in cents
-  features: jsonb("features").default({}), // Available features and limits
-  stripeProductId: text("stripe_product_id"), // Stripe product ID
-  stripePriceId: text("stripe_price_id"), // Stripe price ID
+  seatLimit: integer("seat_limit").notNull(), // Maximum users per organization
+  pricePerSeatCents: integer("price_per_seat_cents").notNull(), // Price per seat in cents
+  features: jsonb("features").default({}), // Available features and limits (JSONB format)
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  codeIdx: index("plans_code_idx").on(table.code),
   activeIdx: index("plans_active_idx").on(table.isActive),
 }));
 
