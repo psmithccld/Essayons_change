@@ -2813,12 +2813,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PATCH /api/super-admin/org-defaults - Update organization default feature templates
   app.patch("/api/super-admin/org-defaults", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
-      // TODO: Implement organization defaults persistence
-      // For now, this is a placeholder that would update default templates for new organizations
+      // Update organization defaults in database
+      const updatedDefaults = await storage.updateOrganizationDefaults(req.body);
+      
       console.log("Organization defaults update requested by:", req.superAdminUser.username, req.body);
       
       res.json({ 
         message: "Organization defaults updated successfully",
+        defaults: updatedDefaults,
         timestamp: new Date().toISOString(),
         updatedFields: Object.keys(req.body)
       });
