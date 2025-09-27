@@ -1607,6 +1607,59 @@ export class DatabaseStorage implements IStorage {
     return users as SuperAdminUser[];
   }
 
+  // Platform User Management Methods - Get all users with organization memberships
+  async getAllPlatformUsers(): Promise<any[]> {
+    // Get all users
+    const allUsers = await db.select({
+      id: users.id,
+      username: users.username,
+      name: users.name,
+      email: users.email,
+      isActive: users.isActive,
+      lastLoginAt: users.lastLoginAt,
+      createdAt: users.createdAt,
+      roleName: roles.name
+    })
+    .from(users)
+    .leftJoin(roles, eq(users.roleId, roles.id))
+    .orderBy(users.createdAt);
+
+    // Get organization memberships for all users
+    const memberships = await db.select({
+      userId: organizationMemberships.userId,
+      organizationId: organizationMemberships.organizationId,
+      orgRole: organizationMemberships.orgRole,
+      isActive: organizationMemberships.isActive,
+      joinedAt: organizationMemberships.joinedAt,
+      organizationName: organizations.name,
+      organizationSlug: organizations.slug,
+      organizationDomain: organizations.slug // Using slug as domain for now
+    })
+    .from(organizationMemberships)
+    .innerJoin(organizations, eq(organizationMemberships.organizationId, organizations.id))
+    .where(eq(organizationMemberships.isActive, true));
+
+    // Combine users with their organization memberships
+    const usersWithOrgs = allUsers.map(user => {
+      const userMemberships = memberships.filter(m => m.userId === user.id);
+      
+      return {
+        ...user,
+        organizations: userMemberships.map(m => ({
+          id: m.organizationId,
+          name: m.organizationName,
+          slug: m.organizationSlug,
+          domain: m.organizationDomain,
+          roleName: m.orgRole,
+          isAdmin: m.orgRole === 'owner' || m.orgRole === 'admin',
+          joinedAt: m.joinedAt
+        }))
+      };
+    });
+
+    return usersWithOrgs;
+  }
+
   async updateSuperAdminUserStatus(userId: string, isActive: boolean): Promise<void> {
     await db.update(superAdminUsers)
       .set({ 

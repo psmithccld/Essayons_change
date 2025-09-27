@@ -1991,14 +1991,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Super Admin User Management Endpoints
   
-  // GET /api/super-admin/users - List all Super Admin users
+  // GET /api/super-admin/users - List all platform users with organization memberships
   app.get("/api/super-admin/users", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
-      const adminUsers = await storage.getAllSuperAdminUsers();
-      res.json(adminUsers);
+      const platformUsers = await storage.getAllPlatformUsers();
+      res.json(platformUsers);
     } catch (error) {
-      console.error("Error fetching super admin users:", error);
-      res.status(500).json({ error: "Failed to fetch admin users" });
+      console.error("Error fetching platform users:", error);
+      res.status(500).json({ error: "Failed to fetch platform users" });
     }
   });
 
