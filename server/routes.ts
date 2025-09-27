@@ -1954,6 +1954,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(subscriptions.id, existingSubscription.id))
           .returning();
           
+        // Sync plan features to organization enabledFeatures
+        await db.update(organizations)
+          .set({
+            enabledFeatures: plan.features,
+            updatedAt: new Date()
+          })
+          .where(eq(organizations.id, orgId));
+          
         res.json(updatedSubscription);
       } else {
         // Create new subscription
@@ -1964,6 +1972,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           seatsPurchased,
           trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 day trial
         }).returning();
+        
+        // Sync plan features to organization enabledFeatures
+        await db.update(organizations)
+          .set({
+            enabledFeatures: plan.features,
+            updatedAt: new Date()
+          })
+          .where(eq(organizations.id, orgId));
         
         res.status(201).json(newSubscription);
       }
