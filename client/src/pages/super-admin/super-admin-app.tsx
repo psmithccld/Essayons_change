@@ -7,6 +7,8 @@ import SuperAdminOrganizations from "@/pages/super-admin/organizations";
 import SuperAdminCustomerTiers from "@/pages/super-admin/customer-tiers";
 import SuperAdminBilling from "@/pages/super-admin/billing";
 import SuperAdminUsers from "@/pages/super-admin/users";
+import SuperAdminAnalytics from "@/pages/super-admin/analytics";
+import SuperAdminSettings from "@/pages/super-admin/settings";
 import { Loader2 } from "lucide-react";
 
 function SuperAdminLoadingSpinner() {
@@ -39,26 +41,8 @@ function SuperAdminRouter() {
         <Route path="/super-admin/customer-tiers" component={SuperAdminCustomerTiers} />
         <Route path="/super-admin/billing" component={SuperAdminBilling} />
         <Route path="/super-admin/users" component={SuperAdminUsers} />
-        <Route path="/super-admin/analytics">
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              Analytics Dashboard
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Advanced analytics and reporting features coming soon.
-            </p>
-          </div>
-        </Route>
-        <Route path="/super-admin/settings">
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              System Settings
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              System configuration and platform settings coming soon.
-            </p>
-          </div>
-        </Route>
+        <Route path="/super-admin/analytics" component={SuperAdminAnalytics} />
+        <Route path="/super-admin/settings" component={SuperAdminSettings} />
         <Route>
           <div className="text-center py-12">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">

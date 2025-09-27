@@ -2189,3 +2189,59 @@ export type CoachContextPage = z.infer<typeof coachContextPageSchema>;
 export type CoachContextSelections = z.infer<typeof coachContextSelectionsSchema>; 
 export type CoachContextSnapshot = z.infer<typeof coachContextSnapshotSchema>;
 export type CoachContextPayload = z.infer<typeof coachContextPayloadSchema>;
+
+// Super Admin System Settings validation schemas
+export const systemSettingsUpdateSchema = z.object({
+  globalFeatures: z.object({
+    maintenanceMode: z.boolean().optional(),
+    newUserRegistration: z.boolean().optional(),
+    emailNotifications: z.boolean().optional(),
+    gptServices: z.boolean().optional(),
+    fileUploads: z.boolean().optional(),
+    reports: z.boolean().optional(),
+  }).optional(),
+  security: z.object({
+    passwordMinLength: z.number().min(6).max(32).optional(),
+    passwordRequireSpecialChars: z.boolean().optional(),
+    sessionTimeoutMinutes: z.number().min(15).max(1440).optional(),
+    maxLoginAttempts: z.number().min(3).max(10).optional(),
+    twoFactorRequired: z.boolean().optional(),
+    ipWhitelist: z.array(z.string()).optional(),
+  }).optional(),
+  email: z.object({
+    fromName: z.string().min(1).max(100).optional(),
+    fromEmail: z.string().email().optional(),
+    replyToEmail: z.string().email().optional(),
+    supportEmail: z.string().email().optional(),
+    enableWelcomeEmails: z.boolean().optional(),
+    enableNotifications: z.boolean().optional(),
+  }).optional(),
+  limits: z.object({
+    maxOrgsPerPlan: z.number().min(1).max(1000).optional(),
+    maxUsersPerOrg: z.number().min(1).max(10000).optional(),
+    maxProjectsPerOrg: z.number().min(1).max(1000).optional(),
+    maxFileUploadSizeMB: z.number().min(1).max(100).optional(),
+    apiRateLimit: z.number().min(10).max(10000).optional(),
+    sessionTimeoutHours: z.number().min(1).max(24).optional(),
+  }).optional(),
+  maintenance: z.object({
+    isMaintenanceMode: z.boolean().optional(),
+    maintenanceMessage: z.string().max(500).optional(),
+    plannedDowntimeStart: z.string().optional(),
+    plannedDowntimeEnd: z.string().optional(),
+    allowedIps: z.array(z.string()).optional(),
+  }).optional(),
+});
+
+export const maintenanceToggleSchema = z.object({
+  enabled: z.boolean(),
+  message: z.string().max(500).optional(),
+});
+
+export const analyticsRangeSchema = z.object({
+  range: z.enum(['1d', '7d', '30d', '90d']).default('7d'),
+});
+
+export type SystemSettingsUpdate = z.infer<typeof systemSettingsUpdateSchema>;
+export type MaintenanceToggle = z.infer<typeof maintenanceToggleSchema>;
+export type AnalyticsRange = z.infer<typeof analyticsRangeSchema>;
