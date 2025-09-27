@@ -594,6 +594,83 @@ const requireAuthAndPermission = (permission: keyof Permissions) => {
 // Combined middleware for auth + organization context (for routes that need org context but no special permissions)
 const requireAuthAndOrg = [requireAuth, requireOrgContext];
 
+// CRITICAL SECURITY: Global read-only enforcement middleware for support session impersonation
+const enforceReadOnlyImpersonation = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    // Only check for super admin support sessions
+    if (!req.superAdminUser?.id) {
+      return next(); // No super admin context, proceed normally
+    }
+    
+    // Get current support session for this super admin
+    const supportSession = await storage.getCurrentSupportSession(req.superAdminUser.id);
+    
+    // If no active support session, proceed normally
+    if (!supportSession || !supportSession.isActive) {
+      return next();
+    }
+    
+    // Check if session is in read-only mode
+    if (supportSession.sessionType !== "read_only") {
+      return next(); // Support mode allows writes, proceed normally
+    }
+    
+    // Block non-idempotent methods during read-only impersonation
+    const writeMethod = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method);
+    
+    if (writeMethod) {
+      // Allow-list essential support routes that need to work during read-only mode
+      const allowedWriteRoutes = [
+        '/api/super-admin/support/session', // Creating/ending support sessions
+        '/api/super-admin/support/audit-logs', // Audit log creation
+        '/api/super-admin/auth/logout' // Logout functionality
+      ];
+      
+      // Check if this is an allowed route
+      const isAllowedRoute = allowedWriteRoutes.some(route => req.path.startsWith(route));
+      
+      if (!isAllowedRoute) {
+        // Create audit log for blocked write attempt
+        await storage.createSupportAuditLog({
+          sessionId: supportSession.id,
+          superAdminUserId: req.superAdminUser.id,
+          organizationId: supportSession.organizationId,
+          action: "write_attempt_blocked",
+          description: `Blocked ${req.method} request to ${req.path} during read-only impersonation`,
+          details: { 
+            method: req.method, 
+            path: req.path, 
+            sessionType: supportSession.sessionType,
+            userAgent: req.get('User-Agent'),
+            ip: req.ip
+          },
+          accessLevel: "admin",
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+        });
+        
+        console.warn(`SECURITY: Blocked ${req.method} ${req.path} by super admin ${req.superAdminUser.username} during read-only impersonation of org ${supportSession.organizationId}`);
+        
+        return res.status(403).json({ 
+          error: "Write operations are not allowed during read-only impersonation mode",
+          details: "You are currently in a read-only support session. End the session or switch to support mode to perform write operations.",
+          sessionId: supportSession.id,
+          sessionType: supportSession.sessionType
+        });
+      }
+    }
+    
+    // Add support session context to request for other middleware to use
+    req.supportSession = supportSession;
+    
+    next();
+  } catch (error) {
+    console.error("Error in read-only enforcement middleware:", error);
+    // On error, fail secure by blocking the request
+    res.status(500).json({ error: "Unable to verify support session permissions" });
+  }
+};
+
 // Helper function to build complete RAID log from template-specific data
 function buildRaidInsertFromTemplate(type: string, baseData: any): any {
   // Add backward compatibility mapping
@@ -742,6 +819,10 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // CRITICAL SECURITY: Apply global read-only enforcement middleware
+  // This must run early to block writes during read-only impersonation sessions
+  app.use('/api/*', enforceReadOnlyImpersonation);
+  
   // Roles
   app.get("/api/roles", requireAuthAndOrg, requirePermission('canSeeRoles'), async (req, res) => {
     try {
