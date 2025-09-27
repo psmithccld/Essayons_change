@@ -110,14 +110,12 @@ export default function SuperAdminUsers() {
     queryKey: ["/api/super-admin/users"],
     queryFn: async () => {
       const response = await fetch("/api/super-admin/users", {
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include', // Use cookies for authentication
       });
       if (!response.ok) throw new Error("Failed to fetch users");
       return response.json() as Promise<PlatformUser[]>;
     },
-    enabled: !!sessionId,
+    enabled: true, // Always enabled, auth handled by cookies
   });
 
   // Fetch organizations for dropdowns
@@ -125,23 +123,19 @@ export default function SuperAdminUsers() {
     queryKey: ["/api/super-admin/organizations", "simple"],
     queryFn: async () => {
       const response = await fetch("/api/super-admin/organizations?fields=id,name,domain,isActive,userCount", {
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include', // Use cookies for authentication
       });
       if (!response.ok) throw new Error("Failed to fetch organizations");
       return response.json() as Promise<Organization[]>;
     },
-    enabled: !!sessionId,
+    enabled: true, // Always enabled, auth handled by cookies
   });
 
   // Search users mutation
   const searchUsersMutation = useMutation({
     mutationFn: async (query: string) => {
       const response = await fetch(`/api/super-admin/users/search?q=${encodeURIComponent(query)}`, {
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include', // Use cookies for authentication
       });
       if (!response.ok) throw new Error("Failed to search users");
       return response.json();
@@ -155,8 +149,8 @@ export default function SuperAdminUsers() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-super-admin-session": sessionId!,
         },
+        credentials: 'include', // Use cookies for authentication
         body: JSON.stringify({
           userId: data.userId,
           isAdmin: data.isAdmin,
@@ -192,9 +186,7 @@ export default function SuperAdminUsers() {
     mutationFn: async ({ organizationId, userId }: { organizationId: string; userId: string }) => {
       const response = await fetch(`/api/super-admin/organizations/${organizationId}/members/${userId}`, {
         method: "DELETE",
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include', // Use cookies for authentication
       });
       if (!response.ok) {
         const error = await response.json();
@@ -225,8 +217,8 @@ export default function SuperAdminUsers() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-super-admin-session": sessionId!,
         },
+        credentials: 'include', // Use cookies for authentication
         body: JSON.stringify(data),
       });
       if (!response.ok) {
@@ -279,14 +271,15 @@ export default function SuperAdminUsers() {
 
   // Filter users
   const filteredUsers = users.filter((user) => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = (searchTerm || '').toLowerCase();
+    const matchesSearch = (user.name || '').toLowerCase().includes(term) ||
+                         (user.username || '').toLowerCase().includes(term) ||
+                         (user.email || '').toLowerCase().includes(term);
     const matchesStatus = statusFilter === "all" || 
                          (statusFilter === "active" && user.isActive) ||
                          (statusFilter === "inactive" && !user.isActive);
     const matchesOrg = orgFilter === "all" || 
-                      user.organizations.some(org => org.id === orgFilter);
+                      (user.organizations || []).some(org => org.id === orgFilter);
     return matchesSearch && matchesStatus && matchesOrg;
   });
 
@@ -304,8 +297,8 @@ export default function SuperAdminUsers() {
   const userStats = {
     totalUsers: users.length,
     activeUsers: users.filter(u => u.isActive).length,
-    usersWithMultipleOrgs: users.filter(u => u.organizations.length > 1).length,
-    adminUsers: users.filter(u => u.organizations.some(org => org.isAdmin)).length,
+    usersWithMultipleOrgs: users.filter(u => (u.organizations || []).length > 1).length,
+    adminUsers: users.filter(u => (u.organizations || []).some(org => org.isAdmin)).length,
   };
 
   return (
@@ -720,7 +713,7 @@ export default function SuperAdminUsers() {
                       <Badge variant={user.isActive ? "default" : "secondary"}>
                         {user.isActive ? "Active" : "Inactive"}
                       </Badge>
-                      {user.organizations.some(org => org.isAdmin) && (
+                      {(user.organizations || []).some(org => org.isAdmin) && (
                         <Badge variant="outline">
                           <Crown className="h-3 w-3 mr-1" />
                           Admin
@@ -728,7 +721,7 @@ export default function SuperAdminUsers() {
                       )}
                       <Badge variant="outline">
                         <Building2 className="h-3 w-3 mr-1" />
-                        {user.organizations.length} orgs
+                        {(user.organizations || []).length} orgs
                       </Badge>
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 text-sm text-muted-foreground">
@@ -747,9 +740,9 @@ export default function SuperAdminUsers() {
                     </div>
                     
                     {/* Organization Memberships */}
-                    {user.organizations.length > 0 && (
+                    {(user.organizations || []).length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {user.organizations.map((org) => (
+                        {(user.organizations || []).map((org) => (
                           <div key={org.id} className="flex items-center gap-2 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-xs">
                             <span>{org.name}</span>
                             {org.isAdmin && <Shield className="h-3 w-3 text-yellow-500" />}
@@ -836,11 +829,11 @@ export default function SuperAdminUsers() {
               {/* Organization Memberships */}
               <div>
                 <label className="text-sm font-medium mb-3 block">Organization Memberships</label>
-                {selectedUser.organizations.length === 0 ? (
+                {(selectedUser.organizations || []).length === 0 ? (
                   <p className="text-sm text-muted-foreground">Not a member of any organizations</p>
                 ) : (
                   <div className="space-y-2">
-                    {selectedUser.organizations.map((org) => (
+                    {(selectedUser.organizations || []).map((org) => (
                       <div key={org.id} className="flex items-center justify-between p-3 border rounded">
                         <div>
                           <p className="font-medium">{org.name}</p>
