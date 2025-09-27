@@ -2727,34 +2727,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/super-admin/org-defaults - Get organization default feature templates
   app.get("/api/super-admin/org-defaults", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
-      // For organization defaults, we return a template structure that new organizations can use
-      const orgDefaults = {
-        features: {
-          reports: true,
-          gptCoach: true,
-          advancedAnalytics: false,
-          customBranding: false,
-          apiAccess: false,
-          ssoIntegration: false,
-          advancedSecurity: false,
-          customWorkflows: false,
-        },
-        limits: {
-          maxUsers: 100,
-          maxProjects: 50,
-          maxTasksPerProject: 1000,
-          maxFileUploadSizeMB: 10,
-          apiCallsPerMonth: 10000,
-          storageGB: 10,
-        },
-        settings: {
-          allowGuestAccess: false,
-          requireEmailVerification: true,
-          enableAuditLogs: false,
-          dataRetentionDays: 365,
-          autoBackup: true,
-        }
-      };
+      // Get organization defaults from database
+      const orgDefaults = await storage.getOrganizationDefaults();
+      
+      if (!orgDefaults) {
+        // Return default fallback values if no record exists
+        const fallbackDefaults = {
+          features: {
+            reports: true,
+            gptCoach: true,
+            advancedAnalytics: false,
+            customBranding: false,
+            apiAccess: false,
+            ssoIntegration: false,
+            advancedSecurity: false,
+            customWorkflows: false,
+          },
+          limits: {
+            maxUsers: 100,
+            maxProjects: 50,
+            maxTasksPerProject: 1000,
+            maxFileUploadSizeMB: 10,
+            apiCallsPerMonth: 10000,
+            storageGB: 10,
+          },
+          settings: {
+            allowGuestAccess: false,
+            requireEmailVerification: true,
+            enableAuditLogs: false,
+            dataRetentionDays: 365,
+            autoBackup: true,
+          }
+        };
+        return res.json(fallbackDefaults);
+      }
       
       res.json(orgDefaults);
     } catch (error) {
