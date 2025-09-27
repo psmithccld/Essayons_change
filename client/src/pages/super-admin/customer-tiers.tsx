@@ -247,17 +247,17 @@ export default function SuperAdminCustomerTiers() {
     defaultValues: {
       name: "",
       description: "",
-      price: 0,
-      billingInterval: "monthly",
-      currency: "USD",
-      stripeProductId: "",
-      stripePriceId: "",
+      seatLimit: 5,
+      pricePerSeatCents: 2500, // $25.00 per seat
       isActive: true,
-      isPopular: false,
       features: {
-        maxProjects: 10,
-        maxUsers: 5,
-        maxStorage: 10,
+        // Core Application Features
+        communications: false,
+        reports: false,
+        gptCoach: false,
+        readinessSurveys: false,
+        changeArtifacts: false,
+        // Enterprise Features
         hasAdvancedReporting: false,
         hasAPIAccess: false,
         hasCustomBranding: false,
@@ -276,17 +276,17 @@ export default function SuperAdminCustomerTiers() {
     defaultValues: {
       name: "",
       description: "",
-      price: 0,
-      billingInterval: "monthly",
-      currency: "USD",
-      stripeProductId: "",
-      stripePriceId: "",
+      seatLimit: 5,
+      pricePerSeatCents: 2500,
       isActive: true,
-      isPopular: false,
       features: {
-        maxProjects: 10,
-        maxUsers: 5,
-        maxStorage: 10,
+        // Core Application Features
+        communications: false,
+        reports: false,
+        gptCoach: false,
+        readinessSurveys: false,
+        changeArtifacts: false,
+        // Enterprise Features
         hasAdvancedReporting: false,
         hasAPIAccess: false,
         hasCustomBranding: false,
@@ -305,13 +305,9 @@ export default function SuperAdminCustomerTiers() {
     editForm.reset({
       name: plan.name,
       description: plan.description || "",
-      price: plan.price,
-      billingInterval: plan.billingInterval as "monthly" | "yearly",
-      currency: plan.currency,
-      stripeProductId: plan.stripeProductId || "",
-      stripePriceId: plan.stripePriceId || "",
+      seatLimit: plan.seatLimit,
+      pricePerSeatCents: plan.pricePerSeatCents,
       isActive: plan.isActive,
-      isPopular: plan.isPopular,
       features: plan.features,
     });
     setIsEditDialogOpen(true);

@@ -1755,16 +1755,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: plans.id,
           name: plans.name,
           description: plans.description,
-          priceCents: plans.priceCents,
-          maxSeats: plans.maxSeats,
+          seatLimit: plans.seatLimit,
+          pricePerSeatCents: plans.pricePerSeatCents,
           features: plans.features,
-          isActive: plans.isActive
+          isActive: plans.isActive,
+          createdAt: plans.createdAt,
+          updatedAt: plans.updatedAt
         })
         .from(plans)
         .where(eq(plans.isActive, true))
-        .orderBy(plans.priceCents);
+        .orderBy(plans.pricePerSeatCents);
       
-      res.json({ plans: allPlans });
+      res.json(allPlans);
     } catch (error) {
       console.error("Error fetching plans:", error);
       res.status(500).json({ error: "Failed to fetch plans" });
@@ -1785,6 +1787,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching plan:", error);
       res.status(500).json({ error: "Failed to fetch plan" });
+    }
+  });
+
+  // POST /api/super-admin/plans - Create new subscription plan
+  app.post("/api/super-admin/plans", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { insertPlanSchema } = await import("@shared/schema");
+      
+      // Validate request body
+      const validationResult = insertPlanSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid plan data", 
+          details: validationResult.error.errors 
+        });
+      }
+
+      const planData = validationResult.data;
+
+      // Create the plan
+      const [newPlan] = await db.insert(plans).values(planData).returning();
+      
+      res.status(201).json(newPlan);
+    } catch (error) {
+      console.error("Error creating plan:", error);
+      res.status(500).json({ error: "Failed to create plan" });
+    }
+  });
+
+  // PUT /api/super-admin/plans/:id - Update subscription plan
+  app.put("/api/super-admin/plans/:id", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { insertPlanSchema } = await import("@shared/schema");
+      
+      // Validate request body
+      const validationResult = insertPlanSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid plan data", 
+          details: validationResult.error.errors 
+        });
+      }
+
+      const planData = validationResult.data;
+
+      // Check if plan exists
+      const [existingPlan] = await db.select().from(plans).where(eq(plans.id, id));
+      if (!existingPlan) {
+        return res.status(404).json({ error: "Plan not found" });
+      }
+
+      // Update the plan
+      const [updatedPlan] = await db
+        .update(plans)
+        .set({ ...planData, updatedAt: new Date() })
+        .where(eq(plans.id, id))
+        .returning();
+      
+      res.json(updatedPlan);
+    } catch (error) {
+      console.error("Error updating plan:", error);
+      res.status(500).json({ error: "Failed to update plan" });
+    }
+  });
+
+  // DELETE /api/super-admin/plans/:id - Delete subscription plan
+  app.delete("/api/super-admin/plans/:id", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Check if plan exists
+      const [existingPlan] = await db.select().from(plans).where(eq(plans.id, id));
+      if (!existingPlan) {
+        return res.status(404).json({ error: "Plan not found" });
+      }
+
+      // Check if any organizations are using this plan
+      const [subscriptionCount] = await db
+        .select({ count: count() })
+        .from(subscriptions)
+        .where(eq(subscriptions.planId, id));
+
+      if (subscriptionCount?.count && subscriptionCount.count > 0) {
+        return res.status(400).json({ 
+          error: "Cannot delete plan with active subscriptions",
+          activeSubscriptions: subscriptionCount.count
+        });
+      }
+
+      // Delete the plan
+      await db.delete(plans).where(eq(plans.id, id));
+      
+      res.json({ message: "Plan deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting plan:", error);
+      res.status(500).json({ error: "Failed to delete plan" });
     }
   });
 
