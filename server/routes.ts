@@ -67,6 +67,19 @@ const exportRequestSchema = z.object({
   format: z.enum(['powerpoint', 'pdf', 'canva'])
 });
 
+// Support Session Management Validation Schemas
+const createSupportSessionSchema = z.object({
+  organizationId: z.string().uuid("Organization ID must be a valid UUID"),
+  sessionType: z.enum(["read_only", "support_mode"]).default("read_only"),
+  reason: z.string().min(10, "Reason must be at least 10 characters").max(500, "Reason must not exceed 500 characters"),
+  duration: z.number().min(15, "Duration must be at least 15 minutes").max(480, "Duration must not exceed 8 hours (480 minutes)").default(60),
+  accessScopes: z.record(z.boolean()).optional(), // Record of boolean flags for access scopes
+});
+
+const toggleSupportModeSchema = z.object({
+  supportMode: z.boolean(),
+});
+
 // GPT Content Generation schema
 const generateGroupEmailContentSchema = z.object({
   projectName: z.string().min(1, "Project name is required"),
@@ -2531,38 +2544,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/super-admin/support/session - Start support session
   app.post("/api/super-admin/support/session", requireSuperAdminAuth, async (req: any, res: Response) => {
     try {
-      const { organizationId, sessionType, reason, accessScopes, duration } = req.body;
-      
-      // Basic validation
-      if (!organizationId || !sessionType || !reason) {
-        return res.status(400).json({ error: "Missing required fields: organizationId, sessionType, reason" });
+      // SECURITY: Validate request body with Zod schema
+      const validation = createSupportSessionSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid support session data", 
+          details: validation.error.flatten() 
+        });
       }
 
-      if (reason.length < 10) {
-        return res.status(400).json({ error: "Reason must be at least 10 characters long" });
-      }
-
+      const { organizationId, sessionType, reason, duration, accessScopes } = validation.data;
       const superAdminUserId = req.superAdminUser.id;
       
-      // Create support session
+      // SECURITY: Verify organization exists before creating session
+      try {
+        const organization = await storage.getOrganization(organizationId);
+        if (!organization) {
+          return res.status(404).json({ error: "Organization not found" });
+        }
+      } catch (error) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Create session with proper expiry calculation
+      const expiresAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
+      
       const session = await storage.createSupportSession({
+        superAdminUserId,
         organizationId,
         sessionType,
         reason,
-        accessScopes,
-        duration,
-        superAdminUserId,
+        expiresAt,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
       });
 
       // Create audit log for session start
       await storage.createSupportAuditLog({
         sessionId: session.id,
-        action: "session_started",
-        details: `Started ${sessionType} session. Reason: ${reason}`,
+        superAdminUserId,
         organizationId,
+        action: "session_started",
+        description: `Started ${sessionType} session. Reason: ${reason}`,
+        details: { duration, accessScopes },
+        accessLevel: "admin",
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
       });
 
-      console.log(`Support session started by ${req.superAdminUser.username} for organization ${organizationId}`);
+      console.log(`Support session started by ${req.superAdminUser.username} for organization ${organizationId} (${duration} minutes)`);
       
       res.json(session);
     } catch (error) {
@@ -2629,20 +2659,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/super-admin/support/session/:sessionId/toggle-mode", requireSuperAdminAuth, async (req: any, res: Response) => {
     try {
       const { sessionId } = req.params;
-      const { supportMode } = req.body;
       
       if (!sessionId) {
         return res.status(400).json({ error: "Session ID is required" });
       }
 
-      if (typeof supportMode !== 'boolean') {
-        return res.status(400).json({ error: "Support mode must be a boolean value" });
+      // SECURITY: Validate request body with Zod schema
+      const validation = toggleSupportModeSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid toggle support mode data", 
+          details: validation.error.flatten() 
+        });
       }
+
+      const { supportMode } = validation.data;
 
       // SECURITY: Verify session ownership before allowing any operations
       const sessionData = await storage.getCurrentSupportSession(req.superAdminUser.id);
       if (!sessionData || sessionData.id !== sessionId) {
         return res.status(403).json({ error: "Unauthorized: You can only toggle your own sessions" });
+      }
+
+      // SECURITY: Check if session has expired
+      if (new Date() > new Date(sessionData.expiresAt)) {
+        return res.status(410).json({ error: "Session has expired" });
       }
 
       const session = await storage.toggleSupportMode(sessionId, supportMode);
@@ -2654,12 +2695,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use organizationId from verified session data
       const organizationId = sessionData.organizationId;
       
-      // Create audit log for mode toggle
+      // Create audit log for mode toggle with proper schema format
       await storage.createSupportAuditLog({
         sessionId,
-        action: "support_mode_toggled",
-        details: `Support mode ${supportMode ? 'enabled' : 'disabled'}`,
+        superAdminUserId: req.superAdminUser.id,
         organizationId,
+        action: "support_mode_toggled",
+        description: `Support mode ${supportMode ? 'enabled' : 'disabled'} by super admin`,
+        details: { supportMode, sessionType: session.sessionType },
+        accessLevel: "admin",
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
       });
 
       console.log(`Support mode ${supportMode ? 'enabled' : 'disabled'} for session ${sessionId} by ${req.superAdminUser.username}`);
