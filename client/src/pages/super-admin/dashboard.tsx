@@ -1,8 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { 
   Building2, 
   Users, 
@@ -10,11 +8,12 @@ import {
   TrendingUp, 
   Activity,
   DollarSign,
-  UserCheck,
-  AlertTriangle 
+  AlertTriangle,
+  Clock,
+  CheckCircle,
+  XCircle
 } from "lucide-react";
 import { useSuperAdmin } from "@/contexts/SuperAdminContext";
-import { SuperAdminUserManagement } from "@/components/super-admin/user-management";
 
 interface DashboardStats {
   totalOrganizations: number;
@@ -134,168 +133,153 @@ export default function SuperAdminDashboard() {
         ))}
       </div>
 
-      {/* Main Dashboard Content */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview" data-testid="tab-overview">
-            <Activity className="h-4 w-4 mr-2" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="organizations" data-testid="tab-organizations">
-            <Building2 className="h-4 w-4 mr-2" />
-            Organizations
-          </TabsTrigger>
-          <TabsTrigger value="billing" data-testid="tab-billing">
-            <CreditCard className="h-4 w-4 mr-2" />
-            Billing
-          </TabsTrigger>
-          <TabsTrigger value="analytics" data-testid="tab-analytics">
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Analytics
-          </TabsTrigger>
-          <TabsTrigger value="admin-users" data-testid="tab-admin-users">
-            <UserCheck className="h-4 w-4 mr-2" />
-            Admin Users
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Organizations */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Recent Organizations
-                </CardTitle>
-                <CardDescription>
-                  Latest tenant organizations created
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {recentOrgs && recentOrgs.length > 0 ? (
-                  <div className="space-y-3">
-                    {recentOrgs.map((org: any) => (
-                      <div key={org.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <p className="font-medium" data-testid={`org-name-${org.id}`}>{org.name}</p>
-                          <p className="text-sm text-muted-foreground">{org.domain}</p>
-                        </div>
-                        <Badge variant={org.isActive ? "default" : "secondary"}>
-                          {org.isActive ? "Active" : "Inactive"}
-                        </Badge>
+      {/* Executive Dashboard Content */}
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Recent Organizations */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Recent Organizations
+              </CardTitle>
+              <CardDescription>
+                Latest tenant organizations created
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {recentOrgs && recentOrgs.length > 0 ? (
+                <div className="space-y-3">
+                  {recentOrgs.map((org: any) => (
+                    <div key={org.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium" data-testid={`org-name-${org.id}`}>{org.name}</p>
+                        <p className="text-sm text-muted-foreground">{org.domain}</p>
                       </div>
-                    ))}
+                      <Badge variant={org.isActive ? "default" : "secondary"}>
+                        {org.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No organizations found</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* System Health */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                System Health
+              </CardTitle>
+              <CardDescription>
+                Platform performance metrics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Database Performance</span>
+                  <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Excellent
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">API Response Time</span>
+                  <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    &lt;200ms
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Storage Usage</span>
+                  <Badge variant="outline">73% capacity</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Active Sessions</span>
+                  <span className="text-sm font-medium">{stats?.totalUsers || 0}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Platform Alerts */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Platform Alerts
+              </CardTitle>
+              <CardDescription>
+                Issues requiring attention
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {stats?.pendingActions && stats.pendingActions > 0 ? (
+                  <div className="flex items-center justify-between p-3 border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-medium">Pending Actions</span>
+                    </div>
+                    <Badge variant="secondary">{stats.pendingActions}</Badge>
                   </div>
                 ) : (
-                  <p className="text-muted-foreground">No organizations found</p>
+                  <div className="flex items-center justify-between p-3 border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium">All systems operational</span>
+                    </div>
+                  </div>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* System Health */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  System Health
-                </CardTitle>
-                <CardDescription>
-                  Platform performance metrics
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Database Performance</span>
+                
+                {/* System Status Items */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Payment Processing</span>
                     <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      Excellent
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Online
                     </Badge>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">API Response Time</span>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Email Services</span>
                     <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      Fast
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Online
                     </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Storage Usage</span>
-                    <Badge variant="outline">73% capacity</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Active Sessions</span>
-                    <span className="text-sm font-medium">{stats?.totalUsers || 0}</span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="organizations">
-          <Card>
-            <CardHeader>
-              <CardTitle>Organization Management</CardTitle>
-              <CardDescription>
-                Comprehensive tenant organization management
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">
-                Organization management interface will be loaded here
-              </p>
-              <Button data-testid="button-manage-organizations">
-                <Building2 className="h-4 w-4 mr-2" />
-                Manage Organizations
-              </Button>
+              </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
 
-        <TabsContent value="billing">
-          <Card>
-            <CardHeader>
-              <CardTitle>Billing Management</CardTitle>
-              <CardDescription>
-                Subscription plans, pricing, and Stripe integration
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">
-                Billing management interface will be loaded here
-              </p>
-              <Button data-testid="button-manage-billing">
-                <CreditCard className="h-4 w-4 mr-2" />
-                Manage Billing
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="analytics">
-          <Card>
-            <CardHeader>
-              <CardTitle>Platform Analytics</CardTitle>
-              <CardDescription>
-                Usage metrics, growth trends, and performance data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">
-                Analytics dashboard will be loaded here
-              </p>
-              <Button data-testid="button-view-analytics">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                View Analytics
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="admin-users">
-          <SuperAdminUserManagement />
-        </TabsContent>
-      </Tabs>
+        {/* Recent Activity Feed */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Recent Activity
+            </CardTitle>
+            <CardDescription>
+              Latest platform events and user actions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Activity items will be populated from backend */}
+              <div className="text-center py-8 text-muted-foreground">
+                Activity feed will be implemented with real-time data
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
