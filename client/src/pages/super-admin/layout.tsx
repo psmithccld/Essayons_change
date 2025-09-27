@@ -15,7 +15,8 @@ import {
   Crown,
   UserCheck,
   TrendingUp,
-  Package
+  Package,
+  HelpCircle
 } from "lucide-react";
 import { useSuperAdmin } from "@/contexts/SuperAdminContext";
 import { useToast } from "@/hooks/use-toast";
@@ -60,6 +61,11 @@ const navigation = [
     name: "System Settings",
     href: "/super-admin/settings",
     icon: Settings,
+  },
+  {
+    name: "Customer Support",
+    href: "/super-admin/customer-support",
+    icon: HelpCircle,
   },
 ];
 

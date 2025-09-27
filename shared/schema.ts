@@ -2242,6 +2242,72 @@ export const analyticsRangeSchema = z.object({
   range: z.enum(['1d', '7d', '30d', '90d']).default('7d'),
 });
 
+// Support Session Management - tracks when super admins are impersonating organizations
+export const supportSessions = pgTable("support_sessions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  superAdminUserId: uuid("super_admin_user_id").references(() => superAdminUsers.id, { onDelete: "cascade" }).notNull(),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  sessionType: text("session_type").notNull().default("read_only"), // read_only, support_mode
+  isActive: boolean("is_active").notNull().default(true),
+  reason: text("reason"), // Why this session was created (ticket number, escalation reason, etc.)
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  endedAt: timestamp("ended_at"),
+  expiresAt: timestamp("expires_at").notNull(), // Auto-expire sessions for security
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  superAdminIdx: index("support_sessions_super_admin_idx").on(table.superAdminUserId),
+  organizationIdx: index("support_sessions_organization_idx").on(table.organizationId),
+  activeSessionsIdx: index("support_sessions_active_idx").on(table.isActive, table.organizationId),
+  expiryIdx: index("support_sessions_expiry_idx").on(table.expiresAt),
+}));
+
+// Support Audit Logs - comprehensive logging of all support actions
+export const supportAuditLogs = pgTable("support_audit_logs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: uuid("session_id").references(() => supportSessions.id, { onDelete: "cascade" }),
+  superAdminUserId: uuid("super_admin_user_id").references(() => superAdminUsers.id, { onDelete: "cascade" }).notNull(),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  action: text("action").notNull(), // page_view, data_access, setting_change, user_action, etc.
+  resource: text("resource"), // The specific resource accessed (users, projects, settings, etc.)
+  resourceId: text("resource_id"), // ID of the specific resource if applicable
+  description: text("description").notNull(), // Human readable description of what happened
+  details: jsonb("details"), // Additional structured data about the action
+  accessLevel: text("access_level").notNull().default("read"), // read, write, admin
+  isCustomerVisible: boolean("is_customer_visible").notNull().default(true), // Whether customer can see this log entry
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  sessionIdx: index("support_audit_logs_session_idx").on(table.sessionId),
+  superAdminIdx: index("support_audit_logs_super_admin_idx").on(table.superAdminUserId),
+  organizationIdx: index("support_audit_logs_organization_idx").on(table.organizationId),
+  customerVisibleIdx: index("support_audit_logs_customer_visible_idx").on(table.isCustomerVisible, table.organizationId),
+  createdAtIdx: index("support_audit_logs_created_at_idx").on(table.createdAt),
+}));
+
+// Support system types
+export type SupportSession = typeof supportSessions.$inferSelect;
+export type SupportAuditLog = typeof supportAuditLogs.$inferSelect;
+
+// Support session insert schemas with Zod validation
+export const insertSupportSessionSchema = createInsertSchema(supportSessions, {
+  expiresAt: z.string().datetime(), // ISO datetime string
+  reason: z.string().min(10).max(500).optional(),
+  sessionType: z.enum(["read_only", "support_mode"]).default("read_only"),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+
+export const insertSupportAuditLogSchema = createInsertSchema(supportAuditLogs, {
+  description: z.string().min(5).max(1000),
+  action: z.string().min(2).max(100),
+  accessLevel: z.enum(["read", "write", "admin"]).default("read"),
+}).omit({ id: true, createdAt: true });
+
+export type InsertSupportSession = z.infer<typeof insertSupportSessionSchema>;
+export type InsertSupportAuditLog = z.infer<typeof insertSupportAuditLogSchema>;
+
 export type SystemSettingsUpdate = z.infer<typeof systemSettingsUpdateSchema>;
 export type MaintenanceToggle = z.infer<typeof maintenanceToggleSchema>;
 export type AnalyticsRange = z.infer<typeof analyticsRangeSchema>;
