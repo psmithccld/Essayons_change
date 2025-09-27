@@ -935,6 +935,20 @@ export interface IStorage {
   // Escalation workflows
   escalateConversationToTicket(conversationId: string, ticketData: InsertSupportTicket, organizationId: string): Promise<{ conversation: SupportConversation; ticket: SupportTicket; }>;
   
+  // ===============================================
+  // CUSTOMER SUPPORT SESSIONS - Super Admin impersonation and audit logging
+  // ===============================================
+  
+  // Support Session Management
+  createSupportSession(data: { organizationId: string; sessionType: string; reason: string; accessScopes?: any; duration?: number; superAdminUserId: string; }): Promise<any>;
+  getCurrentSupportSession(superAdminUserId: string): Promise<any>;
+  endSupportSession(sessionId: string): Promise<boolean>;
+  toggleSupportMode(sessionId: string, supportMode: boolean): Promise<any>;
+  
+  // Support Audit Logs
+  getSupportAuditLogs(organizationId?: string, sessionId?: string): Promise<any[]>;
+  createSupportAuditLog(data: { sessionId: string; action: string; details?: string; targetResource?: string; organizationId: string; }): Promise<any>;
+  
   // Analytics and insights for helpdesk improvement
   getHelpdeskAnalytics(organizationId: string, timeRange?: { from: Date; to: Date }): Promise<{
     totalConversations: number;
@@ -949,6 +963,10 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // In-memory storage for support sessions and audit logs per development guidelines
+  private supportSessions: Map<string, any> = new Map();
+  private supportAuditLogs: any[] = [];
+
   // Roles
   async getRoles(): Promise<Role[]> {
     return await db.select().from(roles).orderBy(roles.name);
@@ -5886,6 +5904,117 @@ export class DatabaseStorage implements IStorage {
         eq(supportConversations.organizationId, organizationId)
       ));
     return conversation;
+  }
+
+  // ===============================================
+  // CUSTOMER SUPPORT SESSIONS - Super Admin impersonation and audit logging
+  // ===============================================
+  
+  async createSupportSession(data: { organizationId: string; sessionType: string; reason: string; accessScopes?: any; duration?: number; superAdminUserId: string; }): Promise<any> {
+    const sessionId = crypto.randomUUID();
+    const expiresAt = data.duration ? new Date(Date.now() + data.duration * 60 * 1000) : new Date(Date.now() + 60 * 60 * 1000); // Default 1 hour
+    
+    // End any existing active session for this super admin user
+    for (const [id, session] of this.supportSessions.entries()) {
+      if (session.superAdminUserId === data.superAdminUserId && session.isActive) {
+        session.isActive = false;
+        session.endedAt = new Date();
+        this.supportSessions.set(id, session);
+      }
+    }
+    
+    const sessionData = {
+      id: sessionId,
+      organizationId: data.organizationId,
+      superAdminUserId: data.superAdminUserId,
+      sessionType: data.sessionType,
+      isActive: true,
+      supportMode: false,
+      reason: data.reason,
+      accessScopes: data.accessScopes,
+      expiresAt,
+      startedAt: new Date(),
+    };
+
+    // Store in-memory per development guidelines
+    this.supportSessions.set(sessionId, sessionData);
+    return sessionData;
+  }
+
+  async getCurrentSupportSession(superAdminUserId: string): Promise<any> {
+    // Find active session for the super admin user
+    for (const session of this.supportSessions.values()) {
+      if (session.superAdminUserId === superAdminUserId && session.isActive) {
+        // Check if session has expired
+        if (session.expiresAt && new Date() > session.expiresAt) {
+          session.isActive = false;
+          session.endedAt = new Date();
+          this.supportSessions.set(session.id, session);
+          return null;
+        }
+        return session;
+      }
+    }
+    return null;
+  }
+
+  async endSupportSession(sessionId: string): Promise<boolean> {
+    const session = this.supportSessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+    
+    session.isActive = false;
+    session.endedAt = new Date();
+    this.supportSessions.set(sessionId, session);
+    return true;
+  }
+
+  async toggleSupportMode(sessionId: string, supportMode: boolean): Promise<any> {
+    const session = this.supportSessions.get(sessionId);
+    if (!session) {
+      return null;
+    }
+    
+    session.supportMode = supportMode;
+    session.updatedAt = new Date();
+    this.supportSessions.set(sessionId, session);
+    return session;
+  }
+
+  async getSupportAuditLogs(organizationId?: string, sessionId?: string): Promise<any[]> {
+    let filteredLogs = this.supportAuditLogs;
+    
+    if (organizationId && sessionId) {
+      filteredLogs = filteredLogs.filter(log => 
+        log.organizationId === organizationId && log.sessionId === sessionId
+      );
+    } else if (organizationId) {
+      filteredLogs = filteredLogs.filter(log => log.organizationId === organizationId);
+    } else if (sessionId) {
+      filteredLogs = filteredLogs.filter(log => log.sessionId === sessionId);
+    }
+    
+    // Sort by createdAt descending (newest first)
+    return filteredLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async createSupportAuditLog(data: { sessionId: string; action: string; details?: string; targetResource?: string; organizationId: string; }): Promise<any> {
+    const logId = crypto.randomUUID();
+    
+    const logData = {
+      id: logId,
+      sessionId: data.sessionId,
+      action: data.action,
+      details: data.details,
+      targetResource: data.targetResource,
+      organizationId: data.organizationId,
+      createdAt: new Date(),
+    };
+    
+    // Store in-memory per development guidelines
+    this.supportAuditLogs.push(logData);
+    return logData;
   }
 
   async createSupportConversation(conversation: InsertSupportConversation, organizationId: string): Promise<SupportConversation> {

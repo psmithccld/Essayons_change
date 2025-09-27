@@ -106,7 +106,7 @@ export default function SuperAdminCustomerSupport() {
 
   // Start support session mutation
   const startSessionMutation = useMutation({
-    mutationFn: async (data: { organizationId: string; sessionType: string; reason?: string }) => {
+    mutationFn: async (data: { organizationId: string; sessionType: string; reason: string; accessScopes?: any; duration?: number }) => {
       return apiRequest("POST", "/api/super-admin/support/session", data);
     },
     onSuccess: (data) => {
@@ -144,12 +144,13 @@ export default function SuperAdminCustomerSupport() {
   const session = (currentSession as SupportSession) || activeSession;
 
   const handleStartSession = (data: SessionCreationData) => {
-    // For now, pass only the properties expected by the current mutation interface
-    // TODO: Update backend to handle accessScopes and duration
+    // Now send all the properties including accessScopes and duration
     startSessionMutation.mutate({
       organizationId: data.organizationId,
       sessionType: "read_only",
       reason: data.reason,
+      accessScopes: data.accessScopes,
+      duration: data.duration,
     });
   };
 

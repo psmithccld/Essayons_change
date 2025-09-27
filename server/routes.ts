@@ -2524,6 +2524,170 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===============================================
+  // CUSTOMER SUPPORT SESSION MANAGEMENT - Super Admin impersonation and audit logging
+  // ===============================================
+
+  // POST /api/super-admin/support/session - Start support session
+  app.post("/api/super-admin/support/session", requireSuperAdminAuth, async (req: any, res: Response) => {
+    try {
+      const { organizationId, sessionType, reason, accessScopes, duration } = req.body;
+      
+      // Basic validation
+      if (!organizationId || !sessionType || !reason) {
+        return res.status(400).json({ error: "Missing required fields: organizationId, sessionType, reason" });
+      }
+
+      if (reason.length < 10) {
+        return res.status(400).json({ error: "Reason must be at least 10 characters long" });
+      }
+
+      const superAdminUserId = req.superAdminUser.id;
+      
+      // Create support session
+      const session = await storage.createSupportSession({
+        organizationId,
+        sessionType,
+        reason,
+        accessScopes,
+        duration,
+        superAdminUserId,
+      });
+
+      // Create audit log for session start
+      await storage.createSupportAuditLog({
+        sessionId: session.id,
+        action: "session_started",
+        details: `Started ${sessionType} session. Reason: ${reason}`,
+        organizationId,
+      });
+
+      console.log(`Support session started by ${req.superAdminUser.username} for organization ${organizationId}`);
+      
+      res.json(session);
+    } catch (error) {
+      console.error("Error starting support session:", error);
+      res.status(500).json({ error: "Failed to start support session" });
+    }
+  });
+
+  // GET /api/super-admin/support/session - Get current support session
+  app.get("/api/super-admin/support/session", requireSuperAdminAuth, async (req: any, res: Response) => {
+    try {
+      const superAdminUserId = req.superAdminUser.id;
+      const session = await storage.getCurrentSupportSession(superAdminUserId);
+      
+      res.json(session);
+    } catch (error) {
+      console.error("Error fetching support session:", error);
+      res.status(500).json({ error: "Failed to fetch support session" });
+    }
+  });
+
+  // PATCH /api/super-admin/support/session/:sessionId/end - End support session
+  app.patch("/api/super-admin/support/session/:sessionId/end", requireSuperAdminAuth, async (req: any, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: "Session ID is required" });
+      }
+
+      // SECURITY: Verify session ownership before allowing any operations
+      const sessionToEnd = await storage.getCurrentSupportSession(req.superAdminUser.id);
+      if (!sessionToEnd || sessionToEnd.id !== sessionId) {
+        return res.status(403).json({ error: "Unauthorized: You can only end your own sessions" });
+      }
+
+      // Get organizationId before ending session to avoid corruption
+      const organizationId = sessionToEnd.organizationId;
+
+      const success = await storage.endSupportSession(sessionId);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Support session not found" });
+      }
+      
+      // Create audit log for session end with correct organizationId
+      await storage.createSupportAuditLog({
+        sessionId,
+        action: "session_ended",
+        details: `Session ended by super admin`,
+        organizationId,
+      });
+
+      console.log(`Support session ${sessionId} ended by ${req.superAdminUser.username}`);
+      
+      res.json({ success: true, message: "Support session ended successfully" });
+    } catch (error) {
+      console.error("Error ending support session:", error);
+      res.status(500).json({ error: "Failed to end support session" });
+    }
+  });
+
+  // PATCH /api/super-admin/support/session/:sessionId/toggle-mode - Toggle support mode
+  app.patch("/api/super-admin/support/session/:sessionId/toggle-mode", requireSuperAdminAuth, async (req: any, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+      const { supportMode } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: "Session ID is required" });
+      }
+
+      if (typeof supportMode !== 'boolean') {
+        return res.status(400).json({ error: "Support mode must be a boolean value" });
+      }
+
+      // SECURITY: Verify session ownership before allowing any operations
+      const sessionData = await storage.getCurrentSupportSession(req.superAdminUser.id);
+      if (!sessionData || sessionData.id !== sessionId) {
+        return res.status(403).json({ error: "Unauthorized: You can only toggle your own sessions" });
+      }
+
+      const session = await storage.toggleSupportMode(sessionId, supportMode);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Support session not found" });
+      }
+      
+      // Use organizationId from verified session data
+      const organizationId = sessionData.organizationId;
+      
+      // Create audit log for mode toggle
+      await storage.createSupportAuditLog({
+        sessionId,
+        action: "support_mode_toggled",
+        details: `Support mode ${supportMode ? 'enabled' : 'disabled'}`,
+        organizationId,
+      });
+
+      console.log(`Support mode ${supportMode ? 'enabled' : 'disabled'} for session ${sessionId} by ${req.superAdminUser.username}`);
+      
+      res.json(session);
+    } catch (error) {
+      console.error("Error toggling support mode:", error);
+      res.status(500).json({ error: "Failed to toggle support mode" });
+    }
+  });
+
+  // GET /api/super-admin/support/audit-logs - Get support audit logs
+  app.get("/api/super-admin/support/audit-logs", requireSuperAdminAuth, async (req: any, res: Response) => {
+    try {
+      const { organizationId, sessionId } = req.query;
+      
+      const logs = await storage.getSupportAuditLogs(
+        organizationId as string, 
+        sessionId as string
+      );
+      
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching support audit logs:", error);
+      res.status(500).json({ error: "Failed to fetch support audit logs" });
+    }
+  });
+
   // RBAC: User permissions endpoint for frontend permission gating
   app.get("/api/users/me/permissions", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
