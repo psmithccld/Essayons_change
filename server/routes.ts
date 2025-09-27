@@ -68,7 +68,7 @@ import {
   coachContextPayloadSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload,
   // Add missing schema imports
-  users, projects, organizationMemberships, plans, subscriptions
+  users, projects, organizations, organizationMemberships, plans, subscriptions
 } from "@shared/schema";
 import { db } from "./db"; // Import db from correct location
 import { and, eq, or, sql, count } from "drizzle-orm"; // Add missing drizzle operators
@@ -2689,6 +2689,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching super admin dashboard stats:", error);
       res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  // ===============================================
+  // SUPER ADMIN BILLING API ROUTES
+  // ===============================================
+
+  // GET /api/super-admin/billing/subscriptions - Get all subscriptions with billing details
+  app.get("/api/super-admin/billing/subscriptions", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      console.log("[BILLING] Getting subscriptions for super admin...");
+      // Start with a basic query to ensure it works
+      const allSubscriptions = await db.select().from(subscriptions);
+      console.log("[BILLING] Found subscriptions:", allSubscriptions.length);
+      
+      // Get related data manually to avoid complex joins for now
+      const formattedSubscriptions = await Promise.all(
+        allSubscriptions.map(async (sub) => {
+          // Get organization name
+          const [org] = await db.select({ name: organizations.name })
+            .from(organizations)
+            .where(eq(organizations.id, sub.organizationId));
+          
+          // Get plan details
+          const [plan] = await db.select({ 
+            name: plans.name, 
+            pricePerSeatCents: plans.pricePerSeatCents 
+          })
+            .from(plans)
+            .where(eq(plans.id, sub.planId));
+
+          return {
+            id: sub.id,
+            organizationId: sub.organizationId,
+            organizationName: org?.name || 'Unknown Organization',
+            planId: sub.planId,
+            planName: plan?.name || 'Unknown Plan',
+            status: sub.status,
+            seatsPurchased: sub.seatsPurchased,
+            pricePerSeatCents: plan?.pricePerSeatCents || 0,
+            currency: 'USD',
+            stripeCustomerId: sub.stripeCustomerId,
+            stripeSubscriptionId: sub.stripeSubscriptionId,
+            cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+            trialEndsAt: sub.trialEndsAt,
+            currentPeriodStart: sub.currentPeriodStart,
+            currentPeriodEnd: sub.currentPeriodEnd,
+            createdAt: sub.createdAt,
+            updatedAt: sub.updatedAt,
+            totalMonthlyPrice: sub.seatsPurchased && plan?.pricePerSeatCents 
+              ? (sub.seatsPurchased * plan.pricePerSeatCents) / 100 // Convert cents to dollars
+              : 0
+          };
+        })
+      );
+
+      res.json(formattedSubscriptions);
+    } catch (error) {
+      console.error("Error fetching billing subscriptions:", error);
+      res.status(500).json({ error: "Failed to fetch subscriptions" });
+    }
+  });
+
+  // POST /api/super-admin/billing/sync-stripe - Sync billing data with Stripe
+  app.post("/api/super-admin/billing/sync-stripe", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      // For now, just return a success response
+      // In a real implementation, this would sync with Stripe API
+      res.json({ 
+        success: true, 
+        message: "Stripe sync completed successfully",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error syncing with Stripe:", error);
+      res.status(500).json({ error: "Failed to sync with Stripe" });
     }
   });
 

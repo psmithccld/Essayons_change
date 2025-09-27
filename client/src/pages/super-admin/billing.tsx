@@ -92,9 +92,7 @@ export default function SuperAdminBilling() {
     queryKey: ["/api/super-admin/billing/stats"],
     queryFn: async () => {
       const response = await fetch("/api/super-admin/billing/stats", {
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include' // Use cookies for authentication
       });
       if (!response.ok) throw new Error("Failed to fetch billing stats");
       return response.json() as Promise<BillingStats>;
@@ -107,9 +105,7 @@ export default function SuperAdminBilling() {
     queryKey: ["/api/super-admin/billing/subscriptions"],
     queryFn: async () => {
       const response = await fetch("/api/super-admin/billing/subscriptions", {
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include' // Use cookies for authentication
       });
       if (!response.ok) throw new Error("Failed to fetch subscriptions");
       return response.json() as Promise<Subscription[]>;
@@ -122,9 +118,7 @@ export default function SuperAdminBilling() {
     queryKey: ["/api/super-admin/billing/invoices"],
     queryFn: async () => {
       const response = await fetch("/api/super-admin/billing/invoices", {
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include' // Use cookies for authentication
       });
       if (!response.ok) throw new Error("Failed to fetch invoices");
       return response.json() as Promise<Invoice[]>;
@@ -137,9 +131,7 @@ export default function SuperAdminBilling() {
     mutationFn: async () => {
       const response = await fetch("/api/super-admin/billing/sync-stripe", {
         method: "POST",
-        headers: {
-          "x-super-admin-session": sessionId!,
-        },
+        credentials: 'include' // Use cookies for authentication
       });
       if (!response.ok) {
         const error = await response.json();
@@ -148,7 +140,10 @@ export default function SuperAdminBilling() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/billing"] });
+      // Invalidate all billing-related queries
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/billing/subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/billing/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/billing/invoices"] });
       toast({
         title: "Success",
         description: "Billing data synced with Stripe successfully",
@@ -169,9 +164,9 @@ export default function SuperAdminBilling() {
       const response = await fetch(`/api/super-admin/billing/subscriptions/${subscriptionId}/cancel`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "x-super-admin-session": sessionId!,
+          "Content-Type": "application/json"
         },
+        credentials: 'include', // Use cookies for authentication
         body: JSON.stringify({ immediate }),
       });
       if (!response.ok) {
