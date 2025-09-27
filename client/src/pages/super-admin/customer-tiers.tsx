@@ -744,7 +744,146 @@ export default function SuperAdminCustomerTiers() {
           {selectedPlan && (
             <Form {...editForm}>
               <form onSubmit={editForm.handleSubmit((data) => updatePlanMutation.mutate({ id: selectedPlan.id, data }))} className="space-y-4">
-                {/* Similar form structure as create form, but populated with existing data */}
+                <Tabs defaultValue="basic" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="basic">Basic Details</TabsTrigger>
+                    <TabsTrigger value="features">Features</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="basic" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={editForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Plan Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="input-edit-name" placeholder="e.g. Basic, Pro, Enterprise" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="isActive"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Active Plan</FormLabel>
+                              <div className="text-sm text-muted-foreground">
+                                Available for new subscriptions
+                              </div>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-edit-active"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <FormField
+                      control={editForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} data-testid="textarea-edit-description" placeholder="Brief description of this plan..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={editForm.control}
+                        name="seatLimit"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Seat Limit</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="1"
+                                onChange={e => field.onChange(Number(e.target.value))}
+                                data-testid="input-edit-seat-limit"
+                                placeholder="e.g. 10"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="pricePerSeatCents"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Price Per Seat (cents)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="0"
+                                onChange={e => field.onChange(Number(e.target.value))}
+                                data-testid="input-edit-price-per-seat-cents"
+                                placeholder="e.g. 2500 = $25.00"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="features" className="space-y-4">
+                    {/* Boolean Features */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {Object.entries(FEATURE_DEFINITIONS).map(([key, feature]) => {
+                        if (feature.type === "boolean") {
+                          return (
+                            <FormField
+                              key={key}
+                              control={editForm.control}
+                              name={`features.${key}` as any}
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                  <div className="space-y-0.5">
+                                    <FormLabel className="text-base">{feature.name}</FormLabel>
+                                    <div className="text-sm text-muted-foreground">
+                                      {feature.description}
+                                    </div>
+                                  </div>
+                                  <FormControl>
+                                    <Switch
+                                      checked={field.value}
+                                      onCheckedChange={field.onChange}
+                                      data-testid={`switch-edit-${key}`}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                     Cancel
