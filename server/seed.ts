@@ -92,6 +92,7 @@ export async function seedDatabase() {
       
       await db.insert(users).values({
         username: 'admin',
+        email: 'admin@platform.local',
         passwordHash: hashedPassword,
         name: 'System Administrator',
         roleId: adminRole.id,
