@@ -81,6 +81,23 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Add health check endpoint early to handle requests during startup
+  app.get('/', (req, res) => {
+    res.status(200).json({ 
+      status: 'ok', 
+      message: 'Application is running',
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  app.get('/health', (req, res) => {
+    res.status(200).json({ 
+      status: 'healthy', 
+      message: 'Health check passed',
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Seed the database on startup
   try {
     await seedDatabase();
