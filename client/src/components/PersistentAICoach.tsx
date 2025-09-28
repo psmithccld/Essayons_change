@@ -190,7 +190,7 @@ export default function PersistentAICoach() {
   return (
     <>
       {/* Fixed Bottom Chat Input */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-10">
+      <div className="fixed bottom-0 left-0 md:left-64 right-0 bg-background border-t p-4 z-10">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center space-x-4">
             <div className="flex-1 flex items-center space-x-2">
