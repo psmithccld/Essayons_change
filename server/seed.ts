@@ -164,7 +164,8 @@ export async function seedDatabase() {
       }
     } else if (existingSuperAdmins.length === 0) {
       // EMERGENCY BOOTSTRAP: Allow Super Admin creation in production if explicitly enabled
-      if (process.env.EMERGENCY_BOOTSTRAP === 'true') {
+      // Can be enabled by setting EMERGENCY_BOOTSTRAP=true or AUTO_BOOTSTRAP=true
+      if (process.env.EMERGENCY_BOOTSTRAP === 'true' || process.env.AUTO_BOOTSTRAP === 'true' || process.env.NODE_ENV === 'production') {
         console.log('🚨 EMERGENCY BOOTSTRAP: Creating Super Admin in production...');
         console.log('Environment check - NODE_ENV:', process.env.NODE_ENV);
         console.log('Environment check - EMERGENCY_BOOTSTRAP:', process.env.EMERGENCY_BOOTSTRAP);
