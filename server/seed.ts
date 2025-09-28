@@ -151,7 +151,33 @@ export async function seedDatabase() {
         console.log('⚠️ Super Admin functionality may be limited');
       }
     } else if (existingSuperAdmins.length === 0) {
-      console.log('⚠️ No Super Admin users found - use proper onboarding flow to create first super admin');
+      // EMERGENCY BOOTSTRAP: Allow Super Admin creation in production if explicitly enabled
+      if (process.env.EMERGENCY_BOOTSTRAP === 'true') {
+        console.log('🚨 EMERGENCY BOOTSTRAP: Creating Super Admin in production...');
+        
+        try {
+          const emergencyPassword = process.env.EMERGENCY_ADMIN_PASSWORD || 'TempAdmin2024!';
+          const hashedEmergencyPassword = await bcrypt.hash(emergencyPassword, SALT_ROUNDS);
+          
+          await db.insert(superAdminUsers).values({
+            username: 'bootstrap-admin',
+            email: 'admin@emergency.bootstrap',
+            passwordHash: hashedEmergencyPassword,
+            name: 'Emergency Bootstrap Admin',
+            role: 'super_admin',
+            isActive: true,
+          });
+          
+          console.log('✅ Emergency Super Admin created for production access');
+          console.log('   Username: bootstrap-admin');
+          console.log('   Password: Set via EMERGENCY_ADMIN_PASSWORD or default');
+          console.log('   🔒 SECURITY: Remove EMERGENCY_BOOTSTRAP env var after login!');
+        } catch (emergencyError) {
+          console.error('❌ Emergency bootstrap failed:', emergencyError);
+        }
+      } else {
+        console.log('⚠️ No Super Admin users found - set EMERGENCY_BOOTSTRAP=true to create first admin');
+      }
     } else {
       console.log('Super Admin users already exist, skipping Super Admin creation.');
     }
