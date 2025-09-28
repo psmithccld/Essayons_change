@@ -103,17 +103,20 @@ const toggleSupportModeSchema = z.object({
 });
 
 // CRITICAL SECURITY: Cryptographic token system for secure impersonation binding
-const IMPERSONATION_SECRET = process.env.IMPERSONATION_SECRET || 
+const IMPERSONATION_SECRET_RAW = process.env.IMPERSONATION_SECRET || 
   (process.env.NODE_ENV === 'development' ? 
     'dev-fallback-32-char-hmac-secret-key-not-for-production-use-only' : 
     null);
 
-if (!IMPERSONATION_SECRET) {
+if (!IMPERSONATION_SECRET_RAW) {
   console.error('🚨 SECURITY ERROR: IMPERSONATION_SECRET environment variable is required for secure token validation');
   console.error('Generate a secure key: openssl rand -hex 32');
   console.error('Set it in production environment: IMPERSONATION_SECRET=your_generated_key');
   process.exit(1);
 }
+
+// Type assertion: after the null check above, we know this is never null
+const IMPERSONATION_SECRET: string = IMPERSONATION_SECRET_RAW;
 
 if (process.env.NODE_ENV === 'development' && !process.env.IMPERSONATION_SECRET) {
   console.warn('⚠️  DEVELOPMENT: Using fallback IMPERSONATION_SECRET. Set IMPERSONATION_SECRET env var for production!');
@@ -435,28 +438,28 @@ const cleanupRateLimitStores = (): void => {
   const maxAge = 24 * 60 * 60 * 1000; // 24 hours
   
   // Cleanup rate limit store
-  for (const [key, entry] of rateLimitStore.entries()) {
+  Array.from(rateLimitStore.entries()).forEach(([key, entry]) => {
     if (now > entry.resetTime || (now - entry.lastAttempt) > maxAge) {
       rateLimitStore.delete(key);
     }
-  }
+  });
   
   // SECURITY FIX: Cleanup login attempt store including expired lockouts
-  for (const [key, entry] of loginAttemptStore.entries()) {
+  Array.from(loginAttemptStore.entries()).forEach(([key, entry]) => {
     const isExpiredLockout = entry.lockoutUntil && now >= entry.lockoutUntil;
     const isOldEntry = (now - entry.lastFailedAttempt) > maxAge;
     
     if (isExpiredLockout || isOldEntry) {
       loginAttemptStore.delete(key);
     }
-  }
+  });
   
   // Cleanup suspicious IP store
-  for (const [key, entry] of suspiciousIpStore.entries()) {
+  Array.from(suspiciousIpStore.entries()).forEach(([key, entry]) => {
     if ((now - entry.lastReport) > maxAge) {
       suspiciousIpStore.delete(key);
     }
-  }
+  });
   
   // SECURITY: Log cleanup stats for monitoring
   console.log(`SECURITY: Cleanup completed - Rate limits: ${rateLimitStore.size}, Login attempts: ${loginAttemptStore.size}, Suspicious IPs: ${suspiciousIpStore.size}`);
