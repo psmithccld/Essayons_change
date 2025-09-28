@@ -1,7 +1,13 @@
 import bcrypt from 'bcrypt';
 import { db } from './db';
-import { roles, users, superAdminUsers, DEFAULT_PERMISSIONS } from '@shared/schema';
+import { roles, users, superAdminUsers, DEFAULT_PERMISSIONS, permissionsSchema } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+
+// Helper function to create complete permission objects
+function createPermissions(overrides: Partial<typeof permissionsSchema._type> = {}) {
+  const defaults = permissionsSchema.parse({});
+  return { ...defaults, ...overrides };
+}
 
 const SALT_ROUNDS = 12;
 
@@ -15,47 +21,63 @@ export async function seedDatabase() {
     if (existingRoles.length === 0) {
       console.log('Creating default roles...');
       
-      // Update existing roles with proper permissions structure
-      const roleUpdates = [
+      // Insert new roles since none exist - create complete permission objects
+      const roleData = [
         {
           name: 'Admin',
           description: 'Full system access with all permissions',
-          permissions: DEFAULT_PERMISSIONS.SUPER_ADMIN,
+          permissions: createPermissions(DEFAULT_PERMISSIONS.SUPER_ADMIN),
           isActive: true,
         },
         {
           name: 'Manager', 
           description: 'Can create and manage projects, view reports',
-          permissions: DEFAULT_PERMISSIONS.PROJECT_MANAGER,
+          permissions: createPermissions(DEFAULT_PERMISSIONS.PROJECT_MANAGER),
           isActive: true,
         },
         {
           name: 'User',
           description: 'Basic project access for team collaboration',
-          permissions: DEFAULT_PERMISSIONS.TEAM_MEMBER,
+          permissions: createPermissions(DEFAULT_PERMISSIONS.TEAM_MEMBER),
           isActive: true,
         },
       ];
 
-      for (const roleData of roleUpdates) {
-        await db.update(roles)
-          .set({
-            description: roleData.description,
-            permissions: roleData.permissions,
-            updatedAt: new Date(),
-          })
-          .where(eq(roles.name, roleData.name));
-        console.log(`✅ Updated role: ${roleData.name}`);
-      }
+      // Insert all roles at once for better performance and atomicity
+      await db.insert(roles).values(roleData);
+      console.log(`✅ Created ${roleData.length} roles: ${roleData.map(r => r.name).join(', ')}`);
     } else {
       console.log('Roles already exist, skipping role creation.');
     }
 
-    // Get the Admin role for default user creation (use existing Admin role)
-    const [adminRole] = await db.select().from(roles).where(eq(roles.name, 'Admin'));
+    // Get the Admin role for default user creation with defensive check
+    let [adminRole] = await db.select().from(roles).where(eq(roles.name, 'Admin'));
     
     if (!adminRole) {
-      throw new Error('Admin role not found - database may need proper seeding');
+      // Try to create the Admin role if it doesn't exist
+      console.log('⚠️ Admin role not found, attempting to create it...');
+      try {
+        await db.insert(roles).values({
+          name: 'Admin',
+          description: 'Full system access with all permissions',
+          permissions: createPermissions(DEFAULT_PERMISSIONS.SUPER_ADMIN),
+          isActive: true,
+        });
+        console.log('✅ Emergency Admin role created successfully');
+        
+        // Re-fetch the Admin role
+        const [newAdminRole] = await db.select().from(roles).where(eq(roles.name, 'Admin'));
+        if (!newAdminRole) {
+          console.error('❌ Failed to create or retrieve Admin role');
+          console.log('⚠️ Continuing with reduced functionality - some features may not work');
+          return; // Don't crash the app, just skip user creation
+        }
+        adminRole = newAdminRole;
+      } catch (createError) {
+        console.error('❌ Failed to create emergency Admin role:', createError);
+        console.log('⚠️ Continuing with reduced functionality - some features may not work');
+        return; // Don't crash the app
+      }
     }
 
     // Check if default admin user exists
@@ -119,8 +141,19 @@ export async function seedDatabase() {
     
   } catch (error) {
     console.error('❌ Error during database seeding:', error);
-    throw error;
+    console.log('⚠️ Database seeding failed, but application will continue with reduced functionality');
+    console.log('⚠️ Some features may not work properly until roles and users are properly set up');
+    
+    // Log the error but don't crash the application
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Full error details:', error);
+    }
+    
+    // Return instead of throwing to prevent app crash
+    return false;
   }
+  
+  return true;
 }
 
 // Migration function to handle existing users with text role field
