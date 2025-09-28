@@ -2450,3 +2450,35 @@ export const activitySchema = z.object({
 });
 
 export type Activity = z.infer<typeof activitySchema>;
+
+// System Health Monitoring Types
+export const systemHealthSchema = z.object({
+  status: z.enum(['healthy', 'warning', 'critical']),
+  responseTimeP50: z.number(),
+  responseTimeP95: z.number(),
+  dbLatencyMs: z.number(),
+  errorRate: z.number(),
+  cpuUsage: z.number(),
+  memoryUsage: z.number(),
+  uptime: z.number(),
+  lastUpdated: z.string()
+});
+
+export type SystemHealth = z.infer<typeof systemHealthSchema>;
+
+// Platform Alerts Types
+export const alertSchema = z.object({
+  id: z.string(),
+  type: z.enum(['payment_failed', 'inactive_org', 'license_overage', 'system_error', 'security']),
+  severity: z.enum(['low', 'medium', 'high', 'critical']),
+  title: z.string(),
+  message: z.string(),
+  organizationId: z.string().optional(),
+  organizationName: z.string().optional(),
+  acknowledged: z.boolean(),
+  resolvedAt: z.string().optional(),
+  createdAt: z.string(),
+  metadata: z.record(z.unknown()).optional()
+});
+
+export type Alert = z.infer<typeof alertSchema>;

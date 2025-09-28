@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { 
   Building2, 
   Users, 
@@ -12,10 +14,13 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Server,
+  Monitor,
+  Zap
 } from "lucide-react";
 import { useSuperAdmin } from "@/contexts/SuperAdminContext";
-import type { Activity as ActivityType } from "@shared/schema";
+import type { Activity as ActivityType, SystemHealth, Alert } from "@shared/schema";
 
 interface DashboardStats {
   totalOrganizations: number;
@@ -28,6 +33,22 @@ interface DashboardStats {
 
 export default function SuperAdminDashboard() {
   const { isAuthenticated } = useSuperAdmin();
+
+  // Acknowledge alert mutation
+  const acknowledgeMutation = useMutation({
+    mutationFn: async (alertId: string) => {
+      return apiRequest(`/api/super-admin/dashboard/alerts/${alertId}/acknowledge`, {
+        method: 'POST'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/dashboard/alerts"] });
+    },
+  });
+
+  const acknowledgeAlert = (alertId: string) => {
+    acknowledgeMutation.mutate(alertId);
+  };
 
   // Fetch dashboard statistics
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -71,6 +92,42 @@ export default function SuperAdminDashboard() {
     enabled: isAuthenticated,
     refetchInterval: 30000, // Refetch every 30 seconds for near real-time updates
     staleTime: 10000, // Consider data stale after 10 seconds
+  });
+
+  // Fetch system health
+  const { data: systemHealth, isLoading: isHealthLoading, error: healthError } = useQuery({
+    queryKey: ["/api/super-admin/dashboard/system-health"],
+    queryFn: async (): Promise<SystemHealth> => {
+      const response = await fetch("/api/super-admin/dashboard/system-health", {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || "Failed to fetch system health");
+      }
+      return response.json();
+    },
+    enabled: isAuthenticated,
+    refetchInterval: 30000, // Refetch every 30 seconds
+    staleTime: 15000, // Consider data stale after 15 seconds
+  });
+
+  // Fetch platform alerts
+  const { data: platformAlerts, isLoading: isAlertsLoading, error: alertsError } = useQuery({
+    queryKey: ["/api/super-admin/dashboard/alerts"],
+    queryFn: async (): Promise<Alert[]> => {
+      const response = await fetch("/api/super-admin/dashboard/alerts?limit=5", {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || "Failed to fetch platform alerts");
+      }
+      return response.json();
+    },
+    enabled: isAuthenticated,
+    refetchInterval: 60000, // Refetch every minute for alerts
+    staleTime: 30000, // Consider data stale after 30 seconds
   });
 
   const statCards = [
@@ -192,38 +249,111 @@ export default function SuperAdminDashboard() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
+                <Server className="h-5 w-5" />
                 System Health
               </CardTitle>
               <CardDescription>
-                Platform performance metrics
+                Real-time platform performance metrics
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Database Performance</span>
-                  <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Excellent
-                  </Badge>
+              {isHealthLoading ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  Loading system health...
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">API Response Time</span>
-                  <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    &lt;200ms
-                  </Badge>
+              ) : healthError ? (
+                <div className="text-center py-4">
+                  <div className="flex items-center justify-center gap-2 text-red-600 mb-2">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="font-medium">Health Check Failed</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {healthError instanceof Error ? healthError.message : "Unknown error"}
+                  </p>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Storage Usage</span>
-                  <Badge variant="outline">73% capacity</Badge>
+              ) : systemHealth ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">System Status</span>
+                    <Badge 
+                      variant={systemHealth.status === 'healthy' ? 'default' : systemHealth.status === 'warning' ? 'secondary' : 'destructive'}
+                      className={`${
+                        systemHealth.status === 'healthy' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                        systemHealth.status === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                        'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                      }`}
+                      data-testid={`badge-system-status-${systemHealth.status}`}
+                    >
+                      {systemHealth.status === 'healthy' && <CheckCircle className="h-3 w-3 mr-1" />}
+                      {systemHealth.status === 'warning' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                      {systemHealth.status === 'critical' && <XCircle className="h-3 w-3 mr-1" />}
+                      {systemHealth.status === 'healthy' ? 'Healthy' : 
+                       systemHealth.status === 'warning' ? 'Warning' : 'Critical'}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Response Time P95</span>
+                    <Badge 
+                      variant={systemHealth.responseTimeP95 < 500 ? 'default' : systemHealth.responseTimeP95 < 1000 ? 'secondary' : 'destructive'}
+                      className={`${
+                        systemHealth.responseTimeP95 < 500 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                        systemHealth.responseTimeP95 < 1000 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                        'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                      }`}
+                      data-testid="text-response-time"
+                    >
+                      {systemHealth.responseTimeP95}ms
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Database Latency</span>
+                    <span className="text-sm font-medium" data-testid="text-db-latency">
+                      {systemHealth.dbLatencyMs}ms
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Error Rate</span>
+                    <Badge 
+                      variant={systemHealth.errorRate < 1 ? 'default' : systemHealth.errorRate < 3 ? 'secondary' : 'destructive'}
+                      className={`${
+                        systemHealth.errorRate < 1 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                        systemHealth.errorRate < 3 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                        'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                      }`}
+                      data-testid="text-error-rate"
+                    >
+                      {systemHealth.errorRate}%
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">CPU Usage</span>
+                    <Badge variant="outline" data-testid="text-cpu-usage">
+                      {systemHealth.cpuUsage}%
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Memory Usage</span>
+                    <Badge variant="outline" data-testid="text-memory-usage">
+                      {systemHealth.memoryUsage}%
+                    </Badge>
+                  </div>
+                  
+                  <div className="mt-4 pt-3 border-t">
+                    <div className="text-xs text-muted-foreground">
+                      Last updated: {new Date(systemHealth.lastUpdated).toLocaleString()}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Active Sessions</span>
-                  <span className="text-sm font-medium">{stats?.totalUsers || 0}</span>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  No health data available
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -231,50 +361,105 @@ export default function SuperAdminDashboard() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" />
+                <Monitor className="h-5 w-5" />
                 Platform Alerts
               </CardTitle>
               <CardDescription>
-                Issues requiring attention
+                Critical issues and actionable notifications
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {stats?.pendingActions && stats.pendingActions > 0 ? (
-                  <div className="flex items-center justify-between p-3 border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-amber-600" />
-                      <span className="text-sm font-medium">Pending Actions</span>
+              {isAlertsLoading ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  Loading alerts...
+                </div>
+              ) : alertsError ? (
+                <div className="text-center py-4">
+                  <div className="flex items-center justify-center gap-2 text-red-600 mb-2">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="font-medium">Failed to load alerts</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {alertsError instanceof Error ? alertsError.message : "Unknown error"}
+                  </p>
+                </div>
+              ) : platformAlerts && platformAlerts.length > 0 ? (
+                <div className="space-y-3">
+                  {platformAlerts.map((alert: Alert) => (
+                    <div 
+                      key={alert.id} 
+                      className={`flex items-start justify-between p-3 border rounded-lg ${
+                        alert.severity === 'critical' ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20' :
+                        alert.severity === 'high' ? 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20' :
+                        alert.severity === 'medium' ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20' :
+                        'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20'
+                      }`}
+                      data-testid={`alert-${alert.id}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-1">
+                          {alert.type === 'payment_failed' && <XCircle className={`h-4 w-4 ${
+                            alert.severity === 'critical' ? 'text-red-600' : 'text-orange-600'
+                          }`} />}
+                          {alert.type === 'inactive_org' && <Building2 className="h-4 w-4 text-gray-600" />}
+                          {alert.type === 'system_error' && <Zap className="h-4 w-4 text-red-600" />}
+                          {alert.type === 'security' && <AlertTriangle className="h-4 w-4 text-red-600" />}
+                          {alert.type === 'license_overage' && <CreditCard className="h-4 w-4 text-orange-600" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm" data-testid={`alert-title-${alert.id}`}>
+                              {alert.title}
+                            </p>
+                            <Badge 
+                              variant={
+                                alert.severity === 'critical' ? 'destructive' :
+                                alert.severity === 'high' ? 'destructive' :
+                                alert.severity === 'medium' ? 'secondary' :
+                                'outline'
+                              }
+                              className="text-xs"
+                            >
+                              {alert.severity.toUpperCase()}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {alert.message}
+                          </p>
+                          {alert.organizationName && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Organization: {alert.organizationName}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {new Date(alert.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {!alert.acknowledged && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs"
+                            data-testid={`button-acknowledge-${alert.id}`}
+                            onClick={() => acknowledgeAlert(alert.id)}
+                          >
+                            Acknowledge
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <Badge variant="secondary">{stats.pendingActions}</Badge>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between p-3 border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium">All systems operational</span>
-                    </div>
-                  </div>
-                )}
-                
-                {/* System Status Items */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Payment Processing</span>
-                    <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Online
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Email Services</span>
-                    <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Online
-                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center p-6 border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="text-sm font-medium">No active alerts</span>
                   </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>

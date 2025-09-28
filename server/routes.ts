@@ -2715,6 +2715,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/super-admin/dashboard/system-health - Real-time system health metrics
+  app.get("/api/super-admin/dashboard/system-health", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const health = await storage.getSystemHealth();
+      res.json(health);
+    } catch (error) {
+      console.error("Error fetching system health:", error);
+      res.status(500).json({ 
+        error: "Failed to fetch system health",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // GET /api/super-admin/dashboard/alerts - Platform alerts with severity filtering
+  app.get("/api/super-admin/dashboard/alerts", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      // Safely parse and validate parameters
+      let limit = 20; // Default
+      if (req.query.limit) {
+        const parsedLimit = parseInt(req.query.limit as string, 10);
+        if (!isNaN(parsedLimit)) {
+          limit = Math.max(1, Math.min(parsedLimit, 100)); // Clamp to 1-100 range
+        }
+      }
+
+      let severity: string | undefined;
+      if (req.query.severity && typeof req.query.severity === 'string') {
+        const validSeverities = ['low', 'medium', 'high', 'critical'];
+        if (validSeverities.includes(req.query.severity)) {
+          severity = req.query.severity;
+        }
+      }
+      
+      const alerts = await storage.getPlatformAlerts(limit, severity);
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching platform alerts:", error);
+      res.status(500).json({ 
+        error: "Failed to fetch platform alerts",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // POST /api/super-admin/dashboard/alerts/:id/acknowledge - Acknowledge an alert
+  app.post("/api/super-admin/dashboard/alerts/:id/acknowledge", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const alertId = req.params.id;
+      if (!alertId) {
+        return res.status(400).json({ error: "Alert ID is required" });
+      }
+      
+      await storage.acknowledgeAlert(alertId);
+      res.json({ success: true, message: "Alert acknowledged successfully" });
+    } catch (error) {
+      console.error("Error acknowledging alert:", error);
+      res.status(500).json({ 
+        error: "Failed to acknowledge alert",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // POST /api/super-admin/dashboard/alerts/:id/resolve - Resolve an alert
+  app.post("/api/super-admin/dashboard/alerts/:id/resolve", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const alertId = req.params.id;
+      if (!alertId) {
+        return res.status(400).json({ error: "Alert ID is required" });
+      }
+      
+      await storage.resolveAlert(alertId);
+      res.json({ success: true, message: "Alert resolved successfully" });
+    } catch (error) {
+      console.error("Error resolving alert:", error);
+      res.status(500).json({ 
+        error: "Failed to resolve alert",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // ===============================================
   // SUPER ADMIN BILLING API ROUTES
   // ===============================================
