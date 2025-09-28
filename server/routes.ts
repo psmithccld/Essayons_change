@@ -59,6 +59,7 @@ interface AuthenticatedRequest extends SessionRequest {
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
+import { type SystemSettings } from "@shared/schema";
 import { 
   insertProjectSchema, insertTaskSchema, insertStakeholderSchema, insertRaidLogSchema,
   insertCommunicationSchema, insertCommunicationStrategySchema, insertCommunicationTemplateSchema, insertSurveySchema, baseSurveySchema, insertSurveyResponseSchema, insertGptInteractionSchema,
@@ -714,10 +715,10 @@ const enforceGlobalPlatformSettings = async (req: AuthenticatedRequest, res: Res
       return next();
     }
 
-    const { globalFeatures } = globalSettings;
+    const { globalFeatures } = globalSettings as SystemSettings;
     
     // MAINTENANCE MODE ENFORCEMENT: Block all non-super-admin access when enabled
-    if (globalFeatures.maintenanceMode) {
+    if ((globalFeatures as any).maintenanceMode) {
       // Check if this is a super admin user
       const isSuperAdmin = req.superAdminUser?.id || req.session?.superAdminUserId;
       
@@ -734,17 +735,17 @@ const enforceGlobalPlatformSettings = async (req: AuthenticatedRequest, res: Res
       if (!isSuperAdmin && !isAllowedPath) {
         return res.status(503).json({
           error: "Service temporarily unavailable",
-          message: globalFeatures.maintenanceMessage || "The platform is currently undergoing maintenance. We'll be back shortly.",
+          message: (globalFeatures as any).maintenanceMessage || "The platform is currently undergoing maintenance. We'll be back shortly.",
           maintenanceMode: true,
-          retryAfter: globalFeatures.scheduledMaintenanceEnd ? 
-            Math.ceil((new Date(globalFeatures.scheduledMaintenanceEnd).getTime() - Date.now()) / 1000) : 
+          retryAfter: (globalFeatures as any).scheduledMaintenanceEnd ? 
+            Math.ceil((new Date((globalFeatures as any).scheduledMaintenanceEnd).getTime() - Date.now()) / 1000) : 
             undefined
         });
       }
     }
 
     // NEW USER REGISTRATION BLOCKING: Block registration when disabled globally
-    if (!globalFeatures.allowNewRegistrations || !globalFeatures.newUserRegistrationEnabled) {
+    if (!(globalFeatures as any).allowNewRegistrations || !(globalFeatures as any).newUserRegistrationEnabled) {
       const registrationPaths = [
         '/api/auth/register',
         '/api/auth/signup',
@@ -3062,9 +3063,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update the maintenance mode in global features
       const updatedSettings = await storage.updateSystemSettings({
         globalFeatures: {
-          ...currentSettings.globalFeatures,
+          ...(currentSettings as SystemSettings).globalFeatures,
           maintenanceMode: enabled,
-          maintenanceMessage: message || currentSettings.globalFeatures.maintenanceMessage,
+          maintenanceMessage: message || (currentSettings as SystemSettings & any).globalFeatures.maintenanceMessage,
         }
       });
       
@@ -3075,7 +3076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         maintenanceMode: enabled,
         message: `Maintenance mode ${enabled ? 'enabled' : 'disabled'}`,
         customMessage: message,
-        settings: updatedSettings.globalFeatures,
+        settings: (updatedSettings as SystemSettings).globalFeatures,
         timestamp: new Date().toISOString()
       });
     } catch (error) {
