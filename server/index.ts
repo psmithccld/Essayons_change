@@ -23,6 +23,21 @@ app.head('/health', (req, res) => {
   res.status(200).end();
 });
 
+// DIAGNOSTIC: Environment check endpoint for debugging published app issues
+app.get('/debug/env', (req, res) => {
+  const envCheck = {
+    nodeEnv: process.env.NODE_ENV,
+    port: process.env.PORT,
+    hasDatabase: !!process.env.DATABASE_URL,
+    hasSendGrid: !!process.env.SENDGRID_API_KEY,
+    hasImpersonationSecret: !!process.env.IMPERSONATION_SECRET,
+    hasOpenAI: !!process.env.OPENAI_API_KEY,
+    hasSessionSecret: !!process.env.SESSION_SECRET,
+    timestamp: new Date().toISOString()
+  };
+  res.status(200).json(envCheck);
+});
+
 // SECURITY: Configure session management with PostgreSQL store
 neonConfig.webSocketConstructor = ws;
 const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
