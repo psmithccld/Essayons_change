@@ -126,22 +126,6 @@ app.use((req, res, next) => {
     }
   });
 
-  // Seed the database on startup
-  try {
-    await seedDatabase();
-  } catch (error) {
-    console.error("Database seeding failed:", error);
-    // Continue startup even if seeding fails (e.g., if already seeded)
-  }
-
-  // Initialize vector store with knowledge base
-  try {
-    await initializeVectorStore();
-  } catch (error) {
-    console.error("Vector store initialization failed:", error);
-    // Continue startup even if vector store fails
-  }
-  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -172,5 +156,25 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Start background initialization AFTER server is listening
+    // This ensures health checks respond immediately while init happens in background
+    Promise.resolve().then(async () => {
+      // Seed the database in background
+      try {
+        await seedDatabase();
+      } catch (error) {
+        console.error("Database seeding failed:", error);
+        // Continue running even if seeding fails (e.g., if already seeded)
+      }
+
+      // Initialize vector store in background
+      try {
+        await initializeVectorStore();
+      } catch (error) {
+        console.error("Vector store initialization failed:", error);
+        // Continue running even if vector store fails
+      }
+    });
   });
 })();
