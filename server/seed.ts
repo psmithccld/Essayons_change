@@ -154,9 +154,12 @@ export async function seedDatabase() {
       // EMERGENCY BOOTSTRAP: Allow Super Admin creation in production if explicitly enabled
       if (process.env.EMERGENCY_BOOTSTRAP === 'true') {
         console.log('🚨 EMERGENCY BOOTSTRAP: Creating Super Admin in production...');
+        console.log('Environment check - NODE_ENV:', process.env.NODE_ENV);
+        console.log('Environment check - EMERGENCY_BOOTSTRAP:', process.env.EMERGENCY_BOOTSTRAP);
         
         try {
           const emergencyPassword = process.env.EMERGENCY_ADMIN_PASSWORD || 'TempAdmin2024!';
+          console.log('Using emergency password length:', emergencyPassword.length);
           const hashedEmergencyPassword = await bcrypt.hash(emergencyPassword, SALT_ROUNDS);
           
           await db.insert(superAdminUsers).values({
@@ -177,6 +180,8 @@ export async function seedDatabase() {
         }
       } else {
         console.log('⚠️ No Super Admin users found - set EMERGENCY_BOOTSTRAP=true to create first admin');
+        console.log('Environment check - NODE_ENV:', process.env.NODE_ENV);
+        console.log('Environment check - EMERGENCY_BOOTSTRAP:', process.env.EMERGENCY_BOOTSTRAP);
       }
     } else {
       console.log('Super Admin users already exist, skipping Super Admin creation.');
