@@ -13,6 +13,37 @@ import { sql } from "drizzle-orm";
 
 const app = express();
 
+// CRITICAL: Fast health checks BEFORE any middleware to prevent deployment timeouts
+let isReady = false;
+
+// Ultra-fast health check for deployment - no DB, no sessions, no middleware
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    message: 'Application is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Fast root endpoint during startup, then serve SPA when ready
+app.get('/', (req, res, next) => {
+  if (!isReady) {
+    // During startup: return JSON for health checks
+    return res.status(200).json({
+      status: 'starting',
+      message: 'Application is initializing',
+      timestamp: new Date().toISOString()
+    });
+  }
+  // After ready: continue to static file serving
+  next();
+});
+
+// Support HEAD requests for health checks
+app.head(['/', '/health'], (req, res) => {
+  res.status(200).end();
+});
+
 // SECURITY: Configure session management with PostgreSQL store
 neonConfig.webSocketConstructor = ws;
 const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -83,23 +114,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Add health check endpoint early to handle requests during startup
-  app.get('/', (req, res) => {
-    res.status(200).json({ 
-      status: 'ok', 
-      message: 'Application is running',
-      timestamp: new Date().toISOString()
-    });
-  });
-
-  app.get('/health', (req, res) => {
-    res.status(200).json({ 
-      status: 'healthy', 
-      message: 'Health check passed',
-      timestamp: new Date().toISOString()
-    });
-  });
-
+  // Keep /ready endpoint for detailed diagnostics with DB connectivity check
   app.get('/ready', async (req, res) => {
     try {
       // Check database connectivity
@@ -222,6 +237,10 @@ app.use((req, res, next) => {
         console.error("Vector store initialization failed:", error);
         // Continue running even if vector store fails
       }
+
+      // Mark server as ready after all background initialization completes
+      isReady = true;
+      console.log("✅ Server is now ready - health checks will serve SPA");
     });
   });
 })();

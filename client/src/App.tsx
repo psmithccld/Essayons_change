@@ -7,36 +7,41 @@ import { CurrentProjectProvider } from "@/contexts/CurrentProjectContext";
 import { CoachContextProvider } from "@/contexts/CoachContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
-import NotFound from "@/pages/not-found";
-import Dashboard from "@/pages/dashboard";
-import Tasks from "@/pages/tasks";
-import ChecklistTemplates from "@/pages/checklist-templates";
-import GanttChart from "@/pages/gantt";
-import RaidLogs from "@/pages/raid-logs";
-import Communications from "@/pages/communications";
-import Stakeholders from "@/pages/stakeholders";
-import Surveys from "@/pages/surveys";
-import SurveyTake from "@/pages/survey-take";
-import GptCoach from "@/pages/gpt-coach";
-import ProcessMapping from "@/pages/process-mapping";
-import ChangeArtifacts from "@/pages/change-artifacts";
+import { Suspense, lazy } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
-import UserManagement from "@/pages/user-management";
-import InitiativeManagement from "@/pages/initiative-management";
-import SecurityManagement from "@/pages/security-management";
-import ChangeProcessFlow from "@/pages/fishbone";
-import Reports from "@/pages/reports";
-import Projects from "@/pages/projects";
-import OrganizationSettings from "@/pages/organization-settings";
 import { LoginPage } from "@/pages/auth/login";
 import { EmailVerifyPage } from "@/pages/auth/verify-email";
 import { Loader2 } from "lucide-react";
-import { HelpDeskButton } from "@/components/HelpDeskButton";
 import { AppBreadcrumbs } from "@/components/layout/AppBreadcrumbs";
-import PersistentAICoach from "@/components/PersistentAICoach";
-import SuperAdminApp from "@/pages/super-admin/super-admin-app";
-import { AdminPortal } from "@/pages/admin-portal";
+
+// Code splitting: Lazy load all pages except login/verify to reduce initial bundle size
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const Tasks = lazy(() => import("@/pages/tasks"));
+const ChecklistTemplates = lazy(() => import("@/pages/checklist-templates"));
+const GanttChart = lazy(() => import("@/pages/gantt"));
+const RaidLogs = lazy(() => import("@/pages/raid-logs"));
+const Communications = lazy(() => import("@/pages/communications"));
+const Stakeholders = lazy(() => import("@/pages/stakeholders"));
+const Surveys = lazy(() => import("@/pages/surveys"));
+const SurveyTake = lazy(() => import("@/pages/survey-take"));
+const GptCoach = lazy(() => import("@/pages/gpt-coach"));
+const ProcessMapping = lazy(() => import("@/pages/process-mapping"));
+const ChangeArtifacts = lazy(() => import("@/pages/change-artifacts"));
+const UserManagement = lazy(() => import("@/pages/user-management"));
+const InitiativeManagement = lazy(() => import("@/pages/initiative-management"));
+const SecurityManagement = lazy(() => import("@/pages/security-management"));
+const ChangeProcessFlow = lazy(() => import("@/pages/fishbone"));
+const Reports = lazy(() => import("@/pages/reports"));
+const Projects = lazy(() => import("@/pages/projects"));
+const OrganizationSettings = lazy(() => import("@/pages/organization-settings"));
+const SuperAdminApp = lazy(() => import("@/pages/super-admin/super-admin-app"));
+const AdminPortal = lazy(() => import("@/pages/admin-portal").then(module => ({ default: module.AdminPortal })));
+
+// Lazy load heavy global components to defer their loading
+const HelpDeskButton = lazy(() => import("@/components/HelpDeskButton").then(module => ({ default: module.HelpDeskButton })));
+const PersistentAICoach = lazy(() => import("@/components/PersistentAICoach"));
 
 function LoadingSpinner() {
   return (
@@ -59,7 +64,8 @@ function AuthenticatedApp() {
         <Header />
         <main className="flex-1 overflow-y-auto p-6">
           <AppBreadcrumbs />
-          <Switch>
+          <Suspense fallback={<LoadingSpinner />}>
+            <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/projects" component={Projects} />
             <Route path="/tasks" component={Tasks} />
@@ -81,14 +87,19 @@ function AuthenticatedApp() {
             <Route path="/reports" component={Reports} />
             <Route path="/verify-email" component={() => <EmailVerifyPage onAuthSuccess={login} />} />
             <Route component={NotFound} />
-          </Switch>
+            </Switch>
+          </Suspense>
         </main>
         
-        {/* Global Helpdesk Support Button */}
-        <HelpDeskButton />
+        {/* Global Helpdesk Support Button - Lazy loaded */}
+        <Suspense fallback={null}>
+          <HelpDeskButton />
+        </Suspense>
         
-        {/* Persistent AI Coach - Available on all screens */}
-        <PersistentAICoach />
+        {/* Persistent AI Coach - Available on all screens - Lazy loaded */}
+        <Suspense fallback={null}>
+          <PersistentAICoach />
+        </Suspense>
       </div>
     </div>
   );
@@ -100,12 +111,20 @@ function Router() {
 
   // Check if accessing Super Admin routes
   if (location.startsWith("/super-admin")) {
-    return <SuperAdminApp />;
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <SuperAdminApp />
+      </Suspense>
+    );
   }
 
   // Check if accessing hidden Admin Portal
   if (location === "/admin-portal") {
-    return <AdminPortal />;
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <AdminPortal />
+      </Suspense>
+    );
   }
 
   if (isLoading) {
