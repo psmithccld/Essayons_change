@@ -1,6 +1,5 @@
 import PptxGenJS from "pptxgenjs";
 import { PDFDocument, rgb } from "pdf-lib";
-import { createCanvas, loadImage } from "canvas";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import type { Communication } from "@shared/schema";
@@ -191,60 +190,9 @@ export class ExportService {
   }
 
   async exportToCanvaPNG(communication: Communication): Promise<string> {
-    // Create a branded canvas for Canva-compatible export
-    const canvas = createCanvas(1080, 1080); // Square format for social media
-    const ctx = canvas.getContext('2d');
-
-    // Background
-    ctx.fillStyle = '#F8F9FA';
-    ctx.fillRect(0, 0, 1080, 1080);
-
-    // Header section with brand colors
-    ctx.fillStyle = '#2E5266';
-    ctx.fillRect(0, 0, 1080, 200);
-
-    // Title
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 48px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(this.wrapText(communication.title, 20), 540, 120);
-
-    // Content area
-    ctx.fillStyle = '#333333';
-    ctx.font = '32px Arial';
-    ctx.textAlign = 'left';
-    
-    const contentLines = communication.content.split('\n').filter(line => line.trim());
-    let yPosition = 300;
-    
-    contentLines.forEach((line, index) => {
-      if (line.trim() && yPosition < 900) {
-        const wrappedLines = this.wrapTextToLines(ctx, line.trim(), 900);
-        wrappedLines.forEach(wrappedLine => {
-          if (yPosition < 900) {
-            ctx.fillText(wrappedLine, 90, yPosition);
-            yPosition += 40;
-          }
-        });
-        yPosition += 20; // Extra spacing between paragraphs
-      }
-    });
-
-    // Footer
-    ctx.fillStyle = '#5A7684';
-    ctx.font = '24px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Essayons Change Platform', 540, 1000);
-
-    // Save PNG
-    const exportsDir = this.ensureExportsDir();
-    const filename = `flyer-${communication.id}.png`;
-    const filepath = join(exportsDir, filename);
-    
-    const buffer = canvas.toBuffer('image/png');
-    writeFileSync(filepath, buffer);
-    
-    return `/exports/${filename}`;
+    // PNG export temporarily disabled for cloud deployment compatibility
+    // This feature required native dependencies not available in serverless environments
+    throw new Error("PNG export is currently not available. Please use PowerPoint export instead.");
   }
 
   private wrapText(text: string, maxLength: number): string {
@@ -267,16 +215,16 @@ export class ExportService {
     return lines.join('\n');
   }
 
-  private wrapTextToLines(ctx: any, text: string, maxWidth: number): string[] {
+  // Helper method for text wrapping (kept for potential future use)
+  private wrapTextToLines(text: string, maxLineLength: number): string[] {
     const words = text.split(' ');
     const lines: string[] = [];
     let currentLine = '';
 
     words.forEach(word => {
       const testLine = currentLine + (currentLine ? ' ' : '') + word;
-      const metrics = ctx.measureText(testLine);
       
-      if (metrics.width > maxWidth && currentLine) {
+      if (testLine.length > maxLineLength && currentLine) {
         lines.push(currentLine);
         currentLine = word;
       } else {
