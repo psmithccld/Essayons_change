@@ -1660,9 +1660,10 @@ export default function Reports() {
         </TabsContent>
       </Tabs>
 
-      {/* Spacer sections to prevent GPT Coach overlap on smaller screens */}
-      <div className="h-16 md:h-20" aria-hidden="true"></div>
-      <div className="h-16 md:h-20" aria-hidden="true"></div>
+      {/* Spacer sections to prevent GPT Coach overlap on all screens */}
+      <div className="h-32 md:h-40" aria-hidden="true"></div>
+      <div className="h-32 md:h-40" aria-hidden="true"></div>
+      <div className="h-24 md:h-32" aria-hidden="true"></div>
     </div>
     </FeatureGate>
   );
