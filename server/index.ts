@@ -8,6 +8,8 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
 import { initializeVectorStore } from "./vectorStore";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 
 const app = express();
 
@@ -96,6 +98,32 @@ app.use((req, res, next) => {
       message: 'Health check passed',
       timestamp: new Date().toISOString()
     });
+  });
+
+  app.get('/ready', async (req, res) => {
+    try {
+      // Check database connectivity
+      await db.execute(sql`SELECT 1`);
+      
+      res.status(200).json({ 
+        status: 'ready', 
+        message: 'Ready to serve traffic',
+        timestamp: new Date().toISOString(),
+        checks: {
+          database: 'ok'
+        }
+      });
+    } catch (error) {
+      res.status(503).json({ 
+        status: 'not_ready', 
+        message: 'Service not ready',
+        timestamp: new Date().toISOString(),
+        checks: {
+          database: 'failed',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
   });
 
   // Seed the database on startup

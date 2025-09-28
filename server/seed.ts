@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { db } from './db';
 import { roles, users, superAdminUsers, DEFAULT_PERMISSIONS, permissionsSchema } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 // Helper function to create complete permission objects
 function createPermissions(overrides: Partial<typeof permissionsSchema._type> = {}) {
@@ -14,6 +14,16 @@ const SALT_ROUNDS = 12;
 export async function seedDatabase() {
   console.log('🌱 Starting database seeding...');
   
+  try {
+    // Verify database connectivity first
+    await db.execute(sql`SELECT 1`);
+    console.log('✅ Database connection verified');
+  } catch (connectionError) {
+    console.error('❌ Database connection failed:', connectionError);
+    console.log('⚠️ Continuing without seeding - some features may not work');
+    return false;
+  }
+
   try {
     // Check if roles already exist
     const existingRoles = await db.select().from(roles);
@@ -83,10 +93,11 @@ export async function seedDatabase() {
     // Check if default admin user exists
     const existingUsers = await db.select().from(users);
     
-    if (existingUsers.length === 0) {
-      console.log('Creating default admin user...');
+    // SECURITY: Only create default users in development environment
+    if (existingUsers.length === 0 && process.env.NODE_ENV === 'development' && process.env.SEED_DEMO_DATA === 'true') {
+      console.log('Creating default admin user for development...');
       
-      // Create default admin user
+      // Create default admin user (development only)
       const defaultPassword = 'admin123'; // Should be changed on first login
       const hashedPassword = await bcrypt.hash(defaultPassword, SALT_ROUNDS);
       
@@ -99,10 +110,11 @@ export async function seedDatabase() {
         isActive: true,
       });
       
-      console.log('✅ Created default admin user');
+      console.log('✅ Created default admin user for development');
       console.log('   Username: admin');
-      console.log('   Password: admin123');
-      console.log('   ⚠️  IMPORTANT: Change this password on first login!');
+      console.log('   ⚠️  IMPORTANT: This is for development only!');
+    } else if (existingUsers.length === 0) {
+      console.log('⚠️ No users found - use proper onboarding flow to create first admin user');
     } else {
       console.log('Users already exist, skipping default user creation.');
     }
@@ -113,27 +125,33 @@ export async function seedDatabase() {
       username: superAdminUsers.username
     }).from(superAdminUsers);
     
-    if (existingSuperAdmins.length === 0) {
-      console.log('Creating default Super Admin user...');
+    // SECURITY: Only create default Super Admin users in development environment
+    if (existingSuperAdmins.length === 0 && process.env.NODE_ENV === 'development' && process.env.SEED_DEMO_DATA === 'true') {
+      console.log('Creating default Super Admin user for development...');
       
-      // Create default Super Admin user
-      const superAdminPassword = 'admin123'; // Should be changed on first login
-      const hashedSuperAdminPassword = await bcrypt.hash(superAdminPassword, SALT_ROUNDS);
-      
-      await db.insert(superAdminUsers).values({
-        username: 'superadmin',
-        email: 'superadmin@platform.com',
-        passwordHash: hashedSuperAdminPassword,
-        name: 'Super Administrator',
-        role: 'super_admin',
-        isActive: true,
-      });
-      
-      console.log('✅ Created default Super Admin user');
-      console.log('   Username: superadmin');
-      console.log('   Email: superadmin@platform.com');
-      console.log('   Password: admin123');
-      console.log('   ⚠️  IMPORTANT: Change this password on first login!');
+      try {
+        // Create default Super Admin user (development only)
+        const superAdminPassword = 'admin123'; // Should be changed on first login
+        const hashedSuperAdminPassword = await bcrypt.hash(superAdminPassword, SALT_ROUNDS);
+        
+        await db.insert(superAdminUsers).values({
+          username: 'superadmin',
+          email: 'superadmin@platform.com',
+          passwordHash: hashedSuperAdminPassword,
+          name: 'Super Administrator',
+          role: 'super_admin',
+          isActive: true,
+        });
+        
+        console.log('✅ Created default Super Admin user for development');
+        console.log('   Username: superadmin');
+        console.log('   ⚠️  IMPORTANT: This is for development only!');
+      } catch (superAdminError) {
+        console.error('❌ Failed to create Super Admin user:', superAdminError);
+        console.log('⚠️ Super Admin functionality may be limited');
+      }
+    } else if (existingSuperAdmins.length === 0) {
+      console.log('⚠️ No Super Admin users found - use proper onboarding flow to create first super admin');
     } else {
       console.log('Super Admin users already exist, skipping Super Admin creation.');
     }
