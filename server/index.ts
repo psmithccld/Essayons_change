@@ -33,16 +33,20 @@ app.get('/health', (req, res) => {
   clearTimeout(timeout);
 });
 
-// CRITICAL: Root endpoint always returns 200 for deployment health checks
+// CRITICAL: Root endpoint health checks for deployment, then serve SPA
 app.get('/', (req, res, next) => {
-  // ALWAYS return 200 status for deployment health checks
-  // This ensures deployment succeeds even during initialization
-  return res.status(200).json({
-    status: 'ok',
-    message: isReady ? 'Application ready' : 'Application starting',
-    timestamp: new Date().toISOString(),
-    ready: isReady
-  });
+  // During deployment health checks: return JSON with 200 status
+  // In production: serve SPA normally
+  if (process.env.DEPLOYMENT_HEALTH_CHECK === 'true' || !isReady) {
+    return res.status(200).json({
+      status: 'ok',
+      message: isReady ? 'Application ready' : 'Application starting',
+      timestamp: new Date().toISOString(),
+      ready: isReady
+    });
+  }
+  // After ready and not in health check mode: continue to static file serving
+  next();
 });
 
 // Support HEAD requests for health checks with timeout protection

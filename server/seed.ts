@@ -163,41 +163,28 @@ export async function seedDatabase() {
         console.log('⚠️ Super Admin functionality may be limited');
       }
     } else if (existingSuperAdmins.length === 0) {
-      // EMERGENCY BOOTSTRAP: Allow Super Admin creation in production if explicitly enabled
-      // Can be enabled by setting EMERGENCY_BOOTSTRAP=true or AUTO_BOOTSTRAP=true
-      if (process.env.EMERGENCY_BOOTSTRAP === 'true' || process.env.AUTO_BOOTSTRAP === 'true' || process.env.NODE_ENV === 'production') {
+      // EMERGENCY BOOTSTRAP: Allow Super Admin creation ONLY if explicitly enabled with strong password
+      if (process.env.EMERGENCY_BOOTSTRAP === 'true' && process.env.EMERGENCY_ADMIN_PASSWORD && process.env.EMERGENCY_ADMIN_PASSWORD.length >= 12) {
         console.log('🚨 EMERGENCY BOOTSTRAP: Creating Super Admin in production...');
         console.log('Environment check - NODE_ENV:', process.env.NODE_ENV);
         console.log('Environment check - EMERGENCY_BOOTSTRAP:', process.env.EMERGENCY_BOOTSTRAP);
         
         try {
-          const emergencyPassword = process.env.EMERGENCY_ADMIN_PASSWORD || 'TempAdmin2024!';
+          const emergencyPassword = process.env.EMERGENCY_ADMIN_PASSWORD;
           console.log('Using emergency password length:', emergencyPassword.length);
           const hashedEmergencyPassword = await bcrypt.hash(emergencyPassword, SALT_ROUNDS);
           
-          const emergencyUsersToCreate = [
-            {
-              username: 'bootstrap-admin',
-              email: 'admin@emergency.bootstrap',
-              passwordHash: hashedEmergencyPassword,
-              name: 'Emergency Bootstrap Admin',
-              role: 'super_admin',
-              isActive: true,
-            },
-            {
-              username: 'Essayon6',
-              email: 'essayon6@platform.com',
-              passwordHash: await bcrypt.hash('admin123', SALT_ROUNDS), // Permanent password
-              name: 'Essayon6 Administrator',
-              role: 'super_admin',
-              isActive: true,
-            }
-          ];
-
-          await db.insert(superAdminUsers).values(emergencyUsersToCreate);
+          await db.insert(superAdminUsers).values({
+            username: 'bootstrap-admin',
+            email: 'admin@emergency.bootstrap',
+            passwordHash: hashedEmergencyPassword,
+            name: 'Emergency Bootstrap Admin',
+            role: 'super_admin',
+            isActive: true,
+          });
           
-          console.log('✅ Emergency Super Admin users created for production access');
-          console.log('   Username: bootstrap-admin, Essayon6');
+          console.log('✅ Emergency Super Admin created for production access');
+          console.log('   Username: bootstrap-admin');
           console.log('   Password: Set via EMERGENCY_ADMIN_PASSWORD or default');
           console.log('   🔒 SECURITY: Remove EMERGENCY_BOOTSTRAP env var after login!');
         } catch (emergencyError) {
