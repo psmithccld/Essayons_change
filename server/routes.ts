@@ -36,6 +36,7 @@ interface AuthenticatedSuperAdminRequest extends SessionRequest {
     name: string;
     role: string;
     isActive: boolean;
+    mfaEnabled?: boolean;
     lastLoginAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
@@ -1039,7 +1040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api', enforceGlobalPlatformSettings);
   
   // Roles
-  app.get("/api/roles", requireAuthAndOrg, requirePermission('canSeeRoles'), async (req, res) => {
+  app.get("/api/roles", requireAuthAndOrg, requirePermission('canSeeRoles'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const roles = await storage.getRoles();
       res.json(roles);
@@ -1050,7 +1051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // SECURITY: User registration endpoint
-  app.post("/api/auth/register", async (req: SessionRequest, res) => {
+  app.post("/api/auth/register", async (req: SessionRequest, res: Response) => {
     try {
       const { registrationRequestSchema } = await import("../shared/schema.js");
       
@@ -1110,7 +1111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Email verification endpoint
-  app.post("/api/auth/verify-email", async (req: SessionRequest, res) => {
+  app.post("/api/auth/verify-email", async (req: SessionRequest, res: Response) => {
     try {
       const { emailVerificationResponseSchema } = await import("../shared/schema.js");
       
@@ -1180,7 +1181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // SECURITY: Authentication endpoints with session management
-  app.post("/api/auth/login", async (req: SessionRequest, res) => {
+  app.post("/api/auth/login", async (req: SessionRequest, res: Response) => {
     try {
       const { username, password } = req.body;
       
@@ -1253,7 +1254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // SECURITY: Auth status endpoint
-  app.get("/api/auth/status", async (req: SessionRequest, res) => {
+  app.get("/api/auth/status", async (req: SessionRequest, res: Response) => {
     try {
       let userId = req.session?.userId;
       
