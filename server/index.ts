@@ -23,7 +23,7 @@ app.head('/health', (req, res) => {
   res.status(200).end();
 });
 
-// DIAGNOSTIC: Environment check endpoint for debugging published app issues
+// DIAGNOSTIC: Environment check endpoint for debugging published app issues (bypasses all auth)
 app.get('/debug/env', (req, res) => {
   const envCheck = {
     nodeEnv: process.env.NODE_ENV,
@@ -36,6 +36,15 @@ app.get('/debug/env', (req, res) => {
     timestamp: new Date().toISOString()
   };
   res.status(200).json(envCheck);
+});
+
+// DIAGNOSTIC: Simple test endpoint that always works (for production debugging)
+app.get('/debug/ping', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    message: 'Published app is responding',
+    timestamp: new Date().toISOString() 
+  });
 });
 
 // SECURITY: Configure session management with PostgreSQL store
