@@ -13,52 +13,14 @@ import { sql } from "drizzle-orm";
 
 const app = express();
 
-// CRITICAL: Fast health checks BEFORE any middleware to prevent deployment timeouts
-let isReady = false;
-
-// Ultra-fast health check for deployment - no DB, no sessions, no middleware
+// ULTRA-SIMPLE: Health endpoint for deployment health checks - no logic, immediate response
 app.get('/health', (req, res) => {
-  // Set timeout protection for health checks
-  const timeout = setTimeout(() => {
-    if (!res.headersSent) {
-      res.status(200).json({ status: 'healthy', message: 'Application is running', timestamp: new Date().toISOString() });
-    }
-  }, 100); // 100ms maximum response time
-  
-  res.status(200).json({ 
-    status: 'healthy', 
-    message: 'Application is running',
-    timestamp: new Date().toISOString()
-  });
-  clearTimeout(timeout);
+  res.status(200).json({ status: 'healthy' });
 });
 
-// CRITICAL: Root endpoint health checks for deployment, then serve SPA
-app.get('/', (req, res, next) => {
-  // During deployment health checks: return JSON with 200 status
-  // In production: serve SPA normally
-  if (process.env.DEPLOYMENT_HEALTH_CHECK === 'true' || !isReady) {
-    return res.status(200).json({
-      status: 'ok',
-      message: isReady ? 'Application ready' : 'Application starting',
-      timestamp: new Date().toISOString(),
-      ready: isReady
-    });
-  }
-  // After ready and not in health check mode: continue to static file serving
-  next();
-});
-
-// Support HEAD requests for health checks with timeout protection
-app.head(['/', '/health'], (req, res) => {
-  const timeout = setTimeout(() => {
-    if (!res.headersSent) {
-      res.status(200).end();
-    }
-  }, 50); // 50ms maximum for HEAD requests
-  
+// ULTRA-SIMPLE: HEAD requests for health checks - immediate response
+app.head('/health', (req, res) => {
   res.status(200).end();
-  clearTimeout(timeout);
 });
 
 // SECURITY: Configure session management with PostgreSQL store
@@ -215,9 +177,7 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // Setup Vite or static serving - this handles SPA routing correctly
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
@@ -235,9 +195,6 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
-    
-    // CRITICAL: Set ready immediately for deployment health checks
-    isReady = true;
     console.log("🚀 Server ready for health checks - serving on port", port);
     
     // Start background initialization AFTER server is listening
@@ -259,9 +216,8 @@ app.use((req, res, next) => {
         // Continue running even if vector store fails
       }
 
-      // Mark server as ready after all background initialization completes
-      isReady = true;
-      console.log("✅ Server is now ready - health checks will serve SPA");
+      // Background initialization completed
+      console.log("✅ Server initialization complete");
     });
   });
 })();
