@@ -1659,6 +1659,10 @@ export default function Reports() {
           <CrossCuttingReportsTab />
         </TabsContent>
       </Tabs>
+
+      {/* Spacer sections to prevent GPT Coach overlap on smaller screens */}
+      <div className="h-16 md:h-20" aria-hidden="true"></div>
+      <div className="h-16 md:h-20" aria-hidden="true"></div>
     </div>
     </FeatureGate>
   );

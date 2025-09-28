@@ -37,9 +37,7 @@ export default function SuperAdminDashboard() {
   // Acknowledge alert mutation
   const acknowledgeMutation = useMutation({
     mutationFn: async (alertId: string) => {
-      return apiRequest(`/api/super-admin/dashboard/alerts/${alertId}/acknowledge`, {
-        method: 'POST'
-      });
+      return apiRequest('POST', `/api/super-admin/dashboard/alerts/${alertId}/acknowledge`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/dashboard/alerts"] });
