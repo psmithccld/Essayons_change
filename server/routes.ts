@@ -6,6 +6,7 @@ import { createServer, type Server } from "http";
 declare module 'express-session' {
   interface SessionData {
     userId?: string;
+    superAdminUserId?: string;
     user?: {
       id: string;
       username: string;
@@ -27,7 +28,7 @@ interface SessionRequest extends Request {
   session: Session & SessionData;
 }
 
-interface AuthenticatedSuperAdminRequest extends Request {
+interface AuthenticatedSuperAdminRequest extends SessionRequest {
   superAdminUser: {
     id: string;
     username: string;
@@ -53,6 +54,7 @@ interface AuthenticatedRequest extends SessionRequest {
     createdAt: Date;
     updatedAt: Date;
   };
+  supportSession?: any;
 }
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
@@ -1392,7 +1394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===============================================
 
   // Super Admin authentication middleware with MFA verification
-  const requireSuperAdminAuth = async (req: Request & { superAdminUser?: any }, res: Response, next: NextFunction) => {
+  const requireSuperAdminAuth = async (req: AuthenticatedSuperAdminRequest, res: Response, next: NextFunction) => {
     try {
       // SECURITY: Read session ID from secure HttpOnly cookie instead of custom header
       const sessionId = req.cookies?.superAdminSessionId;
