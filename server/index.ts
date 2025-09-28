@@ -126,6 +126,53 @@ app.use((req, res, next) => {
     }
   });
 
+  // EMERGENCY: Simple Super Admin login bypass for broken routes.ts
+  app.post('/api/auth/super-admin/login', express.json(), async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password required' });
+      }
+
+      // Query super admin user
+      const result = await db.execute(sql`
+        SELECT id, username, email, name, role, password_hash, is_active, created_at
+        FROM super_admin_users 
+        WHERE username = ${username} AND is_active = true
+      `);
+      const user = result.rows[0];
+
+      if (!user || !user.password_hash) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      // Verify password with bcrypt
+      const bcrypt = await import('bcrypt');
+      const passwordMatch = await bcrypt.default.compare(password, user.password_hash);
+
+      if (!passwordMatch) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      // Success - return user data (no session for now, just auth confirmation)
+      res.status(200).json({
+        success: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          name: user.name,
+          role: user.role
+        }
+      });
+
+    } catch (error) {
+      console.error('Emergency login error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
