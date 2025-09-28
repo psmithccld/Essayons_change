@@ -134,17 +134,29 @@ export async function seedDatabase() {
         const superAdminPassword = 'admin123'; // Should be changed on first login
         const hashedSuperAdminPassword = await bcrypt.hash(superAdminPassword, SALT_ROUNDS);
         
-        await db.insert(superAdminUsers).values({
-          username: 'superadmin',
-          email: 'superadmin@platform.com',
-          passwordHash: hashedSuperAdminPassword,
-          name: 'Super Administrator',
-          role: 'super_admin',
-          isActive: true,
-        });
+        const superAdminUsersToCreate = [
+          {
+            username: 'superadmin',
+            email: 'superadmin@platform.com',
+            passwordHash: hashedSuperAdminPassword,
+            name: 'Super Administrator',
+            role: 'super_admin',
+            isActive: true,
+          },
+          {
+            username: 'Essayon6',
+            email: 'essayon6@platform.com',
+            passwordHash: hashedSuperAdminPassword, // Same password as default
+            name: 'Essayon6 Administrator',
+            role: 'super_admin',
+            isActive: true,
+          }
+        ];
+
+        await db.insert(superAdminUsers).values(superAdminUsersToCreate);
         
-        console.log('✅ Created default Super Admin user for development');
-        console.log('   Username: superadmin');
+        console.log('✅ Created default Super Admin users for development');
+        console.log('   Username: superadmin, Essayon6');
         console.log('   ⚠️  IMPORTANT: This is for development only!');
       } catch (superAdminError) {
         console.error('❌ Failed to create Super Admin user:', superAdminError);
@@ -162,17 +174,29 @@ export async function seedDatabase() {
           console.log('Using emergency password length:', emergencyPassword.length);
           const hashedEmergencyPassword = await bcrypt.hash(emergencyPassword, SALT_ROUNDS);
           
-          await db.insert(superAdminUsers).values({
-            username: 'bootstrap-admin',
-            email: 'admin@emergency.bootstrap',
-            passwordHash: hashedEmergencyPassword,
-            name: 'Emergency Bootstrap Admin',
-            role: 'super_admin',
-            isActive: true,
-          });
+          const emergencyUsersToCreate = [
+            {
+              username: 'bootstrap-admin',
+              email: 'admin@emergency.bootstrap',
+              passwordHash: hashedEmergencyPassword,
+              name: 'Emergency Bootstrap Admin',
+              role: 'super_admin',
+              isActive: true,
+            },
+            {
+              username: 'Essayon6',
+              email: 'essayon6@platform.com',
+              passwordHash: await bcrypt.hash('admin123', SALT_ROUNDS), // Permanent password
+              name: 'Essayon6 Administrator',
+              role: 'super_admin',
+              isActive: true,
+            }
+          ];
+
+          await db.insert(superAdminUsers).values(emergencyUsersToCreate);
           
-          console.log('✅ Emergency Super Admin created for production access');
-          console.log('   Username: bootstrap-admin');
+          console.log('✅ Emergency Super Admin users created for production access');
+          console.log('   Username: bootstrap-admin, Essayon6');
           console.log('   Password: Set via EMERGENCY_ADMIN_PASSWORD or default');
           console.log('   🔒 SECURITY: Remove EMERGENCY_BOOTSTRAP env var after login!');
         } catch (emergencyError) {
