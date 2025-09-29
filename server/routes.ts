@@ -1396,7 +1396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===============================================
 
   // Super Admin authentication middleware with MFA verification
-  const requireSuperAdminAuth = async (req: AuthenticatedSuperAdminRequest, res: Response, next: NextFunction) => {
+  const requireSuperAdminAuth = async (req: Request, res: Response, next: NextFunction) => {
     try {
       // SECURITY: Read session ID from secure HttpOnly cookie instead of custom header
       const sessionId = req.cookies?.superAdminSessionId;
@@ -1435,7 +1435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Future: MFA verification can be added when feature is enabled
 
       // Store user info for use in route handlers
-      req.superAdminUser = user;
+      (req as any).superAdminUser = user;
       
       next();
     } catch (error) {
@@ -1518,12 +1518,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Super Admin Auth Status
-  app.get("/api/super-admin/auth/status", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+  app.get("/api/super-admin/auth/status", requireSuperAdminAuth, async (req: Request, res: Response) => {
     try {
       res.json({
-        user: req.superAdminUser,
+        user: (req as AuthenticatedSuperAdminRequest).superAdminUser,
         authenticated: true,
-        role: req.superAdminUser.role
+        role: (req as AuthenticatedSuperAdminRequest).superAdminUser.role
       });
     } catch (error) {
       console.error("Error checking super admin auth status:", error);
