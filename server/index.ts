@@ -23,29 +23,6 @@ app.head('/health', (req, res) => {
   res.status(200).end();
 });
 
-// DIAGNOSTIC: Environment check endpoint for debugging published app issues (bypasses all auth)
-app.get('/debug/env', (req, res) => {
-  const envCheck = {
-    nodeEnv: process.env.NODE_ENV,
-    port: process.env.PORT,
-    hasDatabase: !!process.env.DATABASE_URL,
-    hasSendGrid: !!process.env.SENDGRID_API_KEY,
-    hasImpersonationSecret: !!process.env.IMPERSONATION_SECRET,
-    hasOpenAI: !!process.env.OPENAI_API_KEY,
-    hasSessionSecret: !!process.env.SESSION_SECRET,
-    timestamp: new Date().toISOString()
-  };
-  res.status(200).json(envCheck);
-});
-
-// DIAGNOSTIC: Simple test endpoint that always works (for production debugging)
-app.get('/debug/ping', (req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
-    message: 'Published app is responding',
-    timestamp: new Date().toISOString() 
-  });
-});
 
 // SECURITY: Configure session management with PostgreSQL store
 neonConfig.webSocketConstructor = ws;
@@ -58,7 +35,17 @@ app.use(session({
     tableName: 'session', // Uses PostgreSQL session table
     createTableIfMissing: true,
   }),
-  secret: process.env.SESSION_SECRET || 'fallback-secret-for-development-only',
+  secret: (() => {
+    const secret = process.env.SESSION_SECRET;
+    const isProduction = process.env.REPLIT_DEPLOYMENT === '1' || process.env.NODE_ENV === 'production';
+    
+    if (isProduction && !secret) {
+      console.error('🚨 SECURITY ERROR: SESSION_SECRET is required in production');
+      throw new Error('SESSION_SECRET environment variable is required in production');
+    }
+    
+    return secret || 'fallback-secret-for-development-only';
+  })(),
   resave: false,
   saveUninitialized: false,
   name: 'essayons.sid', // Custom session name
@@ -144,8 +131,10 @@ app.use((req, res, next) => {
     }
   });
 
-  // EMERGENCY: Simple Super Admin login bypass for broken routes.ts
-  app.post('/api/auth/super-admin/login', express.json(), async (req, res) => {
+  // EMERGENCY: Simple Super Admin login bypass for broken routes.ts (DEVELOPMENT ONLY)
+  const isProduction = process.env.REPLIT_DEPLOYMENT === '1' || process.env.NODE_ENV === 'production';
+  if (!isProduction) {
+    app.post('/api/auth/super-admin/login', express.json(), async (req, res) => {
     try {
       const { username, password } = req.body;
       
@@ -189,7 +178,10 @@ app.use((req, res, next) => {
       console.error('Emergency login error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
-  });
+    });
+  } else {
+    console.log("🔒 Production environment - emergency login route disabled for security");
+  }
 
   const server = await registerRoutes(app);
 
@@ -224,17 +216,27 @@ app.use((req, res, next) => {
     // Start background initialization AFTER server is listening
     // This ensures health checks respond immediately while init happens in background
     Promise.resolve().then(async () => {
-      // Seed the database in background
-      try {
-        await seedDatabase();
-      } catch (error) {
-        console.error("Database seeding failed:", error);
-        // Continue running even if seeding fails (e.g., if already seeded)
+      const isProduction = process.env.REPLIT_DEPLOYMENT === '1' || process.env.NODE_ENV === 'production';
+      
+      // PRODUCTION FIX: Skip seeding in production to prevent connection timeouts
+      if (!isProduction) {
+        console.log("🌱 Starting database seeding...");
+        try {
+          await seedDatabase();
+          console.log("🎉 Database seeding completed successfully!");
+        } catch (error) {
+          console.error("Database seeding failed:", error);
+          // Continue running even if seeding fails (e.g., if already seeded)
+        }
+      } else {
+        console.log("🏭 Production environment detected - skipping database seeding");
       }
 
-      // Initialize vector store in background
+      // Initialize vector store in background (safe for production)
       try {
+        console.log("Initializing vector store...");
         await initializeVectorStore();
+        console.log("✅ Vector store initialization complete");
       } catch (error) {
         console.error("Vector store initialization failed:", error);
         // Continue running even if vector store fails
