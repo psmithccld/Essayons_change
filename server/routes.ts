@@ -1518,7 +1518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Super Admin Auth Status
-  app.get("/api/super-admin/auth/status", requireSuperAdminAuth, async (req: Request & { superAdminUser: any }, res: Response) => {
+  app.get("/api/super-admin/auth/status", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
       res.json({
         user: req.superAdminUser,
@@ -2045,7 +2045,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Super Admin Session Cleanup (maintenance endpoint)
-  app.post("/api/super-admin/auth/cleanup-sessions", requireSuperAdminAuth, async (req: Request, res: Response) => {
+  app.post("/api/super-admin/auth/cleanup-sessions", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
       await storage.cleanupExpiredSuperAdminSessions();
       res.json({ message: "Session cleanup completed" });
@@ -3185,7 +3185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CRITICAL SECURITY: Generate secure impersonation token for super admin dashboard
-  app.post("/api/super-admin/support/impersonation/token", requireSuperAdminAuth, async (req: any, res: Response) => {
+  app.post("/api/super-admin/support/impersonation/token", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
       const { sessionId, organizationId, mode } = req.body;
       
@@ -3264,7 +3264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/super-admin/support/session - Start support session
-  app.post("/api/super-admin/support/session", requireSuperAdminAuth, async (req: any, res: Response) => {
+  app.post("/api/super-admin/support/session", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
       // SECURITY: Validate request body with Zod schema
       const validation = createSupportSessionSchema.safeParse(req.body);
@@ -3324,7 +3324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/super-admin/support/session - Get current support session
-  app.get("/api/super-admin/support/session", requireSuperAdminAuth, async (req: any, res: Response) => {
+  app.get("/api/super-admin/support/session", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
       const superAdminUserId = req.superAdminUser.id;
       const session = await storage.getCurrentSupportSession(superAdminUserId);
@@ -3337,7 +3337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/super-admin/support/session/:sessionId/end - End support session
-  app.patch("/api/super-admin/support/session/:sessionId/end", requireSuperAdminAuth, async (req: any, res: Response) => {
+  app.patch("/api/super-admin/support/session/:sessionId/end", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
       const { sessionId } = req.params;
       
@@ -3378,7 +3378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/super-admin/support/session/:sessionId/toggle-mode - Toggle support mode
-  app.patch("/api/super-admin/support/session/:sessionId/toggle-mode", requireSuperAdminAuth, async (req: any, res: Response) => {
+  app.patch("/api/super-admin/support/session/:sessionId/toggle-mode", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
       const { sessionId } = req.params;
       
@@ -3440,7 +3440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/super-admin/support/audit-logs - Get support audit logs
-  app.get("/api/super-admin/support/audit-logs", requireSuperAdminAuth, async (req: any, res: Response) => {
+  app.get("/api/super-admin/support/audit-logs", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
       const { organizationId, sessionId } = req.query;
       
