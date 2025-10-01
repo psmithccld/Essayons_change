@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "engines": { "node": "22.x" },
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
@@ -133,3 +134,4 @@
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
   }
+}
