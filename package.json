@@ -129,5 +129,11 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
+  },
+  "scripts": {
+    "migrate:gen": "drizzle-kit generate",
+    "migrate:apply": "drizzle-kit migrate",
+    "prestart": "npm run migrate:gen && npm run migrate:apply",
+    "start": "NODE_ENV=production node dist/index.js"
   }
 }
