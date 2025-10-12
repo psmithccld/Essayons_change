@@ -9,7 +9,6 @@ import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
 import { initializeVectorStore } from "./vectorStore";
 import { sql } from "drizzle-orm";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pkg from "pg";
 const { Pool } = pkg;
@@ -148,7 +147,7 @@ app.use((req, res, next) => {
 (async () => {
   try {
     // ✅ 1. RUN MIGRATIONS BEFORE ANYTHING ELSE
-    console.log("🚀 Running database migrations...");
+    console.log("ℹ️ Skipping drizzle migrate at runtime – schema is applied during build (db:push).");
     await migrate(db, { migrationsFolder: "migrations" });
     console.log("✅ Database migrations applied successfully");
 
