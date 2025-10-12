@@ -3,15 +3,19 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": "22.x" },
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "postbuild": "drizzle-kit generate",
     "start": "NODE_ENV=production node dist/index.js",
-    "check": "tsc"
-  }
- },
+    "check": "tsc",
+    "db:push": "drizzle-kit push --force",
+    "migrate:gen": "drizzle-kit generate",
+    "migrate:apply": "drizzle-kit migrate",
+    "prestart": "npm run migrate:gen && npm run migrate:apply"
+  },
   "dependencies": {
     "@google-cloud/storage": "^7.17.1",
     "@hookform/resolvers": "^3.10.0",
@@ -130,6 +134,10 @@
     "vite": "^5.4.19"
   },
   "optionalDependencies": {
+    "bufferutil": "^4.0.8"
+  }
+}
+
     "bufferutil": "^4.0.8"
   }
 }
