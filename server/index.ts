@@ -146,10 +146,7 @@ app.use((req, res, next) => {
 // -------------------------------------
 (async () => {
   try {
-    // ✅ 1. RUN MIGRATIONS BEFORE ANYTHING ELSE
-    console.log("ℹ️ Skipping drizzle migrate at runtime – schema is applied during build (db:push).");
-    await migrate(db, { migrationsFolder: "migrations" });
-    console.log("✅ Database migrations applied successfully");
+    // ✅ 1. (No runtime migrations) We apply schema during build (db:push)
 
     // 2. HEALTH + READY ENDPOINT
     app.get("/ready", async (_req, res) => {
@@ -222,4 +219,3 @@ app.use((req, res, next) => {
     process.exit(1);
   }
 })();
-
