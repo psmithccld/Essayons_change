@@ -1,10 +1,25 @@
 export async function seedDatabase() {
+  // ✅ Prevent any seeding in production
   if (process.env.NODE_ENV === 'production') {
     console.log('🏭 Production environment detected - skipping seedDatabase()');
     return;
+  }
+
+  console.log('🌱 Seeding database (development only)...');
+
+  // ✅ Import bcrypt dynamically (so it doesn’t break your build)
+  const { default: bcrypt } = await import('bcrypt'); 
+  // ⬆ if bcrypt still causes errors, replace 'bcrypt' with 'bcryptjs' 
+  // and run `npm install bcryptjs`
+
+  // Example usage — keep your own logic below
+  const hashedPassword = await bcrypt.hash('admin123', 10);
+
+  // Continue your existing seed logic (roles, users, etc.)
+  // Example:
+  // await db.insert(users).values({ username: 'admin', password_hash: hashedPassword });
 }
-  
-import bcrypt from 'bcrypt';
+
 import { db } from './db';
 import { roles, users, superAdminUsers, DEFAULT_PERMISSIONS, permissionsSchema } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';
