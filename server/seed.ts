@@ -1,3 +1,9 @@
+export async function seedDatabase() {
+  if (process.env.NODE_ENV === 'production') {
+    console.log('🏭 Production environment detected - skipping seedDatabase()');
+    return;
+}
+  
 import bcrypt from 'bcrypt';
 import { db } from './db';
 import { roles, users, superAdminUsers, DEFAULT_PERMISSIONS, permissionsSchema } from '@shared/schema';
