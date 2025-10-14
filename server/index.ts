@@ -1,3 +1,5 @@
+console.log('DATABASE_URL:', process.env.DATABASE_URL);
+
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection:', reason);
 });
