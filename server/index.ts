@@ -5,6 +5,8 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
 
+console.log("Startup: Top-level script loaded."); // <--- Added
+
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import cookieParser from "cookie-parser";
@@ -20,22 +22,24 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pkg from "pg";
 const { Pool } = pkg;
 
-// -------------------------------------
+console.log("Startup: All imports completed."); // <--- Added
+
 // EXPRESS INITIALIZATION
-// -------------------------------------
 const app = express();
+console.log("Startup: Express initialized."); // <--- Added
 
 // Create a single shared Postgres pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // Fix self-signed cert
+  ssl: { rejectUnauthorized: false }
 });
 
-const db = drizzle(pool);
+console.log("Startup: Postgres pool created."); // <--- Added
 
-// -------------------------------------
+const db = drizzle(pool);
+console.log("Startup: Drizzle DB initialized."); // <--- Added
+
 // HEALTH ENDPOINTS
-// -------------------------------------
 app.get("/health", (_req, res) =>
   res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() })
 );
@@ -66,9 +70,9 @@ app.get("/", (req, res, next) => {
 
 app.head("/", (_req, res) => res.status(200).end());
 
-// -------------------------------------
+console.log("Startup: Health endpoints registered."); // <--- Added
+
 // SESSION CONFIGURATION
-// -------------------------------------
 neonConfig.webSocketConstructor = ws;
 const pgPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 const PgSession = ConnectPgSimple(session);
@@ -105,9 +109,9 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// -------------------------------------
+console.log("Startup: Session and middleware registered."); // <--- Added
+
 // STATIC EXPORTS
-// -------------------------------------
 app.use(
   "/exports",
   express.static("exports", {
@@ -121,9 +125,9 @@ app.use(
   })
 );
 
-// -------------------------------------
+console.log("Startup: Static exports registered."); // <--- Added
+
 // REQUEST LOGGING MIDDLEWARE
-// -------------------------------------
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -148,14 +152,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// -------------------------------------
+console.log("Startup: Request logging middleware registered."); // <--- Added
+
 // ASYNC STARTUP WRAPPER
-// -------------------------------------
 (async () => {
   try {
     console.log("Startup: Entered async wrapper.");
 
-    // 1. HEALTH + READY ENDPOINT
+    // HEALTH + READY ENDPOINT
     app.get("/ready", async (_req, res) => {
       try {
         await db.execute(sql`SELECT 1`);
@@ -175,12 +179,13 @@ app.use((req, res, next) => {
       }
     });
 
-    // 2. REGISTER ROUTES
+    // REGISTER ROUTES
     try {
       await registerRoutes(app);
       console.log("Startup: registerRoutes complete.");
     } catch (err) {
       console.error("Startup: Error in registerRoutes:", err);
+      throw err;
     }
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -189,7 +194,7 @@ app.use((req, res, next) => {
       throw err;
     });
 
-    // 3. VITE/STATIC
+    // VITE/STATIC
     try {
       if (app.get("env") === "development") {
         await setupVite(app);
@@ -200,9 +205,10 @@ app.use((req, res, next) => {
       }
     } catch (err) {
       console.error("Startup: Error in serveStatic/setupVite:", err);
+      throw err;
     }
 
-    // 4. SERVER START
+    // SERVER START
     const port = parseInt(process.env.PORT || "5000", 10);
     console.log("Startup: Before app.listen");
     app.listen(port, "0.0.0.0", () => {
@@ -211,7 +217,7 @@ app.use((req, res, next) => {
       console.log("Startup: After app.listen");
     });
 
-    // 5. SEED ONLY IN DEV
+    // SEED ONLY IN DEV
     const isProduction = process.env.NODE_ENV === "production";
     if (!isProduction) {
       console.log("Startup: Starting database seeding...");
@@ -225,7 +231,7 @@ app.use((req, res, next) => {
       console.log("Startup: Production environment detected - skipping database seeding");
     }
 
-    // 6. INITIALIZE VECTOR STORE
+    // INITIALIZE VECTOR STORE
     try {
       console.log("Startup: Initializing vector store...");
       await initializeVectorStore();
