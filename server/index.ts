@@ -1,14 +1,3 @@
-console.log('DATABASE_URL:', process.env.DATABASE_URL);
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection:', reason);
-});
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-});
-
-console.log("Startup: Top-level script loaded."); // <--- Added
-
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import cookieParser from "cookie-parser";
@@ -24,6 +13,18 @@ import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pkg from "pg";
 const { Pool } = pkg;
+
+// Top-level logging
+console.log('DATABASE_URL:', process.env.DATABASE_URL);
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+console.log("Startup: Top-level script loaded."); // <--- Added
 
 console.log("Startup: All imports completed."); // <--- Added
 
@@ -131,7 +132,6 @@ app.use(
 console.log("Startup: Static exports registered."); // <--- Added
 
 // REQUEST LOGGING MIDDLEWARE
-// If log() comes from ./vite, you need to dynamically import it below!
 let log = console.log;
 app.use((req, res, next) => {
   const start = Date.now();
@@ -218,15 +218,6 @@ console.log("Startup: Request logging middleware registered."); // <--- Added
       throw err;
     }
 
-    // SERVER START
-    const port = parseInt(process.env.PORT || "5000", 10);
-    console.log("Startup: Before app.listen");
-    app.listen(port, "0.0.0.0", () => {
-      log(`serving on port ${port}`);
-      console.log("🚀 Server ready for health checks - serving on port", port);
-      console.log("Startup: After app.listen");
-    });
-
     // SEED ONLY IN DEV
     const isProduction = process.env.NODE_ENV === "production";
     if (!isProduction) {
@@ -256,3 +247,12 @@ console.log("Startup: Request logging middleware registered."); // <--- Added
     process.exit(1);
   }
 })();
+
+// SERVER START: This must run at top-level, outside of async wrapper!
+const port = parseInt(process.env.PORT || "5000", 10);
+console.log("Startup: Before app.listen");
+app.listen(port, "0.0.0.0", () => {
+  log(`serving on port ${port}`);
+  console.log("🚀 Server ready for health checks - serving on port", port);
+  console.log("Startup: After app.listen");
+});
