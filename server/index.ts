@@ -24,13 +24,13 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
 
-console.log("Startup: Top-level script loaded."); // <--- Added
+console.log("Startup: Top-level script loaded.");
 
-console.log("Startup: All imports completed."); // <--- Added
+console.log("Startup: All imports completed.");
 
 // EXPRESS INITIALIZATION
 const app = express();
-console.log("Startup: Express initialized."); // <--- Added
+console.log("Startup: Express initialized.");
 
 // Create a single shared Postgres pool
 const pool = new Pool({
@@ -38,10 +38,10 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-console.log("Startup: Postgres pool created."); // <--- Added
+console.log("Startup: Postgres pool created.");
 
 const db = drizzle(pool);
-console.log("Startup: Drizzle DB initialized."); // <--- Added
+console.log("Startup: Drizzle DB initialized.");
 
 // HEALTH ENDPOINTS
 app.get("/health", (_req, res) =>
@@ -74,7 +74,7 @@ app.get("/", (req, res, next) => {
 
 app.head("/", (_req, res) => res.status(200).end());
 
-console.log("Startup: Health endpoints registered."); // <--- Added
+console.log("Startup: Health endpoints registered.");
 
 // SESSION CONFIGURATION
 neonConfig.webSocketConstructor = ws;
@@ -113,7 +113,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-console.log("Startup: Session and middleware registered."); // <--- Added
+console.log("Startup: Session and middleware registered.");
 
 // STATIC EXPORTS
 app.use(
@@ -129,7 +129,7 @@ app.use(
   })
 );
 
-console.log("Startup: Static exports registered."); // <--- Added
+console.log("Startup: Static exports registered.");
 
 // REQUEST LOGGING MIDDLEWARE
 let log = console.log;
@@ -157,7 +157,7 @@ app.use((req, res, next) => {
   next();
 });
 
-console.log("Startup: Request logging middleware registered."); // <--- Added
+console.log("Startup: Request logging middleware registered.");
 
 // ASYNC STARTUP WRAPPER
 (async () => {
@@ -241,18 +241,18 @@ console.log("Startup: Request logging middleware registered."); // <--- Added
       console.error("Startup: Vector store initialization failed:", error);
     }
 
+    // SERVER START: THIS IS THE KEY PART!
+    const port = parseInt(process.env.PORT || "5000", 10);
+    console.log("Startup: Before app.listen");
+    app.listen(port, "0.0.0.0", () => {
+      log(`serving on port ${port}`);
+      console.log("🚀 Server ready for health checks - serving on port", port);
+      console.log("Startup: After app.listen");
+    });
+
     console.log("Startup: ✅ Server initialization complete");
   } catch (err) {
     console.error("❌ Startup failed:", err);
     process.exit(1);
   }
 })();
-
-// SERVER START: This must run at top-level, outside of async wrapper!
-const port = parseInt(process.env.PORT || "5000", 10);
-console.log("Startup: Before app.listen");
-app.listen(port, "0.0.0.0", () => {
-  log(`serving on port ${port}`);
-  console.log("🚀 Server ready for health checks - serving on port", port);
-  console.log("Startup: After app.listen");
-});
