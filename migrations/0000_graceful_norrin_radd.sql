@@ -589,7 +589,7 @@ CREATE TABLE "system_settings" (
 	"security" jsonb DEFAULT '{"passwordMinLength":8,"passwordRequireSpecialChars":true,"sessionTimeoutMinutes":120,"maxLoginAttempts":5,"twoFactorRequired":false,"ipWhitelist":[]}'::jsonb NOT NULL,
 	"email" jsonb DEFAULT '{"fromName":"Platform Support","fromEmail":"noreply@platform.com","replyToEmail":"support@platform.com","supportEmail":"help@platform.com","maxDailyEmails":10000}'::jsonb NOT NULL,
 	"limits" jsonb DEFAULT '{"maxOrganizations":1000,"maxUsersPerOrganization":500,"maxProjectsPerOrganization":100,"maxStoragePerOrganizationMB":5000}'::jsonb NOT NULL,
-	"maintenance" jsonb DEFAULT '{"scheduledMaintenanceStart":null,"scheduledMaintenanceEnd":null,"maintenanceMessage":"The platform is currently undergoing maintenance. We'll be back shortly."}'::jsonb NOT NULL,
+	"maintenance" jsonb DEFAULT '{"scheduledMaintenanceStart":null,"scheduledMaintenanceEnd":null,"maintenanceMessage":"The platform is currently undergoing maintenance. We will be back shortly."}'::jsonb NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
