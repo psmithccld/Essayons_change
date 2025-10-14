@@ -5,8 +5,6 @@ import { neonConfig } from "@neondatabase/serverless";
 import ConnectPgSimple from "connect-pg-simple";
 import ws from "ws";
 import { registerRoutes } from "./routes";
-// REMOVE the static import for Vite-related functionality!
-// import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
 import { initializeVectorStore } from "./vectorStore";
 import { sql } from "drizzle-orm";
@@ -25,7 +23,6 @@ process.on('uncaughtException', (err) => {
 });
 
 console.log("Startup: Top-level script loaded.");
-
 console.log("Startup: All imports completed.");
 
 // EXPRESS INITIALIZATION
@@ -37,7 +34,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
-
 console.log("Startup: Postgres pool created.");
 
 const db = drizzle(pool);
@@ -190,13 +186,13 @@ console.log("Startup: Request logging middleware registered.");
       console.log("Startup: registerRoutes complete.");
     } catch (err) {
       console.error("Startup: Error in registerRoutes:", err);
-      throw err;
+      // Do NOT throw or return here!
     }
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || 500;
       res.status(status).json({ message: err.message || "Internal Server Error" });
-      throw err;
+      // Do NOT throw or return here!
     });
 
     // VITE/STATIC
@@ -207,7 +203,6 @@ console.log("Startup: Request logging middleware registered.");
         log = viteLog;
         console.log("Startup: setupVite complete.");
       } else {
-        // Only import serveStatic & log if needed!
         const { serveStatic, log: viteLog } = await import("./vite");
         serveStatic(app);
         log = viteLog;
@@ -215,7 +210,7 @@ console.log("Startup: Request logging middleware registered.");
       }
     } catch (err) {
       console.error("Startup: Error in serveStatic/setupVite:", err);
-      throw err;
+      // Do NOT throw or return here!
     }
 
     // SEED ONLY IN DEV
@@ -227,6 +222,7 @@ console.log("Startup: Request logging middleware registered.");
         console.log("Startup: 🎉 Database seeding completed successfully!");
       } catch (error) {
         console.error("Startup: Database seeding failed:", error);
+        // Do NOT throw or return here!
       }
     } else {
       console.log("Startup: Production environment detected - skipping database seeding");
@@ -239,6 +235,7 @@ console.log("Startup: Request logging middleware registered.");
       console.log("Startup: ✅ Vector store initialization complete");
     } catch (error) {
       console.error("Startup: Vector store initialization failed:", error);
+      // Do NOT throw or return here!
     }
 
     // SERVER START: THIS IS THE KEY PART!
