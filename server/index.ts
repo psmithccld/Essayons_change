@@ -153,9 +153,9 @@ app.use((req, res, next) => {
 // -------------------------------------
 (async () => {
   try {
-    // ✅ 1. (No runtime migrations) We apply schema during build (db:push)
+    console.log("Startup: Entered async wrapper.");
 
-    // 2. HEALTH + READY ENDPOINT
+    // 1. HEALTH + READY ENDPOINT
     app.get("/ready", async (_req, res) => {
       try {
         await db.execute(sql`SELECT 1`);
@@ -175,8 +175,13 @@ app.use((req, res, next) => {
       }
     });
 
-    // ✅ 3. REGISTER ROUTES
-    await registerRoutes(app);
+    // 2. REGISTER ROUTES
+    try {
+      await registerRoutes(app);
+      console.log("Startup: registerRoutes complete.");
+    } catch (err) {
+      console.error("Startup: Error in registerRoutes:", err);
+    }
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || 500;
@@ -184,43 +189,52 @@ app.use((req, res, next) => {
       throw err;
     });
 
-    if (app.get("env") === "development") {
-      await setupVite(app);
-    } else {
-      serveStatic(app);
+    // 3. VITE/STATIC
+    try {
+      if (app.get("env") === "development") {
+        await setupVite(app);
+        console.log("Startup: setupVite complete.");
+      } else {
+        serveStatic(app);
+        console.log("Startup: serveStatic complete.");
+      }
+    } catch (err) {
+      console.error("Startup: Error in serveStatic/setupVite:", err);
     }
 
-    // ✅ 4. START SERVER (updated to use app.listen)
+    // 4. SERVER START
     const port = parseInt(process.env.PORT || "5000", 10);
+    console.log("Startup: Before app.listen");
     app.listen(port, "0.0.0.0", () => {
       log(`serving on port ${port}`);
       console.log("🚀 Server ready for health checks - serving on port", port);
+      console.log("Startup: After app.listen");
     });
 
-    // ✅ 5. SEED ONLY IN DEV
+    // 5. SEED ONLY IN DEV
     const isProduction = process.env.NODE_ENV === "production";
     if (!isProduction) {
-      console.log("🌱 Starting database seeding...");
+      console.log("Startup: Starting database seeding...");
       try {
         await seedDatabase();
-        console.log("🎉 Database seeding completed successfully!");
+        console.log("Startup: 🎉 Database seeding completed successfully!");
       } catch (error) {
-        console.error("Database seeding failed:", error);
+        console.error("Startup: Database seeding failed:", error);
       }
     } else {
-      console.log("🏭 Production environment detected - skipping database seeding");
+      console.log("Startup: Production environment detected - skipping database seeding");
     }
 
-    // ✅ 6. INITIALIZE VECTOR STORE
+    // 6. INITIALIZE VECTOR STORE
     try {
-      console.log("Initializing vector store...");
+      console.log("Startup: Initializing vector store...");
       await initializeVectorStore();
-      console.log("✅ Vector store initialization complete");
+      console.log("Startup: ✅ Vector store initialization complete");
     } catch (error) {
-      console.error("Vector store initialization failed:", error);
+      console.error("Startup: Vector store initialization failed:", error);
     }
 
-    console.log("✅ Server initialization complete");
+    console.log("Startup: ✅ Server initialization complete");
   } catch (err) {
     console.error("❌ Startup failed:", err);
     process.exit(1);
