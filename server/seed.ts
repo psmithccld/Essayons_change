@@ -1,5 +1,3 @@
-// Revised seed.ts for Render deployment and local development
-
 import { db } from './db';
 import { roles, users, superAdminUsers, DEFAULT_PERMISSIONS, permissionsSchema } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';

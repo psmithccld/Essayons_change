@@ -16,7 +16,8 @@ import { neonConfig } from "@neondatabase/serverless";
 import ConnectPgSimple from "connect-pg-simple";
 import ws from "ws";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+// REMOVE the static import for Vite-related functionality!
+// import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
 import { initializeVectorStore } from "./vectorStore";
 import { sql } from "drizzle-orm";
@@ -130,6 +131,8 @@ app.use(
 console.log("Startup: Static exports registered."); // <--- Added
 
 // REQUEST LOGGING MIDDLEWARE
+// If log() comes from ./vite, you need to dynamically import it below!
+let log = console.log;
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -199,10 +202,15 @@ console.log("Startup: Request logging middleware registered."); // <--- Added
     // VITE/STATIC
     try {
       if (app.get("env") === "development") {
+        const { setupVite, log: viteLog } = await import("./vite");
         await setupVite(app);
+        log = viteLog;
         console.log("Startup: setupVite complete.");
       } else {
+        // Only import serveStatic & log if needed!
+        const { serveStatic, log: viteLog } = await import("./vite");
         serveStatic(app);
+        log = viteLog;
         console.log("Startup: serveStatic complete.");
       }
     } catch (err) {
