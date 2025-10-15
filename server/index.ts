@@ -238,18 +238,17 @@ console.log("Startup: Request logging middleware registered.");
       // Do NOT throw or return here!
     }
 
-    // SERVER START: THIS IS THE KEY PART!
-    const port = parseInt(process.env.PORT || "5000", 10);
-    console.log("Startup: Before app.listen");
-    app.listen(port, "0.0.0.0", () => {
-      log(`serving on port ${port}`);
-      console.log("🚀 Server ready for health checks - serving on port", port);
-      console.log("Startup: After app.listen");
-    });
-
     console.log("Startup: ✅ Server initialization complete");
   } catch (err) {
     console.error("❌ Startup failed:", err);
     process.exit(1);
   }
 })();
+
+// OUTSIDE the async wrapper, at top-level:
+const port = parseInt(process.env.PORT || "5000", 10);
+console.log("Startup: Before app.listen (outside async)");
+app.listen(port, "0.0.0.0", () => {
+  console.log(`🚀 Server listening on port ${port}`);
+  console.log("Startup: After app.listen (outside async)");
+});
