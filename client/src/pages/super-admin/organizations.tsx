@@ -73,12 +73,12 @@ interface Organization {
   billingEmail: string;
   taxId?: string;
   userCount: number;
-  planName?: string;
+  tierName?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-interface Plan {
+interface CustomerTier {
   id: string;
   name: string;
   description?: string;
@@ -89,8 +89,8 @@ interface Plan {
 
 interface SubscriptionInfo {
   id?: string;
-  planId?: string;
-  planName?: string;
+  tierId?: string;
+  tierName?: string;
   status?: string;
   seatsPurchased?: number;
   currentPeriodEnd?: string;
@@ -103,17 +103,17 @@ export default function SuperAdminOrganizations() {
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string>("");
+  const [selectedTier, setSelectedTier] = useState<string>("");
   const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
   const { isAuthenticated } = useSuperAdmin();
   const { toast } = useToast();
   
-  // Fetch available plans from API
-  const { data: plansData } = useQuery({
-    queryKey: ["/api/super-admin/plans"],
+  // Fetch available customer tiers from API
+  const { data: tiersData } = useQuery({
+    queryKey: ["/api/super-admin/customer-tiers"],
     enabled: isAuthenticated
   });
-  const availablePlans = plansData?.plans || [];
+  const availableTiers = tiersData?.tiers || tiersData?.plans || [];
 
   // Fetch organizations
   const { data: organizations = [], isLoading, refetch } = useQuery({
@@ -202,9 +202,9 @@ export default function SuperAdminOrganizations() {
         maxUsers: data.maxUsers,
         taxId: data.taxId,
         status: data.isActive ? "active" : "inactive", // Map isActive to status
-        // Include selected plan information
-        planId: selectedPlan || undefined,
-        planName: selectedPlan ? availablePlans.find(p => p.id === selectedPlan)?.name : undefined
+        // Include selected customer tier information
+        tierId: selectedTier || undefined,
+        tierName: selectedTier ? availableTiers.find(t => t.id === selectedTier)?.name : undefined
       };
       
       const response = await fetch(`/api/super-admin/organizations/${id}`, {
@@ -225,7 +225,7 @@ export default function SuperAdminOrganizations() {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/organizations"] });
       setIsEditDialogOpen(false);
       setSelectedOrg(null);
-      setSelectedPlan("");
+      setSelectedTier("");
       setSubscriptionInfo(null);
       editForm.reset();
       toast({
@@ -332,12 +332,12 @@ export default function SuperAdminOrganizations() {
       taxId: org.taxId || "",
     });
     
-    // Find and set current plan if organization has one
-    const orgPlan = availablePlans.find(plan => plan.name === org.planName);
-    if (orgPlan) {
-      setSelectedPlan(orgPlan.id);
+    // Find and set current tier if organization has one
+    const orgTier = availableTiers.find(tier => tier.name === org.tierName);
+    if (orgTier) {
+      setSelectedTier(orgTier.id);
     } else {
-      setSelectedPlan("");
+      setSelectedTier("");
     }
     
     // Reset subscription info for now (could be loaded from API in future)
@@ -627,9 +627,9 @@ export default function SuperAdminOrganizations() {
                       <Badge variant={org.isActive ? "default" : "secondary"}>
                         {org.isActive ? "Active" : "Inactive"}
                       </Badge>
-                      {org.planName && (
+                      {org.tierName && (
                         <Badge variant="outline">
-                          {org.planName}
+                          {org.tierName}
                         </Badge>
                       )}
                     </div>
@@ -855,23 +855,23 @@ export default function SuperAdminOrganizations() {
                       </div>
                       
                       <div className="grid gap-4">
-                        {availablePlans.map((plan) => (
-                          <Card key={plan.id} className={`cursor-pointer transition-all ${selectedPlan === plan.id ? 'ring-2 ring-primary' : ''}`} onClick={() => setSelectedPlan(plan.id)}>
+                        {availableTiers.map((tier) => (
+                          <Card key={tier.id} className={`cursor-pointer transition-all ${selectedTier === tier.id ? 'ring-2 ring-primary' : ''}`} onClick={() => setSelectedTier(tier.id)}>
                             <CardContent className="pt-4">
                               <div className="flex items-center justify-between">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-3 mb-2">
-                                    <h4 className="font-semibold">{plan.name}</h4>
+                                    <h4 className="font-semibold">{tier.name}</h4>
                                     <Badge variant="outline">
-                                      ${(plan.priceCents / 100).toFixed(2)}/seat/month
+                                      ${(tier.priceCents / 100).toFixed(2)}/seat/month
                                     </Badge>
                                     <Badge variant="secondary">
-                                      Up to {plan.maxSeats} seats
+                                      Up to {tier.maxSeats} seats
                                     </Badge>
                                   </div>
-                                  <p className="text-sm text-muted-foreground mb-2">{plan.description}</p>
+                                  <p className="text-sm text-muted-foreground mb-2">{tier.description}</p>
                                   <div className="flex flex-wrap gap-1">
-                                    {Object.entries(plan.features).map(([feature, enabled]) => enabled && (
+                                    {Object.entries(tier.features).map(([feature, enabled]) => enabled && (
                                       <Badge key={feature} variant="outline" className="text-xs">
                                         {feature}
                                       </Badge>
@@ -881,10 +881,10 @@ export default function SuperAdminOrganizations() {
                                 <div className="flex items-center">
                                   <input
                                     type="radio"
-                                    name="plan"
-                                    value={plan.id}
-                                    checked={selectedPlan === plan.id}
-                                    onChange={() => setSelectedPlan(plan.id)}
+                                    name="tier"
+                                    value={tier.id}
+                                    checked={selectedTier === tier.id}
+                                    onChange={() => setSelectedTier(tier.id)}
                                     className="h-4 w-4"
                                   />
                                 </div>
@@ -894,7 +894,7 @@ export default function SuperAdminOrganizations() {
                         ))}
                       </div>
 
-                      {selectedPlan && (
+                      {selectedTier && (
                         <Card className="bg-muted/50">
                           <CardContent className="pt-4">
                             <div className="flex items-center gap-2 mb-2">
@@ -903,16 +903,16 @@ export default function SuperAdminOrganizations() {
                             </div>
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
-                                <span className="text-muted-foreground">Selected Plan:</span>
-                                <div className="font-medium">{availablePlans.find(p => p.id === selectedPlan)?.name}</div>
+                                <span className="text-muted-foreground">Selected Tier:</span>
+                                <div className="font-medium">{availableTiers.find(t => t.id === selectedTier)?.name}</div>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Price per Seat:</span>
-                                <div className="font-medium">${(availablePlans.find(p => p.id === selectedPlan)?.priceCents || 0) / 100}/month</div>
+                                <div className="font-medium">${(availableTiers.find(t => t.id === selectedTier)?.priceCents || 0) / 100}/month</div>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Max Seats:</span>
-                                <div className="font-medium">{availablePlans.find(p => p.id === selectedPlan)?.seatLimit}</div>
+                                <div className="font-medium">{availableTiers.find(t => t.id === selectedTier)?.maxSeats}</div>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Current Users:</span>
@@ -999,9 +999,9 @@ export default function SuperAdminOrganizations() {
 
                 <div className="flex justify-between">
                   <div>
-                    {selectedPlan && selectedPlan !== selectedOrg?.planName && (
+                    {selectedTier && selectedTier !== selectedOrg?.tierName && (
                       <p className="text-sm text-muted-foreground">
-                        Plan will be updated to: <strong>{availablePlans.find(p => p.id === selectedPlan)?.name}</strong>
+                        Tier will be updated to: <strong>{availableTiers.find(t => t.id === selectedTier)?.name}</strong>
                       </p>
                     )}
                   </div>
