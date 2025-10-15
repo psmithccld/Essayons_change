@@ -207,3 +207,23 @@ export async function migrateUsersToRoleId() {
     throw error;
   }
 }
+// ... all other imports and code ...
+
+// DO NOT call seedDatabase and process.exit() automatically if this file is imported or bundled.
+// If you want to seed manually, run a dedicated script, like:
+//    tsx server/seed.ts
+
+// Example of a safe approach:
+if (import.meta.url === `file://${process.argv[1]}`) {
+  seedDatabase()
+    .then(() => {
+      console.log('Database seeding completed.');
+      // DO NOT call process.exit() here!
+    })
+    .catch((error) => {
+      console.error('Database seeding failed:', error);
+      // DO NOT call process.exit() here!
+    });
+}
+
+// Or simply REMOVE the entire block above if you only seed from your main app logic.
