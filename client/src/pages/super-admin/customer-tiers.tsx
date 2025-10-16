@@ -127,13 +127,14 @@ export default function SuperAdminCustomerTiers() {
 
   // Fetch plans
   const { data: plans = [], isLoading, refetch } = useQuery({
-    queryKey: ["/api/super-admin/plans"],
+    queryKey: ["/api/super-admin/customer-tiers"],
     queryFn: async () => {
-      const response = await fetch("/api/super-admin/plans", {
+      const response = await fetch("/api/super-admin/customer-tiers", {
         credentials: 'include', // Use cookies for authentication
       });
-      if (!response.ok) throw new Error("Failed to fetch plans");
-      return response.json() as Promise<Plan[]>;
+      if (!response.ok) throw new Error("Failed to fetch customer tiers");
+      const result = await response.json();
+      return result.tiers as Plan[];
     },
     enabled: isAuthenticated,
   });
@@ -141,7 +142,7 @@ export default function SuperAdminCustomerTiers() {
   // Create plan mutation
   const createPlanMutation = useMutation({
     mutationFn: async (data: PlanFormData) => {
-      const response = await fetch("/api/super-admin/plans", {
+      const response = await fetch("/api/super-admin/customer-tiers", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -151,12 +152,12 @@ export default function SuperAdminCustomerTiers() {
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to create plan");
+        throw new Error(error.error || "Failed to create customer tier");
       }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/plans"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/customer-tiers"] });
       setIsCreateDialogOpen(false);
       createForm.reset();
       toast({
@@ -176,7 +177,7 @@ export default function SuperAdminCustomerTiers() {
   // Update plan mutation
   const updatePlanMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: PlanFormData }) => {
-      const response = await fetch(`/api/super-admin/plans/${id}`, {
+      const response = await fetch(`/api/super-admin/customer-tiers/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -186,12 +187,12 @@ export default function SuperAdminCustomerTiers() {
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to update plan");
+        throw new Error(error.error || "Failed to update customer tier");
       }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/plans"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/customer-tiers"] });
       setIsEditDialogOpen(false);
       setSelectedPlan(null);
       editForm.reset();
@@ -212,17 +213,17 @@ export default function SuperAdminCustomerTiers() {
   // Delete plan mutation
   const deletePlanMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/super-admin/plans/${id}`, {
+      const response = await fetch(`/api/super-admin/customer-tiers/${id}`, {
         method: "DELETE",
         credentials: 'include', // Use cookies for authentication
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to delete plan");
+        throw new Error(error.error || "Failed to delete customer tier");
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/plans"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/customer-tiers"] });
       toast({
         title: "Success",
         description: "Customer tier deleted successfully",
@@ -315,121 +316,87 @@ export default function SuperAdminCustomerTiers() {
     }
   };
 
-  const renderPlanCard = (plan: Plan) => (
-    <Card key={plan.id} className={`relative ${plan.isPopular ? 'ring-2 ring-blue-500' : ''}`}>
-      {plan.isPopular && (
-        <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-          <Badge className="bg-blue-500 text-white px-3">
-            <Star className="h-3 w-3 mr-1" />
-            Popular
-          </Badge>
-        </div>
-      )}
-      
-      <CardHeader className="text-center pb-4">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          {plan.name === "Enterprise" && <Crown className="h-5 w-5 text-yellow-500" />}
-          {plan.name === "Pro" && <Zap className="h-5 w-5 text-purple-500" />}
-          {plan.name === "Basic" && <Package className="h-5 w-5 text-blue-500" />}
-          <CardTitle className="text-xl" data-testid={`plan-name-${plan.id}`}>{plan.name}</CardTitle>
-        </div>
-        
-        <div className="flex items-center justify-center gap-1">
-          <span className="text-3xl font-bold">${plan.price}</span>
-          <span className="text-muted-foreground">/{plan.billingInterval}</span>
-        </div>
-        
-        {plan.description && (
-          <CardDescription className="mt-2">{plan.description}</CardDescription>
-        )}
-        
-        <div className="flex items-center justify-center gap-2 mt-3">
-          <Badge variant={plan.isActive ? "default" : "secondary"}>
-            {plan.isActive ? "Active" : "Inactive"}
-          </Badge>
-          <Badge variant="outline">
-            <Users className="h-3 w-3 mr-1" />
-            {plan.organizationCount} orgs
-          </Badge>
-        </div>
-      </CardHeader>
-      
-      <CardContent className="space-y-4">
-        {/* Key Features */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span>Max Projects</span>
-            <span className="font-medium">{plan.features.maxProjects}</span>
+  const renderPlanCard = (plan: Plan) => {
+    // Calculate price display from cents
+    const pricePerSeat = (plan.pricePerSeatCents / 100).toFixed(2);
+    
+    return (
+      <Card key={plan.id} className="relative">
+        <CardHeader className="text-center pb-4">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            {plan.name.toLowerCase().includes("enterprise") && <Crown className="h-5 w-5 text-yellow-500" />}
+            {plan.name.toLowerCase().includes("pro") && <Zap className="h-5 w-5 text-purple-500" />}
+            {plan.name.toLowerCase().includes("basic") && <Package className="h-5 w-5 text-blue-500" />}
+            <CardTitle className="text-xl" data-testid={`plan-name-${plan.id}`}>{plan.name}</CardTitle>
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <span>Max Users</span>
-            <span className="font-medium">{plan.features.maxUsers}</span>
+          
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-3xl font-bold">${pricePerSeat}</span>
+            <span className="text-muted-foreground">/seat</span>
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <span>Storage</span>
-            <span className="font-medium">{plan.features.maxStorage} GB</span>
+          
+          {plan.description && (
+            <CardDescription className="mt-2">{plan.description}</CardDescription>
+          )}
+          
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <Badge variant={plan.isActive ? "default" : "secondary"}>
+              {plan.isActive ? "Active" : "Inactive"}
+            </Badge>
+            <Badge variant="outline">
+              <Users className="h-3 w-3 mr-1" />
+              {plan.seatLimit} max seats
+            </Badge>
           </div>
-        </div>
+        </CardHeader>
         
-        {/* Feature Toggles */}
-        <div className="space-y-1 pt-2 border-t">
-          {Object.entries(FEATURE_DEFINITIONS).map(([key, feature]) => {
-            if (feature.type === "boolean") {
-              const hasFeature = plan.features[key as keyof typeof plan.features] as boolean;
-              return (
-                <div key={key} className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{feature.name}</span>
-                  {hasFeature ? (
-                    <Check className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <X className="h-4 w-4 text-gray-400" />
-                  )}
-                </div>
-              );
-            }
-            return null;
-          })}
-        </div>
-        
-        {/* Stripe Integration */}
-        {plan.stripeProductId && (
-          <div className="pt-2 border-t">
-            <p className="text-xs text-muted-foreground">
-              Stripe Product: {plan.stripeProductId}
-            </p>
-            {plan.stripePriceId && (
-              <p className="text-xs text-muted-foreground">
-                Price: {plan.stripePriceId}
-              </p>
-            )}
+        <CardContent className="space-y-4">
+          {/* Feature Toggles */}
+          <div className="space-y-1">
+            {Object.entries(FEATURE_DEFINITIONS).map(([key, feature]) => {
+              if (feature.type === "boolean") {
+                const hasFeature = plan.features[key as keyof typeof plan.features] as boolean;
+                return (
+                  <div key={key} className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{feature.name}</span>
+                    {hasFeature ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <X className="h-4 w-4 text-gray-400" />
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })}
           </div>
-        )}
-        
-        {/* Actions */}
-        <div className="flex gap-2 pt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            onClick={() => handleEditPlan(plan)}
-            data-testid={`button-edit-plan-${plan.id}`}
-          >
-            <Edit className="h-3 w-3 mr-1" />
-            Edit
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleDeletePlan(plan.id)}
-            className="text-red-600 hover:text-red-700"
-            data-testid={`button-delete-plan-${plan.id}`}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+          
+          {/* Actions */}
+          <div className="flex gap-2 pt-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => handleEditPlan(plan)}
+              data-testid={`button-edit-plan-${plan.id}`}
+            >
+              <Edit className="h-3 w-3 mr-1" />
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleDeletePlan(plan.id)}
+              className="text-red-600 hover:text-red-700"
+              data-testid={`button-delete-plan-${plan.id}`}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -468,44 +435,19 @@ export default function SuperAdminCustomerTiers() {
                   </TabsList>
                   
                   <TabsContent value="basic" className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={createForm.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Plan Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="e.g. Pro, Enterprise" data-testid="input-plan-name" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={createForm.control}
-                        name="currency"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Currency</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-currency">
-                                  <SelectValue placeholder="Select currency" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="USD">USD</SelectItem>
-                                <SelectItem value="EUR">EUR</SelectItem>
-                                <SelectItem value="GBP">GBP</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                    <FormField
+                      control={createForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Plan Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="e.g. Pro, Enterprise" data-testid="input-plan-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                     <FormField
                       control={createForm.control}
