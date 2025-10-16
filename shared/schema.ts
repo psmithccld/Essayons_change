@@ -284,10 +284,10 @@ export const organizationMemberships = pgTable("organization_memberships", {
   userIdx: index("org_memberships_user_idx").on(table.userId),
 }));
 
-// Subscription plans - licensing tiers with features and limits
-export const plans = pgTable("plans", {
+// Customer tiers - licensing tiers with features and limits
+export const customerTiers = pgTable("customer_tiers", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(), // "Basic Plan", "Professional", etc.
+  name: text("name").notNull(), // "Basic", "Professional", "Enterprise", etc.
   description: text("description"),
   seatLimit: integer("seat_limit").notNull(), // Maximum users per organization
   pricePerSeatCents: integer("price_per_seat_cents").notNull(), // Price per seat in cents
@@ -296,14 +296,14 @@ export const plans = pgTable("plans", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  activeIdx: index("plans_active_idx").on(table.isActive),
+  activeIdx: index("customer_tiers_active_idx").on(table.isActive),
 }));
 
 // Organization subscriptions - billing and license tracking
 export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
-  planId: uuid("plan_id").references(() => plans.id, { onDelete: "restrict" }).notNull(),
+  tierId: uuid("tier_id").references(() => customerTiers.id, { onDelete: "restrict" }).notNull(),
   status: text("status").notNull().default("trialing"), // trialing, active, past_due, canceled, incomplete
   seatsPurchased: integer("seats_purchased").notNull().default(1), // Number of licensed seats
   trialEndsAt: timestamp("trial_ends_at"),
@@ -385,7 +385,7 @@ export const consultationWorkflows = pgTable("consultation_workflows", {
   completedAt: timestamp("completed_at"),
   duration: integer("duration"), // Duration in minutes
   // Custom package configuration
-  recommendedPlanId: uuid("recommended_plan_id").references(() => plans.id),
+  recommendedTierId: uuid("recommended_tier_id").references(() => customerTiers.id),
   customFeatures: jsonb("custom_features").default({}), // Recommended custom features
   customLimits: jsonb("custom_limits").default({}), // Recommended custom limits
   // User setup and training
@@ -1357,7 +1357,7 @@ export const insertOrganizationMembershipSchema = createInsertSchema(organizatio
   joinedAt: true,
 });
 
-export const insertPlanSchema = createInsertSchema(plans).omit({
+export const insertCustomerTierSchema = createInsertSchema(customerTiers).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -1810,8 +1810,8 @@ export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 export type OrganizationMembership = typeof organizationMemberships.$inferSelect;
 export type InsertOrganizationMembership = z.infer<typeof insertOrganizationMembershipSchema>;
 
-export type Plan = typeof plans.$inferSelect;
-export type InsertPlan = z.infer<typeof insertPlanSchema>;
+export type CustomerTier = typeof customerTiers.$inferSelect;
+export type InsertCustomerTier = z.infer<typeof insertCustomerTierSchema>;
 
 export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;

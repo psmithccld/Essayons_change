@@ -72,7 +72,7 @@ import {
   coachContextPayloadSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload,
   // Add missing schema imports
-  users, projects, organizations, organizationMemberships, plans, subscriptions
+  users, projects, organizations, organizationMemberships, customerTiers, subscriptions
 } from "@shared/schema";
 import { db } from "./db"; // Import db from correct location
 import { and, eq, or, sql, count } from "drizzle-orm"; // Add missing drizzle operators
@@ -1857,17 +1857,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract and validate planId separately for security
       const { planId, planName, ...orgData } = req.body;
       
-      // Validate plan if provided
-      let validatedPlanId = undefined;
+      // Validate tier if provided
+      let validatedTierId = undefined;
       if (planId) {
-        const [plan] = await db.select({ id: plans.id, name: plans.name })
-          .from(plans)
-          .where(and(eq(plans.id, planId), eq(plans.isActive, true)));
+        const [tier] = await db.select({ id: customerTiers.id, name: customerTiers.name })
+          .from(customerTiers)
+          .where(and(eq(customerTiers.id, planId), eq(customerTiers.isActive, true)));
         
-        if (!plan) {
-          return res.status(400).json({ error: "Invalid plan selected" });
+        if (!tier) {
+          return res.status(400).json({ error: "Invalid customer tier selected" });
         }
-        validatedPlanId = planId;
+        validatedTierId = planId;
       }
       
       // Partial validation since this is an update (ignoring planName from client)
@@ -2055,145 +2055,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== SUPER ADMIN PLAN MANAGEMENT =====
+  // ===== SUPER ADMIN CUSTOMER TIER MANAGEMENT =====
   
-  // GET /api/super-admin/plans - List all subscription plans
-  app.get("/api/super-admin/plans", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+  // GET /api/super-admin/customer-tiers - List all customer tiers
+  app.get("/api/super-admin/customer-tiers", requireSuperAdminAuth, async (req: Request, res: Response) => {
     try {
-      const allPlans = await db
+      const allTiers = await db
         .select({
-          id: plans.id,
-          name: plans.name,
-          description: plans.description,
-          seatLimit: plans.seatLimit,
-          pricePerSeatCents: plans.pricePerSeatCents,
-          features: plans.features,
-          isActive: plans.isActive,
-          createdAt: plans.createdAt,
-          updatedAt: plans.updatedAt
+          id: customerTiers.id,
+          name: customerTiers.name,
+          description: customerTiers.description,
+          seatLimit: customerTiers.seatLimit,
+          pricePerSeatCents: customerTiers.pricePerSeatCents,
+          features: customerTiers.features,
+          isActive: customerTiers.isActive,
+          createdAt: customerTiers.createdAt,
+          updatedAt: customerTiers.updatedAt
         })
-        .from(plans)
-        .where(eq(plans.isActive, true))
-        .orderBy(plans.pricePerSeatCents);
+        .from(customerTiers)
+        .where(eq(customerTiers.isActive, true))
+        .orderBy(customerTiers.pricePerSeatCents);
       
-      res.json(allPlans);
+      res.json({ tiers: allTiers });
     } catch (error) {
-      console.error("Error fetching plans:", error);
-      res.status(500).json({ error: "Failed to fetch plans" });
+      console.error("Error fetching customer tiers:", error);
+      res.status(500).json({ error: "Failed to fetch customer tiers" });
     }
   });
 
-  // GET /api/super-admin/plans/:id - Get specific plan details
-  app.get("/api/super-admin/plans/:id", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+  // GET /api/super-admin/customer-tiers/:id - Get specific customer tier details
+  app.get("/api/super-admin/customer-tiers/:id", requireSuperAdminAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const [plan] = await db.select().from(plans).where(eq(plans.id, id));
+      const [tier] = await db.select().from(customerTiers).where(eq(customerTiers.id, id));
       
-      if (!plan) {
-        return res.status(404).json({ error: "Plan not found" });
+      if (!tier) {
+        return res.status(404).json({ error: "Customer tier not found" });
       }
       
-      res.json(plan);
+      res.json(tier);
     } catch (error) {
-      console.error("Error fetching plan:", error);
-      res.status(500).json({ error: "Failed to fetch plan" });
+      console.error("Error fetching customer tier:", error);
+      res.status(500).json({ error: "Failed to fetch customer tier" });
     }
   });
 
-  // POST /api/super-admin/plans - Create new subscription plan
-  app.post("/api/super-admin/plans", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+  // POST /api/super-admin/customer-tiers - Create new customer tier
+  app.post("/api/super-admin/customer-tiers", requireSuperAdminAuth, async (req: Request, res: Response) => {
     try {
-      const { insertPlanSchema } = await import("@shared/schema");
+      const { insertCustomerTierSchema } = await import("@shared/schema");
       
       // Validate request body
-      const validationResult = insertPlanSchema.safeParse(req.body);
+      const validationResult = insertCustomerTierSchema.safeParse(req.body);
       if (!validationResult.success) {
         return res.status(400).json({ 
-          error: "Invalid plan data", 
+          error: "Invalid customer tier data", 
           details: validationResult.error.errors 
         });
       }
 
-      const planData = validationResult.data;
+      const tierData = validationResult.data;
 
-      // Create the plan
-      const [newPlan] = await db.insert(plans).values(planData).returning();
+      // Create the customer tier
+      const [newTier] = await db.insert(customerTiers).values(tierData).returning();
       
-      res.status(201).json(newPlan);
+      res.status(201).json(newTier);
     } catch (error) {
-      console.error("Error creating plan:", error);
-      res.status(500).json({ error: "Failed to create plan" });
+      console.error("Error creating customer tier:", error);
+      res.status(500).json({ error: "Failed to create customer tier" });
     }
   });
 
-  // PUT /api/super-admin/plans/:id - Update subscription plan
-  app.put("/api/super-admin/plans/:id", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+  // PUT /api/super-admin/customer-tiers/:id - Update customer tier
+  app.put("/api/super-admin/customer-tiers/:id", requireSuperAdminAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { insertPlanSchema } = await import("@shared/schema");
+      const { insertCustomerTierSchema } = await import("@shared/schema");
       
       // Validate request body
-      const validationResult = insertPlanSchema.safeParse(req.body);
+      const validationResult = insertCustomerTierSchema.safeParse(req.body);
       if (!validationResult.success) {
         return res.status(400).json({ 
-          error: "Invalid plan data", 
+          error: "Invalid customer tier data", 
           details: validationResult.error.errors 
         });
       }
 
-      const planData = validationResult.data;
+      const tierData = validationResult.data;
 
-      // Check if plan exists
-      const [existingPlan] = await db.select().from(plans).where(eq(plans.id, id));
-      if (!existingPlan) {
-        return res.status(404).json({ error: "Plan not found" });
+      // Check if customer tier exists
+      const [existingTier] = await db.select().from(customerTiers).where(eq(customerTiers.id, id));
+      if (!existingTier) {
+        return res.status(404).json({ error: "Customer tier not found" });
       }
 
-      // Update the plan
-      const [updatedPlan] = await db
-        .update(plans)
-        .set({ ...planData, updatedAt: new Date() })
-        .where(eq(plans.id, id))
+      // Update the customer tier
+      const [updatedTier] = await db
+        .update(customerTiers)
+        .set({ ...tierData, updatedAt: new Date() })
+        .where(eq(customerTiers.id, id))
         .returning();
       
-      res.json(updatedPlan);
+      res.json(updatedTier);
     } catch (error) {
-      console.error("Error updating plan:", error);
-      res.status(500).json({ error: "Failed to update plan" });
+      console.error("Error updating customer tier:", error);
+      res.status(500).json({ error: "Failed to update customer tier" });
     }
   });
 
-  // DELETE /api/super-admin/plans/:id - Delete subscription plan
-  app.delete("/api/super-admin/plans/:id", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+  // DELETE /api/super-admin/customer-tiers/:id - Delete customer tier
+  app.delete("/api/super-admin/customer-tiers/:id", requireSuperAdminAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
 
-      // Check if plan exists
-      const [existingPlan] = await db.select().from(plans).where(eq(plans.id, id));
-      if (!existingPlan) {
-        return res.status(404).json({ error: "Plan not found" });
+      // Check if customer tier exists
+      const [existingTier] = await db.select().from(customerTiers).where(eq(customerTiers.id, id));
+      if (!existingTier) {
+        return res.status(404).json({ error: "Customer tier not found" });
       }
 
-      // Check if any organizations are using this plan
+      // Check if any organizations are using this customer tier
       const [subscriptionCount] = await db
         .select({ count: count() })
         .from(subscriptions)
-        .where(eq(subscriptions.planId, id));
+        .where(eq(subscriptions.tierId, id));
 
       if (subscriptionCount?.count && subscriptionCount.count > 0) {
         return res.status(400).json({ 
-          error: "Cannot delete plan with active subscriptions",
+          error: "Cannot delete customer tier with active subscriptions",
           activeSubscriptions: subscriptionCount.count
         });
       }
 
-      // Delete the plan
-      await db.delete(plans).where(eq(plans.id, id));
+      // Delete the customer tier
+      await db.delete(customerTiers).where(eq(customerTiers.id, id));
       
-      res.json({ message: "Plan deleted successfully" });
+      res.json({ message: "Customer tier deleted successfully" });
     } catch (error) {
-      console.error("Error deleting plan:", error);
-      res.status(500).json({ error: "Failed to delete plan" });
+      console.error("Error deleting customer tier:", error);
+      res.status(500).json({ error: "Failed to delete customer tier" });
     }
   });
 
@@ -2202,11 +2202,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orgId } = req.params;
       
-      // Get current subscription with plan details
+      // Get current subscription with customer tier details
       const [subscription] = await db.select({
         id: subscriptions.id,
         organizationId: subscriptions.organizationId,
-        planId: subscriptions.planId,
+        tierId: subscriptions.tierId,
         status: subscriptions.status,
         seatsPurchased: subscriptions.seatsPurchased,
         trialEndsAt: subscriptions.trialEndsAt,
@@ -2215,14 +2215,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stripeCustomerId: subscriptions.stripeCustomerId,
         stripeSubscriptionId: subscriptions.stripeSubscriptionId,
         createdAt: subscriptions.createdAt,
-        planName: plans.name,
-        planDescription: plans.description,
-        planPriceCents: plans.priceCents,
-        planMaxSeats: plans.maxSeats,
-        planFeatures: plans.features
+        tierName: customerTiers.name,
+        tierDescription: customerTiers.description,
+        tierPricePerSeatCents: customerTiers.pricePerSeatCents,
+        tierSeatLimit: customerTiers.seatLimit,
+        tierFeatures: customerTiers.features
       })
       .from(subscriptions)
-      .leftJoin(plans, eq(subscriptions.planId, plans.id))
+      .leftJoin(customerTiers, eq(subscriptions.tierId, customerTiers.id))
       .where(eq(subscriptions.organizationId, orgId))
       .orderBy(sql`${subscriptions.createdAt} DESC`)
       .limit(1);
@@ -2241,13 +2241,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { planId, seatsPurchased } = req.body;
       
       if (!planId || !seatsPurchased) {
-        return res.status(400).json({ error: "Plan ID and seats purchased are required" });
+        return res.status(400).json({ error: "Customer tier ID and seats purchased are required" });
       }
       
-      // Verify the plan exists
-      const [plan] = await db.select().from(plans).where(eq(plans.id, planId));
-      if (!plan) {
-        return res.status(404).json({ error: "Plan not found" });
+      // Verify the customer tier exists
+      const [tier] = await db.select().from(customerTiers).where(eq(customerTiers.id, planId));
+      if (!tier) {
+        return res.status(404).json({ error: "Customer tier not found" });
       }
       
       // Check if organization already has a subscription
@@ -2257,17 +2257,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update existing subscription
         const [updatedSubscription] = await db.update(subscriptions)
           .set({
-            planId,
+            tierId: planId,
             seatsPurchased,
             updatedAt: new Date()
           })
           .where(eq(subscriptions.id, existingSubscription.id))
           .returning();
           
-        // Sync plan features to organization enabledFeatures
+        // Sync tier features to organization enabledFeatures
         await db.update(organizations)
           .set({
-            enabledFeatures: plan.features,
+            enabledFeatures: tier.features,
             updatedAt: new Date()
           })
           .where(eq(organizations.id, orgId));
@@ -2277,7 +2277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create new subscription
         const [newSubscription] = await db.insert(subscriptions).values({
           organizationId: orgId,
-          planId,
+          tierId: planId,
           status: 'trialing',
           seatsPurchased,
           trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 day trial
@@ -2671,10 +2671,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate monthly revenue from active subscriptions with correct column reference
       const monthlyRevenueResult = await db.select({
-        totalRevenue: sql<number>`COALESCE(SUM(CASE WHEN ${subscriptions.status} = 'active' THEN plans.price_per_seat_cents ELSE 0 END), 0)`
+        totalRevenue: sql<number>`COALESCE(SUM(CASE WHEN ${subscriptions.status} = 'active' THEN customer_tiers.price_per_seat_cents ELSE 0 END), 0)`
       })
       .from(subscriptions)
-      .leftJoin(plans, eq(subscriptions.planId, plans.id));
+      .leftJoin(customerTiers, eq(subscriptions.tierId, customerTiers.id));
       
       const monthlyRevenueCents = Number(monthlyRevenueResult[0]?.totalRevenue) || 0;
       const monthlyRevenue = Math.round(monthlyRevenueCents / 100); // Convert cents to dollars
@@ -2825,23 +2825,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .from(organizations)
             .where(eq(organizations.id, sub.organizationId));
           
-          // Get plan details
-          const [plan] = await db.select({ 
-            name: plans.name, 
-            pricePerSeatCents: plans.pricePerSeatCents 
+          // Get customer tier details
+          const [tier] = await db.select({ 
+            name: customerTiers.name, 
+            pricePerSeatCents: customerTiers.pricePerSeatCents 
           })
-            .from(plans)
-            .where(eq(plans.id, sub.planId));
+            .from(customerTiers)
+            .where(eq(customerTiers.id, sub.tierId));
 
           return {
             id: sub.id,
             organizationId: sub.organizationId,
             organizationName: org?.name || 'Unknown Organization',
-            planId: sub.planId,
-            planName: plan?.name || 'Unknown Plan',
+            tierId: sub.tierId,
+            tierName: tier?.name || 'Unknown Tier',
             status: sub.status,
             seatsPurchased: sub.seatsPurchased,
-            pricePerSeatCents: plan?.pricePerSeatCents || 0,
+            pricePerSeatCents: tier?.pricePerSeatCents || 0,
             currency: 'USD',
             stripeCustomerId: sub.stripeCustomerId,
             stripeSubscriptionId: sub.stripeSubscriptionId,
@@ -2851,8 +2851,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             currentPeriodEnd: sub.currentPeriodEnd,
             createdAt: sub.createdAt,
             updatedAt: sub.updatedAt,
-            totalMonthlyPrice: sub.seatsPurchased && plan?.pricePerSeatCents 
-              ? (sub.seatsPurchased * plan.pricePerSeatCents) / 100 // Convert cents to dollars
+            totalMonthlyPrice: sub.seatsPurchased && tier?.pricePerSeatCents 
+              ? (sub.seatsPurchased * tier.pricePerSeatCents) / 100 // Convert cents to dollars
               : 0
           };
         })
