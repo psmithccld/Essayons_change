@@ -519,7 +519,7 @@ export default function SuperAdminUsers() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">No Organization</SelectItem>
+                            <SelectItem value="none">No Organization</SelectItem>
                             {organizations.filter(org => org.isActive).map((org) => (
                               <SelectItem key={org.id} value={org.id}>
                                 {org.name} ({org.domain})

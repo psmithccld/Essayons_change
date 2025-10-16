@@ -72,7 +72,7 @@ import {
   coachContextPayloadSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload,
   // Add missing schema imports
-  users, projects, organizations, organizationMemberships, customerTiers, subscriptions
+  users, projects, organizations, organizationMemberships, customerTiers, subscriptions, roles
 } from "@shared/schema";
 import { db } from "./db"; // Import db from correct location
 import { and, eq, or, sql, count } from "drizzle-orm"; // Add missing drizzle operators
@@ -2312,43 +2312,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/super-admin/users - Create new Super Admin user
+  // POST /api/super-admin/users - Create new platform user
   app.post("/api/super-admin/users", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
-      const { createSuperAdminSchema } = await import("@shared/schema");
+      const { name, username, email, password, isActive, organizationId, isAdmin } = req.body;
       
-      // Validate request body
-      const validationResult = createSuperAdminSchema.safeParse(req.body);
-      if (!validationResult.success) {
+      // Validate required fields
+      if (!name || !username || !email || !password) {
         return res.status(400).json({ 
-          error: "Invalid user data", 
-          details: validationResult.error.errors 
+          error: "Name, username, email, and password are required" 
         });
       }
 
-      const { username, password } = validationResult.data;
-
       // Check if username already exists
-      const existingUser = await storage.getSuperAdminUserByUsername(username);
-      if (existingUser) {
+      const existingUsername = await db.select()
+        .from(users)
+        .where(eq(users.username, username))
+        .limit(1);
+      
+      if (existingUsername.length > 0) {
         return res.status(409).json({ error: "Username already exists" });
       }
 
-      // Create new Super Admin user - TODO: Fix method signature
-      // const newUser = await storage.createSuperAdminUser(username, password);
+      // Check if email already exists
+      const existingEmail = await db.select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+      
+      if (existingEmail.length > 0) {
+        return res.status(409).json({ error: "Email already exists" });
+      }
+
+      // Hash password
+      const { default: bcrypt } = await import("bcryptjs");
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Get a default role (member role)
+      const [defaultRole] = await db.select()
+        .from(roles)
+        .where(eq(roles.name, 'Member'))
+        .limit(1);
+
+      if (!defaultRole) {
+        return res.status(500).json({ error: "Default role not found" });
+      }
+
+      // Create the user
+      const [newUser] = await db.insert(users).values({
+        name,
+        username,
+        email,
+        passwordHash,
+        roleId: defaultRole.id,
+        isActive: isActive !== undefined ? isActive : true,
+        isEmailVerified: true, // Super admin created users are auto-verified
+      }).returning();
+
+      // If organizationId is provided and it's not 'none', add user to organization
+      if (organizationId && organizationId !== 'none') {
+        // Verify organization exists
+        const [org] = await db.select()
+          .from(organizations)
+          .where(eq(organizations.id, organizationId))
+          .limit(1);
+
+        if (!org) {
+          return res.status(400).json({ error: "Invalid organization ID" });
+        }
+
+        // Create organization membership
+        await db.insert(organizationMemberships).values({
+          organizationId,
+          userId: newUser.id,
+          orgRole: isAdmin ? 'admin' : 'member',
+          isActive: true,
+        });
+
+        console.log(`Super admin ${req.superAdminUser!.username} created user ${username} and assigned to organization ${org.name}`);
+      } else {
+        console.log(`Super admin ${req.superAdminUser!.username} created homeless user ${username}`);
+      }
       
       res.status(201).json({
-        user: {
-          id: newUser.id,
-          username: newUser.username,
-          isActive: newUser.isActive,
-          createdAt: newUser.createdAt
-        },
-        message: "Super Admin user created successfully"
+        id: newUser.id,
+        name: newUser.name,
+        username: newUser.username,
+        email: newUser.email,
+        isActive: newUser.isActive,
+        createdAt: newUser.createdAt,
       });
     } catch (error) {
-      console.error("Error creating super admin user:", error);
-      res.status(500).json({ error: "Failed to create admin user" });
+      console.error("Error creating platform user:", error);
+      res.status(500).json({ error: "Failed to create user" });
     }
   });
 
