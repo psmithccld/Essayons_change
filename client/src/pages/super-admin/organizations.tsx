@@ -113,7 +113,7 @@ export default function SuperAdminOrganizations() {
     queryKey: ["/api/super-admin/customer-tiers"],
     enabled: isAuthenticated
   });
-  const availableTiers = tiersData?.tiers || tiersData?.plans || [];
+  const availableTiers = tiersData?.tiers || [];
 
   // Fetch organizations
   const { data: organizations = [], isLoading, refetch } = useQuery({

@@ -48,8 +48,8 @@ interface Subscription {
   id: string;
   organizationId: string;
   organizationName: string;
-  planId: string;
-  planName: string;
+  tierId: string;
+  tierName: string;
   status: string;
   currentPeriodStart: string;
   currentPeriodEnd: string;
@@ -194,7 +194,7 @@ export default function SuperAdminBilling() {
   // Filter subscriptions
   const filteredSubscriptions = subscriptions.filter((sub) => {
     const matchesSearch = sub.organizationName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sub.planName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         sub.tierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          sub.stripeSubscriptionId.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = subscriptionFilter === "all" || sub.status === subscriptionFilter;
     return matchesSearch && matchesFilter;
@@ -459,7 +459,7 @@ export default function SuperAdminBilling() {
                             {subscription.organizationName}
                           </h3>
                           {getStatusBadge(subscription.status)}
-                          <Badge variant="outline">{subscription.planName}</Badge>
+                          <Badge variant="outline">{subscription.tierName}</Badge>
                           {subscription.cancelAtPeriodEnd && (
                             <Badge variant="destructive">Cancelling</Badge>
                           )}

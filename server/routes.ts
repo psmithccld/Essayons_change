@@ -1854,23 +1854,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { insertOrganizationSchema } = await import("@shared/schema");
       
-      // Extract and validate planId separately for security
-      const { planId, planName, ...orgData } = req.body;
+      // Extract and validate tierId separately for security
+      const { tierId, tierName, ...orgData } = req.body;
       
       // Validate tier if provided
       let validatedTierId = undefined;
-      if (planId) {
+      if (tierId) {
         const [tier] = await db.select({ id: customerTiers.id, name: customerTiers.name })
           .from(customerTiers)
-          .where(and(eq(customerTiers.id, planId), eq(customerTiers.isActive, true)));
+          .where(and(eq(customerTiers.id, tierId), eq(customerTiers.isActive, true)));
         
         if (!tier) {
           return res.status(400).json({ error: "Invalid customer tier selected" });
         }
-        validatedTierId = planId;
+        validatedTierId = tierId;
       }
       
-      // Partial validation since this is an update (ignoring planName from client)
+      // Partial validation since this is an update (ignoring tierName from client)
       const validation = insertOrganizationSchema.partial().safeParse(orgData);
       if (!validation.success) {
         return res.status(400).json({ 
@@ -1879,10 +1879,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Include validated planId in update data
+      // Include validated tierId in update data
       const updateData = {
         ...validation.data,
-        ...(validatedPlanId && { planId: validatedPlanId })
+        ...(validatedTierId && { tierId: validatedTierId })
       };
 
       const organization = await storage.updateOrganization(id, updateData);
@@ -2238,14 +2238,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/super-admin/organizations/:orgId/subscription", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
       const { orgId } = req.params;
-      const { planId, seatsPurchased } = req.body;
+      const { tierId, seatsPurchased } = req.body;
       
-      if (!planId || !seatsPurchased) {
+      if (!tierId || !seatsPurchased) {
         return res.status(400).json({ error: "Customer tier ID and seats purchased are required" });
       }
       
       // Verify the customer tier exists
-      const [tier] = await db.select().from(customerTiers).where(eq(customerTiers.id, planId));
+      const [tier] = await db.select().from(customerTiers).where(eq(customerTiers.id, tierId));
       if (!tier) {
         return res.status(404).json({ error: "Customer tier not found" });
       }
@@ -2257,7 +2257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update existing subscription
         const [updatedSubscription] = await db.update(subscriptions)
           .set({
-            tierId: planId,
+            tierId: tierId,
             seatsPurchased,
             updatedAt: new Date()
           })
@@ -2277,7 +2277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create new subscription
         const [newSubscription] = await db.insert(subscriptions).values({
           organizationId: orgId,
-          tierId: planId,
+          tierId: tierId,
           status: 'trialing',
           seatsPurchased,
           trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 day trial
