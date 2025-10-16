@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import { 
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
-  organizations, organizationMemberships, organizationSettings, plans, subscriptions, invitations,
+  organizations, organizationMemberships, organizationSettings, customerTiers, subscriptions, invitations,
   superAdminUsers, superAdminSessions, superAdminMfaSetup, supportTickets, supportConversations, systemSettings, organizationDefaults,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
@@ -20,7 +20,7 @@ import {
   type ChangeArtifact, type InsertChangeArtifact,
   type Organization, type InsertOrganization, type OrganizationMembership, type InsertOrganizationMembership,
   type OrganizationSettings, type InsertOrganizationSettings,
-  type Plan, type InsertPlan, type Subscription, type InsertSubscription, type Invitation, type InsertInvitation,
+  type CustomerTier, type InsertCustomerTier, type Subscription, type InsertSubscription, type Invitation, type InsertInvitation,
   type SuperAdminUser, type InsertSuperAdminUser, type SuperAdminSession, type InsertSuperAdminSession, type SuperAdminMfaSetup, type InsertSuperAdminMfaSetup,
   type SuperAdminLoginRequest, type SuperAdminRegistrationRequest,
   type SupportTicket, type InsertSupportTicket, type SupportConversation, type InsertSupportConversation, type GPTMessage,
@@ -6014,7 +6014,7 @@ export class DatabaseStorage implements IStorage {
         ));
 
       const activeMembers = Number(memberCount.count) || 0;
-      const seatLimit = 5; // TODO: Get from subscription/plan
+      const seatLimit = 5; // TODO: Get from subscription/customer tier
       
       if (activeMembers >= seatLimit) {
         return { success: false, error: 'No available seats in organization' };
@@ -6126,7 +6126,7 @@ export class DatabaseStorage implements IStorage {
     const activeMembers = Number(memberCount.count) || 0;
     
     // Get seat limit from subscription (default to 5 for now)
-    // TODO: Get actual seat limit from subscription/plan
+    // TODO: Get actual seat limit from subscription/customer tier
     const seatLimit = 5; 
     const available = Math.max(0, seatLimit - activeMembers);
 
