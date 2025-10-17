@@ -61,8 +61,9 @@ const FEATURE_DEFINITIONS = {
 const tierSchema = z.object({
   name: z.string().min(1, "Tier name is required"),
   description: z.string().optional(),
+  pricingModel: z.enum(["flat", "per_seat"]).default("per_seat"),
+  price: z.number().min(0, "Price must be positive"),
   seatLimit: z.number().min(1, "Seat limit must be at least 1"),
-  pricePerSeatCents: z.number().min(0, "Price must be positive"),
   maxProjects: z.number().min(0, "Max projects must be zero or greater").optional(),
   maxUsers: z.number().min(0, "Max users must be zero or greater").optional(),
   maxStorage: z.number().min(0, "Max storage must be zero or greater").optional(),
@@ -101,8 +102,9 @@ interface CustomerTier {
   id: string;
   name: string;
   description?: string;
+  pricingModel: "flat" | "per_seat";
+  price: number;
   seatLimit: number;
-  pricePerSeatCents: number;
   maxProjects?: number;
   maxUsers?: number;
   maxStorage?: number;
@@ -239,7 +241,8 @@ export default function SuperAdminCustomerTiers() {
       name: "",
       description: "",
       seatLimit: 5,
-      pricePerSeatCents: 2500,
+      price: 2500,
+      pricingModel: "per_seat",
       maxProjects: 0,
       maxUsers: 0,
       maxStorage: 0,
@@ -278,7 +281,8 @@ export default function SuperAdminCustomerTiers() {
       name: "",
       description: "",
       seatLimit: 5,
-      pricePerSeatCents: 2500,
+      price: 2500,
+      pricingModel: "per_seat",
       maxProjects: 0,
       maxUsers: 0,
       maxStorage: 0,
@@ -317,7 +321,8 @@ export default function SuperAdminCustomerTiers() {
       name: tier.name,
       description: tier.description || "",
       seatLimit: tier.seatLimit,
-      pricePerSeatCents: tier.pricePerSeatCents,
+      price: tier.price,
+      pricingModel: tier.pricingModel || "per_seat",
       maxProjects: tier.maxProjects || 0,
       maxUsers: tier.maxUsers || 0,
       maxStorage: tier.maxStorage || 0,
@@ -357,7 +362,7 @@ export default function SuperAdminCustomerTiers() {
           <CardTitle className="text-xl" data-testid={`tier-name-${tier.id}`}>{tier.name}</CardTitle>
         </div>
         <div className="flex items-center justify-center gap-1">
-          <span className="text-3xl font-bold">${(tier.pricePerSeatCents / 100).toFixed(2)}</span>
+          <span className="text-3xl font-bold">${(tier.price / 100).toFixed(2)}{tier.pricingModel === 'per_seat' ? '/seat' : ''}</span>
           <span className="text-muted-foreground">/{tier.billingInterval || "month"}</span>
         </div>
         {tier.description && (
@@ -592,18 +597,41 @@ export default function SuperAdminCustomerTiers() {
                       />
                       <FormField
                         control={createForm.control}
-                        name="pricePerSeatCents"
+                        name="pricingModel"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Price Per Seat (cents)</FormLabel>
+                            <FormLabel>Pricing Model</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-pricing-model">
+                                  <SelectValue placeholder="Select pricing model" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="flat">Flat Monthly Rate</SelectItem>
+                                <SelectItem value="per_seat">Price Per Seat</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createForm.control}
+                        name="price"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Price (dollars)</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
                                 type="number"
+                                step="0.01"
                                 min="0"
-                                onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-price-per-seat-cents"
-                                placeholder="e.g. 2500 = $25.00"
+                                value={field.value ? (field.value / 100).toFixed(2) : ''}
+                                onChange={e => field.onChange(Math.round(Number(e.target.value) * 100))}
+                                data-testid="input-price-dollars"
+                                placeholder="e.g. 25.00"
                               />
                             </FormControl>
                             <FormMessage />
@@ -1083,18 +1111,41 @@ export default function SuperAdminCustomerTiers() {
                       />
                       <FormField
                         control={editForm.control}
-                        name="pricePerSeatCents"
+                        name="pricingModel"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Price Per Seat (cents)</FormLabel>
+                            <FormLabel>Pricing Model</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-edit-pricing-model">
+                                  <SelectValue placeholder="Select pricing model" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="flat">Flat Monthly Rate</SelectItem>
+                                <SelectItem value="per_seat">Price Per Seat</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={editForm.control}
+                        name="price"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Price (dollars)</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
                                 type="number"
+                                step="0.01"
                                 min="0"
-                                onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-edit-price-per-seat-cents"
-                                placeholder="e.g. 2500 = $25.00"
+                                value={field.value ? (field.value / 100).toFixed(2) : ''}
+                                onChange={e => field.onChange(Math.round(Number(e.target.value) * 100))}
+                                data-testid="input-edit-price-dollars"
+                                placeholder="e.g. 25.00"
                               />
                             </FormControl>
                             <FormMessage />
