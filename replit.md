@@ -27,8 +27,14 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 - **PostgreSQL**: Primary database using Neon serverless PostgreSQL
-- **Database Schema**: Comprehensive schema including users, projects, tasks, stakeholders, RAID logs, communications, surveys, and GPT interactions
-- **Migrations**: Drizzle-kit for database schema management and migrations
+- **Database Schema**: Comprehensive schema including users, projects, tasks, stakeholders, RAID logs, communications, surveys, GPT interactions, customer tiers, and subscriptions
+- **Migrations**: Drizzle-kit push-based schema management (schema.ts as source of truth)
+- **Customer Tier System**: Single source of truth for feature availability and resource limits across the platform
+  - Customer Tiers define: features, storage limits (maxFileUploadSizeMB, storageGB), seat limits, pricing
+  - Organizations access features through active subscriptions linked to customer tiers
+  - Feature resolution flow: Organization → Active Subscription → Customer Tier → Features
+  - Standardized features: reports, gptCoach, communications, changeArtifacts, readinessSurveys, dataExport, auditLogs, customBranding, workflowAutomation
+  - **Organization Defaults System**: REMOVED - Customer Tiers are now the sole source of feature and limit configuration
 
 ### Authentication and Authorization
 - **Session-based**: Cookie-based session management with PostgreSQL session store
