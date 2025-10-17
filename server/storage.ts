@@ -4,7 +4,7 @@ import {
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
   organizations, organizationMemberships, organizationSettings, customerTiers, subscriptions, invitations,
-  superAdminUsers, superAdminSessions, superAdminMfaSetup, supportTickets, supportConversations, systemSettings, organizationDefaults,
+  superAdminUsers, superAdminSessions, superAdminMfaSetup, supportTickets, supportConversations, systemSettings,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type CommunicationVersion, type InsertCommunicationVersion, type Survey, type InsertSurvey,
@@ -25,7 +25,7 @@ import {
   type SuperAdminLoginRequest, type SuperAdminRegistrationRequest,
   type SupportTicket, type InsertSupportTicket, type SupportConversation, type InsertSupportConversation, type GPTMessage,
   type SupportSession, type InsertSupportSession, type SupportAuditLog, type InsertSupportAuditLog,
-  type SystemSettings, type OrganizationDefaults, type OrganizationDefaultsUpdate,
+  type SystemSettings,
   type Activity, type SystemHealth, type Alert
 } from "@shared/schema";
 import { db } from "./db";
@@ -904,10 +904,6 @@ export interface IStorage {
   getOrganizationSettings(organizationId: string): Promise<OrganizationSettings | undefined>;
   updateOrganizationSettings(organizationId: string, settings: Partial<InsertOrganizationSettings>): Promise<OrganizationSettings>;
 
-  // Organization Defaults - Platform-wide defaults for new organizations
-  getOrganizationDefaults(): Promise<OrganizationDefaults | undefined>;
-  updateOrganizationDefaults(updates: OrganizationDefaultsUpdate): Promise<OrganizationDefaults>;
-
   // ===============================================
   // HELPDESK GPT AGENT - SECURITY: Organization-scoped for tenant isolation
   // ===============================================
@@ -987,6 +983,16 @@ export interface IStorage {
   // System Settings Management
   getSystemSettings(): Promise<SystemSettings | undefined>;
   updateSystemSettings(settings: Partial<SystemSettings>): Promise<SystemSettings>;
+
+  // ===============================================
+  // CUSTOMER TIERS & SUBSCRIPTIONS - Feature and billing management
+  // ===============================================
+  
+  // Customer Tiers
+  getCustomerTier(id: string): Promise<CustomerTier | undefined>;
+  
+  // Subscriptions
+  getActiveSubscription(organizationId: string): Promise<Subscription | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5600,66 +5606,6 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  // Organization Defaults - Platform-wide defaults for new organizations
-  async getOrganizationDefaults(): Promise<OrganizationDefaults | undefined> {
-    const [defaults] = await db
-      .select()
-      .from(organizationDefaults)
-      .limit(1);
-    return defaults || undefined;
-  }
-
-  async updateOrganizationDefaults(updates: OrganizationDefaultsUpdate): Promise<OrganizationDefaults> {
-    // Check if defaults record exists
-    const existing = await this.getOrganizationDefaults();
-    
-    if (existing) {
-      // Update existing record
-      const [updated] = await db
-        .update(organizationDefaults)
-        .set({ 
-          ...updates,
-          updatedAt: sql`now()`
-        })
-        .where(eq(organizationDefaults.id, existing.id))
-        .returning();
-      return updated;
-    } else {
-      // Create initial defaults record
-      const [created] = await db
-        .insert(organizationDefaults)
-        .values({
-          features: updates.features || {
-            reports: true,
-            gptCoach: true,
-            advancedAnalytics: false,
-            customBranding: false,
-            apiAccess: false,
-            ssoIntegration: false,
-            advancedSecurity: false,
-            customWorkflows: false,
-          },
-          limits: updates.limits || {
-            maxUsers: 100,
-            maxProjects: 50,
-            maxTasksPerProject: 1000,
-            maxFileUploadSizeMB: 10,
-            apiCallsPerMonth: 10000,
-            storageGB: 10,
-          },
-          settings: updates.settings || {
-            allowGuestAccess: false,
-            requireEmailVerification: true,
-            enableAuditLogs: true,
-            dataRetentionDays: 365,
-            autoBackup: true,
-          },
-        })
-        .returning();
-      return created;
-    }
-  }
-
   // Organization Management
   async getCurrentOrganization(userId: string): Promise<Organization | undefined> {
     // Get user's current organization selection
@@ -6814,6 +6760,31 @@ export class DatabaseStorage implements IStorage {
     }
 
     return updatedSettings;
+  }
+
+  // ===============================================
+  // CUSTOMER TIERS & SUBSCRIPTIONS - Feature and billing management
+  // ===============================================
+  
+  async getCustomerTier(id: string): Promise<CustomerTier | undefined> {
+    const [tier] = await db.select().from(customerTiers).where(eq(customerTiers.id, id));
+    return tier || undefined;
+  }
+
+  async getActiveSubscription(organizationId: string): Promise<Subscription | undefined> {
+    // Get the organization's active subscription
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.organizationId, organizationId),
+          eq(subscriptions.status, 'active')
+        )
+      )
+      .limit(1);
+    
+    return subscription || undefined;
   }
 }
 

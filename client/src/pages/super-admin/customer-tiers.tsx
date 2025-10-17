@@ -41,22 +41,18 @@ import { queryClient } from "@/lib/queryClient";
 
 // Feature definitions - including core application features
 const FEATURE_DEFINITIONS = {
-  // Core Application Features (connected to actual functionality)
-  communications: { name: "Communications", description: "Communication management and planning tools", type: "boolean" },
-  reports: { name: "Reporting", description: "Advanced reports and analytics dashboard", type: "boolean" },
-  gptCoach: { name: "GPT Integration", description: "AI-powered coaching and insights", type: "boolean" },
-  readinessSurveys: { name: "Surveys", description: "Survey creation and response management", type: "boolean" },
-  changeArtifacts: { name: "Change Artifacts", description: "Change artifact management", type: "boolean" },
-  // Enterprise Features (advanced tier features)
-  hasAdvancedReporting: { name: "Advanced Reporting", description: "Access to advanced reports and analytics", type: "boolean" },
-  hasAPIAccess: { name: "API Access", description: "REST API access for integrations", type: "boolean" },
-  hasCustomBranding: { name: "Custom Branding", description: "Customize logos, colors, and themes", type: "boolean" },
-  hasSSO: { name: "Single Sign-On", description: "SAML/OAuth SSO integration", type: "boolean" },
-  hasPrioritySupport: { name: "Priority Support", description: "24/7 priority customer support", type: "boolean" },
-  hasAdvancedSecurity: { name: "Advanced Security", description: "Enhanced security features and compliance", type: "boolean" },
-  hasWorkflowAutomation: { name: "Workflow Automation", description: "Automated workflows and triggers", type: "boolean" },
-  hasDataExport: { name: "Data Export", description: "Export data in various formats", type: "boolean" },
-  hasAuditLogs: { name: "Audit Logs", description: "Detailed activity and audit logging", type: "boolean" },
+  // Core Application Features (fully implemented)
+  communications: { name: "Communications", description: "Communication management and planning tools", implemented: true },
+  reports: { name: "Reporting", description: "Advanced reports and analytics dashboard", implemented: true },
+  gptCoach: { name: "GPT Integration", description: "AI-powered coaching and insights", implemented: true },
+  readinessSurveys: { name: "Surveys", description: "Survey creation and response management", implemented: true },
+  changeArtifacts: { name: "Change Artifacts", description: "Change artifact management", implemented: true },
+  // Data Management Features (partially implemented)
+  dataExport: { name: "Data Export", description: "Export data in PowerPoint and PDF formats", implemented: true },
+  auditLogs: { name: "Audit Logs", description: "Basic activity and request logging", implemented: true },
+  // Future Features (under construction)
+  customBranding: { name: "Custom Branding", description: "Customize logos, colors, and themes", implemented: false, underConstruction: true },
+  workflowAutomation: { name: "Workflow Automation", description: "Automated workflows and triggers", implemented: false, underConstruction: true },
 } as const;
 
 // Plan schema for form validation - matches database structure
@@ -65,23 +61,21 @@ const planSchema = z.object({
   description: z.string().optional(),
   seatLimit: z.number().min(1, "Seat limit must be at least 1"),
   pricePerSeatCents: z.number().min(0, "Price must be positive"),
+  maxFileUploadSizeMB: z.number().min(1, "File upload size must be at least 1 MB").default(10),
+  storageGB: z.number().min(1, "Storage must be at least 1 GB").default(5),
   features: z.object({
-    // Core Application Features (connected to actual functionality)
+    // Core Application Features (fully implemented)
     communications: z.boolean().default(false),
     reports: z.boolean().default(false),
     gptCoach: z.boolean().default(false),
     readinessSurveys: z.boolean().default(false),
     changeArtifacts: z.boolean().default(false),
-    // Enterprise Features (advanced tier features)
-    hasAdvancedReporting: z.boolean().default(false),
-    hasAPIAccess: z.boolean().default(false),
-    hasCustomBranding: z.boolean().default(false),
-    hasSSO: z.boolean().default(false),
-    hasPrioritySupport: z.boolean().default(false),
-    hasAdvancedSecurity: z.boolean().default(false),
-    hasWorkflowAutomation: z.boolean().default(false),
-    hasDataExport: z.boolean().default(false),
-    hasAuditLogs: z.boolean().default(false),
+    // Data Management Features (partially implemented)
+    dataExport: z.boolean().default(false),
+    auditLogs: z.boolean().default(false),
+    // Future Features (under construction)
+    customBranding: z.boolean().default(false),
+    workflowAutomation: z.boolean().default(false),
   }),
   isActive: z.boolean().default(true),
 });
@@ -94,6 +88,8 @@ interface Plan {
   description?: string;
   seatLimit: number;
   pricePerSeatCents: number;
+  maxFileUploadSizeMB: number;
+  storageGB: number;
   isActive: boolean;
   features: {
     // Core Application Features
@@ -102,16 +98,12 @@ interface Plan {
     gptCoach: boolean;
     readinessSurveys: boolean;
     changeArtifacts: boolean;
-    // Enterprise Features
-    hasAdvancedReporting: boolean;
-    hasAPIAccess: boolean;
-    hasCustomBranding: boolean;
-    hasSSO: boolean;
-    hasPrioritySupport: boolean;
-    hasAdvancedSecurity: boolean;
-    hasWorkflowAutomation: boolean;
-    hasDataExport: boolean;
-    hasAuditLogs: boolean;
+    // Data Management Features
+    dataExport: boolean;
+    auditLogs: boolean;
+    // Future Features
+    customBranding: boolean;
+    workflowAutomation: boolean;
   };
   createdAt: string;
   updatedAt: string;
@@ -246,6 +238,8 @@ export default function SuperAdminCustomerTiers() {
       description: "",
       seatLimit: 5,
       pricePerSeatCents: 2500, // $25.00 per seat
+      maxFileUploadSizeMB: 10,
+      storageGB: 5,
       isActive: true,
       features: {
         // Core Application Features
@@ -254,16 +248,12 @@ export default function SuperAdminCustomerTiers() {
         gptCoach: false,
         readinessSurveys: false,
         changeArtifacts: false,
-        // Enterprise Features
-        hasAdvancedReporting: false,
-        hasAPIAccess: false,
-        hasCustomBranding: false,
-        hasSSO: false,
-        hasPrioritySupport: false,
-        hasAdvancedSecurity: false,
-        hasWorkflowAutomation: false,
-        hasDataExport: false,
-        hasAuditLogs: false,
+        // Data Management Features
+        dataExport: false,
+        auditLogs: false,
+        // Future Features
+        customBranding: false,
+        workflowAutomation: false,
       },
     },
   });
@@ -275,6 +265,8 @@ export default function SuperAdminCustomerTiers() {
       description: "",
       seatLimit: 5,
       pricePerSeatCents: 2500,
+      maxFileUploadSizeMB: 10,
+      storageGB: 5,
       isActive: true,
       features: {
         // Core Application Features
@@ -283,16 +275,12 @@ export default function SuperAdminCustomerTiers() {
         gptCoach: false,
         readinessSurveys: false,
         changeArtifacts: false,
-        // Enterprise Features
-        hasAdvancedReporting: false,
-        hasAPIAccess: false,
-        hasCustomBranding: false,
-        hasSSO: false,
-        hasPrioritySupport: false,
-        hasAdvancedSecurity: false,
-        hasWorkflowAutomation: false,
-        hasDataExport: false,
-        hasAuditLogs: false,
+        // Data Management Features
+        dataExport: false,
+        auditLogs: false,
+        // Future Features
+        customBranding: false,
+        workflowAutomation: false,
       },
     },
   });
@@ -304,6 +292,8 @@ export default function SuperAdminCustomerTiers() {
       description: plan.description || "",
       seatLimit: plan.seatLimit,
       pricePerSeatCents: plan.pricePerSeatCents,
+      maxFileUploadSizeMB: plan.maxFileUploadSizeMB,
+      storageGB: plan.storageGB,
       isActive: plan.isActive,
       features: plan.features,
     });
@@ -354,20 +344,22 @@ export default function SuperAdminCustomerTiers() {
           {/* Feature Toggles */}
           <div className="space-y-1">
             {Object.entries(FEATURE_DEFINITIONS).map(([key, feature]) => {
-              if (feature.type === "boolean") {
-                const hasFeature = plan.features[key as keyof typeof plan.features] as boolean;
-                return (
-                  <div key={key} className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{feature.name}</span>
-                    {hasFeature ? (
-                      <Check className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <X className="h-4 w-4 text-gray-400" />
+              const hasFeature = plan.features[key as keyof typeof plan.features] as boolean;
+              return (
+                <div key={key} className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {feature.name}
+                    {feature.underConstruction && (
+                      <Badge variant="outline" className="ml-2 text-xs">Under Construction</Badge>
                     )}
-                  </div>
-                );
-              }
-              return null;
+                  </span>
+                  {hasFeature ? (
+                    <Check className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <X className="h-4 w-4 text-gray-400" />
+                  )}
+                </div>
+              );
             })}
           </div>
           
@@ -531,6 +523,48 @@ export default function SuperAdminCustomerTiers() {
                           </FormItem>
                         )}
                       />
+                      
+                      <FormField
+                        control={createForm.control}
+                        name="maxFileUploadSizeMB"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Max File Upload Size (MB)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="1"
+                                onChange={e => field.onChange(Number(e.target.value))}
+                                data-testid="input-max-file-upload-size"
+                                placeholder="e.g. 10"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={createForm.control}
+                        name="storageGB"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Storage Limit (GB)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="1"
+                                onChange={e => field.onChange(Number(e.target.value))}
+                                data-testid="input-storage-gb"
+                                placeholder="e.g. 5"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   </TabsContent>
                   
@@ -538,33 +572,36 @@ export default function SuperAdminCustomerTiers() {
                     {/* Boolean Features */}
                     <div className="grid grid-cols-2 gap-4">
                       {Object.entries(FEATURE_DEFINITIONS).map(([key, feature]) => {
-                        if (feature.type === "boolean") {
-                          return (
-                            <FormField
-                              key={key}
-                              control={createForm.control}
-                              name={`features.${key}` as any}
-                              render={({ field }) => (
-                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                                  <div className="space-y-0.5">
-                                    <FormLabel className="text-base">{feature.name}</FormLabel>
-                                    <div className="text-sm text-muted-foreground">
-                                      {feature.description}
-                                    </div>
+                        return (
+                          <FormField
+                            key={key}
+                            control={createForm.control}
+                            name={`features.${key}` as any}
+                            render={({ field }) => (
+                              <FormItem className={`flex flex-row items-center justify-between rounded-lg border p-4 ${feature.underConstruction ? 'opacity-60' : ''}`}>
+                                <div className="space-y-0.5">
+                                  <FormLabel className="text-base">
+                                    {feature.name}
+                                    {feature.underConstruction && (
+                                      <Badge variant="outline" className="ml-2 text-xs">Under Construction</Badge>
+                                    )}
+                                  </FormLabel>
+                                  <div className="text-sm text-muted-foreground">
+                                    {feature.description}
                                   </div>
-                                  <FormControl>
-                                    <Switch
-                                      checked={field.value}
-                                      onCheckedChange={field.onChange}
-                                      data-testid={`switch-${key}`}
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                          );
-                        }
-                        return null;
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    disabled={feature.underConstruction}
+                                    data-testid={`switch-${key}`}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        );
                       })}
                     </div>
                   </TabsContent>
@@ -641,20 +678,18 @@ export default function SuperAdminCustomerTiers() {
                       <tbody>
                         {Object.entries(FEATURE_DEFINITIONS).map(([key, feature]) => (
                           <tr key={key} className="border-b">
-                            <td className="p-3 font-medium">{feature.name}</td>
+                            <td className="p-3 font-medium">
+                              {feature.name}
+                              {feature.underConstruction && (
+                                <Badge variant="outline" className="ml-2 text-xs">Under Construction</Badge>
+                              )}
+                            </td>
                             {plans.map((plan) => (
                               <td key={plan.id} className="text-center p-3">
-                                {feature.type === "boolean" ? (
-                                  plan.features[key as keyof typeof plan.features] ? (
-                                    <Check className="h-4 w-4 text-green-500 mx-auto" />
-                                  ) : (
-                                    <X className="h-4 w-4 text-gray-400 mx-auto" />
-                                  )
+                                {plan.features[key as keyof typeof plan.features] ? (
+                                  <Check className="h-4 w-4 text-green-500 mx-auto" />
                                 ) : (
-                                  <span className="font-medium">
-                                    {plan.features[key as keyof typeof plan.features]}
-                                    {key === "maxStorage" && " GB"}
-                                  </span>
+                                  <X className="h-4 w-4 text-gray-400 mx-auto" />
                                 )}
                               </td>
                             ))}
@@ -787,6 +822,48 @@ export default function SuperAdminCustomerTiers() {
                           </FormItem>
                         )}
                       />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="maxFileUploadSizeMB"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Max File Upload Size (MB)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="1"
+                                onChange={e => field.onChange(Number(e.target.value))}
+                                data-testid="input-edit-max-file-upload-size"
+                                placeholder="e.g. 10"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="storageGB"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Storage Limit (GB)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                min="1"
+                                onChange={e => field.onChange(Number(e.target.value))}
+                                data-testid="input-edit-storage-gb"
+                                placeholder="e.g. 5"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   </TabsContent>
                   
@@ -794,33 +871,36 @@ export default function SuperAdminCustomerTiers() {
                     {/* Boolean Features */}
                     <div className="grid grid-cols-2 gap-4">
                       {Object.entries(FEATURE_DEFINITIONS).map(([key, feature]) => {
-                        if (feature.type === "boolean") {
-                          return (
-                            <FormField
-                              key={key}
-                              control={editForm.control}
-                              name={`features.${key}` as any}
-                              render={({ field }) => (
-                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                                  <div className="space-y-0.5">
-                                    <FormLabel className="text-base">{feature.name}</FormLabel>
-                                    <div className="text-sm text-muted-foreground">
-                                      {feature.description}
-                                    </div>
+                        return (
+                          <FormField
+                            key={key}
+                            control={editForm.control}
+                            name={`features.${key}` as any}
+                            render={({ field }) => (
+                              <FormItem className={`flex flex-row items-center justify-between rounded-lg border p-4 ${feature.underConstruction ? 'opacity-60' : ''}`}>
+                                <div className="space-y-0.5">
+                                  <FormLabel className="text-base">
+                                    {feature.name}
+                                    {feature.underConstruction && (
+                                      <Badge variant="outline" className="ml-2 text-xs">Under Construction</Badge>
+                                    )}
+                                  </FormLabel>
+                                  <div className="text-sm text-muted-foreground">
+                                    {feature.description}
                                   </div>
-                                  <FormControl>
-                                    <Switch
-                                      checked={field.value}
-                                      onCheckedChange={field.onChange}
-                                      data-testid={`switch-edit-${key}`}
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                          );
-                        }
-                        return null;
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    disabled={feature.underConstruction}
+                                    data-testid={`switch-edit-${key}`}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        );
                       })}
                     </div>
                   </TabsContent>

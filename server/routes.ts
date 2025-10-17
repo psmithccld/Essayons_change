@@ -68,7 +68,7 @@ import {
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema,
   insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
   insertUserGroupSchema, insertUserGroupMembershipSchema, insertUserPermissionSchema, insertNotificationSchema, insertChangeArtifactSchema,
-  insertOrganizationSettingsSchema, organizationDefaultsUpdateSchema,
+  insertOrganizationSettingsSchema,
   coachContextPayloadSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload,
   // Add missing schema imports
@@ -2067,6 +2067,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: customerTiers.description,
           seatLimit: customerTiers.seatLimit,
           pricePerSeatCents: customerTiers.pricePerSeatCents,
+          maxFileUploadSizeMB: customerTiers.maxFileUploadSizeMB,
+          storageGB: customerTiers.storageGB,
           features: customerTiers.features,
           isActive: customerTiers.isActive,
           createdAt: customerTiers.createdAt,
@@ -2976,50 +2978,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/super-admin/org-defaults - Get organization default feature templates
-  app.get("/api/super-admin/org-defaults", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
-    try {
-      // Get organization defaults from database
-      const orgDefaults = await storage.getOrganizationDefaults();
-      
-      if (!orgDefaults) {
-        // Return default fallback values if no record exists
-        const fallbackDefaults = {
-          features: {
-            reports: true,
-            gptCoach: true,
-            advancedAnalytics: false,
-            customBranding: false,
-            apiAccess: false,
-            ssoIntegration: false,
-            advancedSecurity: false,
-            customWorkflows: false,
-          },
-          limits: {
-            maxUsers: 100,
-            maxProjects: 50,
-            maxTasksPerProject: 1000,
-            maxFileUploadSizeMB: 10,
-            apiCallsPerMonth: 10000,
-            storageGB: 10,
-          },
-          settings: {
-            allowGuestAccess: false,
-            requireEmailVerification: true,
-            enableAuditLogs: false,
-            dataRetentionDays: 365,
-            autoBackup: true,
-          }
-        };
-        return res.json(fallbackDefaults);
-      }
-      
-      res.json(orgDefaults);
-    } catch (error) {
-      console.error("Error fetching organization defaults:", error);
-      res.status(500).json({ error: "Failed to fetch organization defaults" });
-    }
-  });
 
   // DEPRECATED: Use /api/super-admin/global-settings instead
   // PATCH /api/super-admin/settings - Update system settings (redirects to global settings)
@@ -3062,28 +3020,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH /api/super-admin/org-defaults - Update organization default feature templates
-  app.patch("/api/super-admin/org-defaults", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
-    try {
-      // Validate request body with Zod schema
-      const validatedData = organizationDefaultsUpdateSchema.parse(req.body);
-      
-      // Update organization defaults in database
-      const updatedDefaults = await storage.updateOrganizationDefaults(validatedData);
-      
-      console.log("Organization defaults update requested by:", req.superAdminUser.username, req.body);
-      
-      res.json({ 
-        message: "Organization defaults updated successfully",
-        defaults: updatedDefaults,
-        timestamp: new Date().toISOString(),
-        updatedFields: Object.keys(req.body)
-      });
-    } catch (error) {
-      console.error("Error updating organization defaults:", error);
-      res.status(500).json({ error: "Failed to update organization defaults" });
-    }
-  });
 
   // GET /api/super-admin/system/health - Get system health status
   app.get("/api/super-admin/system/health", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
@@ -7555,26 +7491,41 @@ Please provide coaching guidance based on their question and current context.`;
     }
   });
 
-  // Organization Features API Endpoint
+  // Organization Features API Endpoint - derives features from Customer Tier subscription
   app.get("/api/organization/features", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const organizationId = req.organizationId!;
-      const organization = await storage.getOrganization(organizationId);
       
-      if (!organization) {
-        return res.status(404).json({ error: "Organization not found" });
+      // Get organization's active subscription to determine customer tier
+      const subscription = await storage.getActiveSubscription(organizationId);
+      
+      if (!subscription) {
+        // SECURITY: No subscription = no features (fail closed)
+        return res.json({
+          readinessSurveys: false,
+          gptCoach: false,
+          communications: false,
+          changeArtifacts: false,
+          reports: false
+        });
       }
       
-      // SECURITY: Return enabled features or secure defaults if none exist (fail closed)
-      const defaultFeatures = {
-        readinessSurveys: false,
-        gptCoach: false,
-        communications: false,
-        changeArtifacts: false,
-        reports: false
-      };
+      // Get customer tier features - this is the single source of truth
+      const tier = await storage.getCustomerTier(subscription.tierId);
       
-      res.json(organization.enabledFeatures || defaultFeatures);
+      if (!tier || !tier.features) {
+        // SECURITY: No tier or features = fail closed with defaults
+        return res.json({
+          readinessSurveys: false,
+          gptCoach: false,
+          communications: false,
+          changeArtifacts: false,
+          reports: false
+        });
+      }
+      
+      // Return features from customer tier
+      res.json(tier.features);
     } catch (error) {
       console.error("Error fetching organization features:", error);
       res.status(500).json({ error: "Failed to fetch organization features" });

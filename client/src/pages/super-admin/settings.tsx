@@ -57,35 +57,6 @@ interface GlobalSettings {
   };
 }
 
-// Organization Default Templates - Settings for new organizations
-interface OrganizationDefaults {
-  features: {
-    reports: boolean;
-    gptCoach: boolean;
-    advancedAnalytics: boolean;
-    customBranding: boolean;
-    apiAccess: boolean;
-    ssoIntegration: boolean;
-    advancedSecurity: boolean;
-    customWorkflows: boolean;
-  };
-  limits: {
-    maxUsers: number;
-    maxProjects: number;
-    maxTasksPerProject: number;
-    maxFileUploadSizeMB: number;
-    apiCallsPerMonth: number;
-    storageGB: number;
-  };
-  settings: {
-    allowGuestAccess: boolean;
-    requireEmailVerification: boolean;
-    enableAuditLogs: boolean;
-    dataRetentionDays: number;
-    autoBackup: boolean;
-  };
-}
-
 interface SystemHealth {
   status: "healthy" | "warning" | "critical";
   uptime: number;
@@ -111,19 +82,6 @@ export default function SuperAdminSettings() {
       });
       if (!response.ok) throw new Error("Failed to fetch global settings");
       return response.json() as Promise<GlobalSettings>;
-    },
-    enabled: isAuthenticated,
-  });
-
-  // Fetch organization defaults
-  const { data: orgDefaults, isLoading: orgLoading, refetch: refetchOrgDefaults } = useQuery({
-    queryKey: ["/api/super-admin/org-defaults"],
-    queryFn: async () => {
-      const response = await fetch("/api/super-admin/org-defaults", {
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error("Failed to fetch organization defaults");
-      return response.json() as Promise<OrganizationDefaults>;
     },
     enabled: isAuthenticated,
   });
@@ -165,34 +123,6 @@ export default function SuperAdminSettings() {
       toast({
         title: "Update Failed",
         description: "Failed to update global settings. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Update organization defaults mutation
-  const updateOrgDefaultsMutation = useMutation({
-    mutationFn: async (updatedDefaults: Partial<OrganizationDefaults>) => {
-      const response = await fetch("/api/super-admin/org-defaults", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: 'include',
-        body: JSON.stringify(updatedDefaults),
-      });
-      if (!response.ok) throw new Error("Failed to update organization defaults");
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Organization Defaults Updated",
-        description: "Default settings for new organizations have been updated.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/org-defaults"] });
-    },
-    onError: (error) => {
-      toast({
-        title: "Update Failed",
-        description: "Failed to update organization defaults. Please try again.",
         variant: "destructive",
       });
     },
@@ -242,48 +172,6 @@ export default function SuperAdminSettings() {
     updateGlobalMutation.mutate(updatedSettings);
   };
 
-  const handleOrgFeatureToggle = (feature: keyof OrganizationDefaults['features'], enabled: boolean) => {
-    if (!orgDefaults) return;
-    
-    const updatedDefaults = {
-      ...orgDefaults,
-      features: {
-        ...orgDefaults.features,
-        [feature]: enabled
-      }
-    };
-    
-    updateOrgDefaultsMutation.mutate(updatedDefaults);
-  };
-
-  const handleOrgLimitUpdate = (field: keyof OrganizationDefaults['limits'], value: number) => {
-    if (!orgDefaults) return;
-    
-    const updatedDefaults = {
-      ...orgDefaults,
-      limits: {
-        ...orgDefaults.limits,
-        [field]: value
-      }
-    };
-    
-    updateOrgDefaultsMutation.mutate(updatedDefaults);
-  };
-
-  const handleOrgSettingToggle = (setting: keyof OrganizationDefaults['settings'], enabled: boolean) => {
-    if (!orgDefaults) return;
-    
-    const updatedDefaults = {
-      ...orgDefaults,
-      settings: {
-        ...orgDefaults.settings,
-        [setting]: enabled
-      }
-    };
-    
-    updateOrgDefaultsMutation.mutate(updatedDefaults);
-  };
-
   const formatUptime = (hours: number) => {
     if (hours < 24) return `${hours.toFixed(1)} hours`;
     const days = Math.floor(hours / 24);
@@ -316,7 +204,6 @@ export default function SuperAdminSettings() {
           <Button
             onClick={() => {
               refetchGlobal();
-              refetchOrgDefaults();
             }}
             variant="outline"
             size="sm"
@@ -350,14 +237,10 @@ export default function SuperAdminSettings() {
       )}
 
       <Tabs value={activeSection} onValueChange={setActiveSection} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="global" data-testid="tab-global">
             <Globe className="h-4 w-4 mr-2" />
             Global Platform
-          </TabsTrigger>
-          <TabsTrigger value="org-defaults" data-testid="tab-org-defaults">
-            <Users className="h-4 w-4 mr-2" />
-            Organization Defaults
           </TabsTrigger>
           <TabsTrigger value="system" data-testid="tab-system">
             <Server className="h-4 w-4 mr-2" />
@@ -445,243 +328,6 @@ export default function SuperAdminSettings() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        {/* Organization Defaults */}
-        <TabsContent value="org-defaults" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Organization Default Templates
-              </CardTitle>
-              <CardDescription>
-                Set default features, limits, and settings for new organizations
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {orgLoading ? (
-                <p className="text-center py-8 text-muted-foreground">Loading organization defaults...</p>
-              ) : (
-                <div className="space-y-8">
-                  {/* Default Features */}
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Default Features</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <Label className="text-base font-medium">Reports & Analytics</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Enable advanced reporting capabilities
-                          </p>
-                        </div>
-                        <Switch
-                          checked={orgDefaults?.features?.reports || false}
-                          onCheckedChange={(checked) => handleOrgFeatureToggle('reports', checked)}
-                          data-testid="switch-org-reports"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <Label className="text-base font-medium">AI GPT Coach</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Enable AI-powered coaching features
-                          </p>
-                        </div>
-                        <Switch
-                          checked={orgDefaults?.features?.gptCoach || false}
-                          onCheckedChange={(checked) => handleOrgFeatureToggle('gptCoach', checked)}
-                          data-testid="switch-org-gpt-coach"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <Label className="text-base font-medium">Advanced Analytics</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Deep insights and data visualization
-                          </p>
-                        </div>
-                        <Switch
-                          checked={orgDefaults?.features?.advancedAnalytics || false}
-                          onCheckedChange={(checked) => handleOrgFeatureToggle('advancedAnalytics', checked)}
-                          data-testid="switch-org-advanced-analytics"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <Label className="text-base font-medium">Custom Branding</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Upload logos and customize appearance
-                          </p>
-                        </div>
-                        <Switch
-                          checked={orgDefaults?.features?.customBranding || false}
-                          onCheckedChange={(checked) => handleOrgFeatureToggle('customBranding', checked)}
-                          data-testid="switch-org-custom-branding"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <Label className="text-base font-medium">API Access</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Allow third-party integrations via API
-                          </p>
-                        </div>
-                        <Switch
-                          checked={orgDefaults?.features?.apiAccess || false}
-                          onCheckedChange={(checked) => handleOrgFeatureToggle('apiAccess', checked)}
-                          data-testid="switch-org-api-access"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <Label className="text-base font-medium">SSO Integration</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Single sign-on capabilities
-                          </p>
-                        </div>
-                        <Switch
-                          checked={orgDefaults?.features?.ssoIntegration || false}
-                          onCheckedChange={(checked) => handleOrgFeatureToggle('ssoIntegration', checked)}
-                          data-testid="switch-org-sso"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Default Limits */}
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Default Limits</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <Label htmlFor="max-users">Maximum Users</Label>
-                        <Input
-                          id="max-users"
-                          type="number"
-                          min="1"
-                          max="10000"
-                          value={orgDefaults?.limits?.maxUsers || 50}
-                          onChange={(e) => handleOrgLimitUpdate('maxUsers', parseInt(e.target.value))}
-                          data-testid="input-org-max-users"
-                        />
-                      </div>
-
-                      <div className="space-y-3">
-                        <Label htmlFor="max-projects">Maximum Projects</Label>
-                        <Input
-                          id="max-projects"
-                          type="number"
-                          min="1"
-                          max="1000"
-                          value={orgDefaults?.limits?.maxProjects || 25}
-                          onChange={(e) => handleOrgLimitUpdate('maxProjects', parseInt(e.target.value))}
-                          data-testid="input-org-max-projects"
-                        />
-                      </div>
-
-                      <div className="space-y-3">
-                        <Label htmlFor="max-file-size">Max File Upload Size (MB)</Label>
-                        <Input
-                          id="max-file-size"
-                          type="number"
-                          min="1"
-                          max="500"
-                          value={orgDefaults?.limits?.maxFileUploadSizeMB || 50}
-                          onChange={(e) => handleOrgLimitUpdate('maxFileUploadSizeMB', parseInt(e.target.value))}
-                          data-testid="input-org-max-file-size"
-                        />
-                      </div>
-
-                      <div className="space-y-3">
-                        <Label htmlFor="storage-gb">Storage Limit (GB)</Label>
-                        <Input
-                          id="storage-gb"
-                          type="number"
-                          min="1"
-                          max="1000"
-                          value={orgDefaults?.limits?.storageGB || 10}
-                          onChange={(e) => handleOrgLimitUpdate('storageGB', parseInt(e.target.value))}
-                          data-testid="input-org-storage-gb"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Default Settings */}
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Default Settings</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <Label className="text-base font-medium">Allow Guest Access</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Let guests view certain project data
-                          </p>
-                        </div>
-                        <Switch
-                          checked={orgDefaults?.settings?.allowGuestAccess || false}
-                          onCheckedChange={(checked) => handleOrgSettingToggle('allowGuestAccess', checked)}
-                          data-testid="switch-org-guest-access"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <Label className="text-base font-medium">Require Email Verification</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Verify email addresses for new users
-                          </p>
-                        </div>
-                        <Switch
-                          checked={orgDefaults?.settings?.requireEmailVerification || false}
-                          onCheckedChange={(checked) => handleOrgSettingToggle('requireEmailVerification', checked)}
-                          data-testid="switch-org-email-verification"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <Label className="text-base font-medium">Enable Audit Logs</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Track user actions and changes
-                          </p>
-                        </div>
-                        <Switch
-                          checked={orgDefaults?.settings?.enableAuditLogs || false}
-                          onCheckedChange={(checked) => handleOrgSettingToggle('enableAuditLogs', checked)}
-                          data-testid="switch-org-audit-logs"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <Label className="text-base font-medium">Auto Backup</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Automatically backup organization data
-                          </p>
-                        </div>
-                        <Switch
-                          checked={orgDefaults?.settings?.autoBackup || false}
-                          onCheckedChange={(checked) => handleOrgSettingToggle('autoBackup', checked)}
-                          data-testid="switch-org-auto-backup"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
 
         {/* System Health & Status */}
         <TabsContent value="system" className="space-y-6">
