@@ -40,6 +40,11 @@ Preferred communication style: Simple, everyday language.
 - **Session-based**: Cookie-based session management with PostgreSQL session store
 - **User Management**: Basic user system with roles and permissions
 - **Default User**: Currently uses default user system (ready for full authentication implementation)
+- **Super Admin System**: Separate identity system for platform administrators
+  - Super admin users stored in `super_admin_users` table (separate from platform users in `users` table)
+  - Platform users cannot use reserved super admin usernames to prevent confusion
+  - Comprehensive error handling for user creation with specific validation messages
+  - Database roles: Admin, Manager, User (default role for new platform users)
 
 ### AI Integration
 - **OpenAI GPT-5**: AI-powered coaching system for change management insights
