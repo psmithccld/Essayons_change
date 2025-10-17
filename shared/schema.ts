@@ -307,8 +307,9 @@ export const customerTiers = pgTable("customer_tiers", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(), // "Basic", "Professional", "Enterprise", etc.
   description: text("description"),
+  pricingModel: text("pricing_model").notNull().default("per_seat"), // "flat" or "per_seat"
+  price: integer("price").notNull(), // Price in dollars (stored as cents: $99.99 = 9999)
   seatLimit: integer("seat_limit").notNull(), // Maximum users per organization
-  pricePerSeatCents: integer("price_per_seat_cents").notNull(), // Price per seat in cents
   maxFileUploadSizeMB: integer("max_file_upload_size_mb").notNull().default(10), // Max file upload size in MB
   storageGB: integer("storage_gb").notNull().default(5), // Storage limit in GB
   features: jsonb("features").notNull().default({}).$type<CustomerTierFeatures>(), // Available features (JSONB format)
