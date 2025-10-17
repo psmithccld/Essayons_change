@@ -152,7 +152,8 @@ export default function SuperAdminCustomerTiers() {
         credentials: 'include',
       });
       if (!response.ok) throw new Error("Failed to fetch customer tiers");
-      return response.json() as Promise<CustomerTier[]>;
+      const data = await response.json();
+      return data.tiers as CustomerTier[];
     },
     enabled: isAuthenticated,
   });
