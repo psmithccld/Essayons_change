@@ -2330,7 +2330,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check if username already exists
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Invalid email format" });
+      }
+
+      // Validate username format (alphanumeric, underscore, dash, 3-30 chars)
+      const usernameRegex = /^[a-zA-Z0-9_-]{3,30}$/;
+      if (!usernameRegex.test(username)) {
+        return res.status(400).json({ 
+          error: "Username must be 3-30 characters and contain only letters, numbers, underscores, and dashes" 
+        });
+      }
+
+      // Check if username already exists in platform users
       const existingUsername = await db.select()
         .from(users)
         .where(eq(users.username, username))
@@ -2338,6 +2352,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (existingUsername.length > 0) {
         return res.status(409).json({ error: "Username already exists" });
+      }
+
+      // Also check if username exists in super admin users (to avoid confusion)
+      const existingSuperAdmin = await db.select()
+        .from(superAdminUsers)
+        .where(eq(superAdminUsers.username, username))
+        .limit(1);
+      
+      if (existingSuperAdmin.length > 0) {
+        return res.status(409).json({ error: "Username is reserved and cannot be used" });
       }
 
       // Check if email already exists
@@ -2350,18 +2374,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ error: "Email already exists" });
       }
 
+      // If organizationId is provided, verify organization exists before creating user
+      if (organizationId && organizationId !== 'none') {
+        const [org] = await db.select()
+          .from(organizations)
+          .where(eq(organizations.id, organizationId))
+          .limit(1);
+
+        if (!org) {
+          return res.status(404).json({ error: "Organization not found. Please select a valid organization." });
+        }
+      }
+
       // Hash password
       const { default: bcrypt } = await import("bcryptjs");
       const passwordHash = await bcrypt.hash(password, 10);
 
-      // Get a default role (member role)
+      // Get a default role (User role for basic access)
       const [defaultRole] = await db.select()
         .from(roles)
-        .where(eq(roles.name, 'Member'))
+        .where(eq(roles.name, 'User'))
         .limit(1);
 
       if (!defaultRole) {
-        return res.status(500).json({ error: "Default role not found" });
+        console.error("CRITICAL: Default 'User' role not found in database. Available roles should be: Admin, Manager, User");
+        return res.status(500).json({ error: "System error: Default user role not configured. Please contact support." });
       }
 
       // Create the user
@@ -2377,27 +2414,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If organizationId is provided and it's not 'none', add user to organization
       if (organizationId && organizationId !== 'none') {
-        // Verify organization exists
-        const [org] = await db.select()
-          .from(organizations)
-          .where(eq(organizations.id, organizationId))
-          .limit(1);
+        try {
+          // Get organization name for logging
+          const [org] = await db.select({ name: organizations.name })
+            .from(organizations)
+            .where(eq(organizations.id, organizationId))
+            .limit(1);
 
-        if (!org) {
-          return res.status(400).json({ error: "Invalid organization ID" });
+          // Create organization membership
+          await db.insert(organizationMemberships).values({
+            organizationId,
+            userId: newUser.id,
+            orgRole: isAdmin ? 'admin' : 'member',
+            isActive: true,
+          });
+
+          console.log(`✓ Super admin ${req.superAdminUser!.username} created user ${username} and assigned to organization ${org?.name || organizationId} as ${isAdmin ? 'admin' : 'member'}`);
+        } catch (membershipError: any) {
+          // Log detailed error but user is already created
+          console.error(`ERROR: Failed to assign user ${username} to organization ${organizationId}:`, {
+            error: membershipError.message,
+            code: membershipError.code,
+            constraint: membershipError.constraint,
+            detail: membershipError.detail
+          });
+          
+          // Check if it's a duplicate membership error
+          if (membershipError.code === '23505') {
+            console.warn(`User ${username} already has membership in organization ${organizationId}`);
+          } else {
+            // Return error but note that user was created
+            return res.status(500).json({ 
+              error: "User created successfully, but failed to assign to organization. Please manually assign the user.",
+              userId: newUser.id 
+            });
+          }
         }
-
-        // Create organization membership
-        await db.insert(organizationMemberships).values({
-          organizationId,
-          userId: newUser.id,
-          orgRole: isAdmin ? 'admin' : 'member',
-          isActive: true,
-        });
-
-        console.log(`Super admin ${req.superAdminUser!.username} created user ${username} and assigned to organization ${org.name}`);
       } else {
-        console.log(`Super admin ${req.superAdminUser!.username} created homeless user ${username}`);
+        console.log(`✓ Super admin ${req.superAdminUser!.username} created homeless user ${username} (no organization)`);
       }
       
       res.status(201).json({
@@ -2408,9 +2462,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: newUser.isActive,
         createdAt: newUser.createdAt,
       });
-    } catch (error) {
-      console.error("Error creating platform user:", error);
-      res.status(500).json({ error: "Failed to create user" });
+    } catch (error: any) {
+      // Enhanced error logging for production debugging
+      console.error("ERROR creating platform user:", {
+        message: error.message,
+        code: error.code,
+        constraint: error.constraint,
+        detail: error.detail,
+        stack: error.stack
+      });
+
+      // Handle specific database errors
+      if (error.code === '23505') {
+        // Unique constraint violation
+        if (error.constraint?.includes('username')) {
+          return res.status(409).json({ error: "Username already exists" });
+        } else if (error.constraint?.includes('email')) {
+          return res.status(409).json({ error: "Email already exists" });
+        }
+        return res.status(409).json({ error: "A user with these details already exists" });
+      }
+
+      if (error.code === '23503') {
+        // Foreign key violation
+        return res.status(400).json({ error: "Invalid reference: Organization or role not found" });
+      }
+
+      if (error.code === '23502') {
+        // Not null violation
+        return res.status(400).json({ error: "Required field missing" });
+      }
+
+      // Generic error for unexpected issues
+      res.status(500).json({ error: "Failed to create user. Please try again or contact support." });
     }
   });
 
