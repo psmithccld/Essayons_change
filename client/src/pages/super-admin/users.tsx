@@ -145,7 +145,7 @@ export default function SuperAdminUsers() {
   // Assign user to organization mutation
   const assignUserMutation = useMutation({
     mutationFn: async (data: AssignUserFormData) => {
-      const response = await fetch(`/api/super-admin/organizations/${data.organizationId}/assign-user`, {
+      const response = await fetch(`/api/super-admin/organizations/${data.organizationId}/admins`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -153,7 +153,7 @@ export default function SuperAdminUsers() {
         credentials: 'include', // Use cookies for authentication
         body: JSON.stringify({
           userId: data.userId,
-          isAdmin: data.isAdmin,
+          role: data.isAdmin ? 'admin' : 'owner', // Map checkbox: checked=admin, unchecked=owner
         }),
       });
       if (!response.ok) {
