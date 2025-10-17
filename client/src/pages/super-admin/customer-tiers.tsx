@@ -39,22 +39,17 @@ import { useSuperAdmin } from "@/contexts/SuperAdminContext";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
-// Feature definitions
+// Feature definitions - matches database schema CustomerTierFeatures
 const FEATURE_DEFINITIONS = {
   communications: { name: "Communications", description: "Communication management and planning tools", type: "boolean" },
   reports: { name: "Reporting", description: "Advanced reports and analytics dashboard", type: "boolean" },
   gptCoach: { name: "GPT Integration", description: "AI-powered coaching and insights", type: "boolean" },
   readinessSurveys: { name: "Surveys", description: "Survey creation and response management", type: "boolean" },
   changeArtifacts: { name: "Change Artifacts", description: "Change artifact management", type: "boolean" },
-  hasAdvancedReporting: { name: "Advanced Reporting", description: "Access to advanced reports and analytics", type: "boolean" },
-  hasAPIAccess: { name: "API Access", description: "REST API access for integrations", type: "boolean" },
-  hasCustomBranding: { name: "Custom Branding", description: "Customize logos, colors, and themes", type: "boolean" },
-  hasSSO: { name: "Single Sign-On", description: "SAML/OAuth SSO integration", type: "boolean" },
-  hasPrioritySupport: { name: "Priority Support", description: "24/7 priority customer support", type: "boolean" },
-  hasAdvancedSecurity: { name: "Advanced Security", description: "Enhanced security features and compliance", type: "boolean" },
-  hasWorkflowAutomation: { name: "Workflow Automation", description: "Automated workflows and triggers", type: "boolean" },
-  hasDataExport: { name: "Data Export", description: "Export data in various formats", type: "boolean" },
-  hasAuditLogs: { name: "Audit Logs", description: "Detailed activity and audit logging", type: "boolean" },
+  dataExport: { name: "Data Export", description: "Export data in various formats", type: "boolean" },
+  auditLogs: { name: "Audit Logs", description: "Detailed activity and audit logging", type: "boolean" },
+  workflowAutomation: { name: "Workflow Automation", description: "Automated workflows and triggers", type: "boolean" },
+  customBranding: { name: "Custom Branding", description: "Customize logos, colors, and themes (Under Construction)", type: "boolean", disabled: true },
 } as const;
 
 // Customer Tier schema
@@ -64,12 +59,10 @@ const tierSchema = z.object({
   pricingModel: z.enum(["flat", "per_seat"]).default("per_seat"),
   price: z.number().min(0, "Price must be positive"),
   seatLimit: z.number().min(1, "Seat limit must be at least 1"),
-  maxProjects: z.number().min(0, "Max projects must be zero or greater").optional(),
-  maxUsers: z.number().min(0, "Max users must be zero or greater").optional(),
-  maxStorage: z.number().min(0, "Max storage must be zero or greater").optional(),
+  maxFileUploadSizeMB: z.number().min(1, "File size must be at least 1 MB"),
+  storageGB: z.number().min(1, "Storage must be at least 1 GB"),
   currency: z.string().min(3, "Currency required").max(3, "Currency required").default("USD"),
   billingInterval: z.string().default("month"),
-  organizationCount: z.number().optional(),
   stripeProductId: z.string().optional(),
   stripePriceId: z.string().optional(),
   isPopular: z.boolean().default(false),
@@ -79,19 +72,10 @@ const tierSchema = z.object({
     gptCoach: z.boolean().default(false),
     readinessSurveys: z.boolean().default(false),
     changeArtifacts: z.boolean().default(false),
-    hasAdvancedReporting: z.boolean().default(false),
-    hasAPIAccess: z.boolean().default(false),
-    hasCustomBranding: z.boolean().default(false),
-    hasSSO: z.boolean().default(false),
-    hasPrioritySupport: z.boolean().default(false),
-    hasAdvancedSecurity: z.boolean().default(false),
-    hasWorkflowAutomation: z.boolean().default(false),
-    hasDataExport: z.boolean().default(false),
-    hasAuditLogs: z.boolean().default(false),
-    // For legacy support, add numeric features here as well:
-    maxProjects: z.number().optional(),
-    maxUsers: z.number().optional(),
-    maxStorage: z.number().optional(),
+    customBranding: z.boolean().default(false),
+    dataExport: z.boolean().default(false),
+    auditLogs: z.boolean().default(false),
+    workflowAutomation: z.boolean().default(false),
   }),
   isActive: z.boolean().default(true),
 });
@@ -105,12 +89,10 @@ interface CustomerTier {
   pricingModel: "flat" | "per_seat";
   price: number;
   seatLimit: number;
-  maxProjects?: number;
-  maxUsers?: number;
-  maxStorage?: number;
+  maxFileUploadSizeMB: number;
+  storageGB: number;
   currency?: string;
   billingInterval?: string;
-  organizationCount?: number;
   stripeProductId?: string;
   stripePriceId?: string;
   isPopular?: boolean;
@@ -121,18 +103,10 @@ interface CustomerTier {
     gptCoach: boolean;
     readinessSurveys: boolean;
     changeArtifacts: boolean;
-    hasAdvancedReporting: boolean;
-    hasAPIAccess: boolean;
-    hasCustomBranding: boolean;
-    hasSSO: boolean;
-    hasPrioritySupport: boolean;
-    hasAdvancedSecurity: boolean;
-    hasWorkflowAutomation: boolean;
-    hasDataExport: boolean;
-    hasAuditLogs: boolean;
-    maxProjects?: number;
-    maxUsers?: number;
-    maxStorage?: number;
+    customBranding: boolean;
+    dataExport: boolean;
+    auditLogs: boolean;
+    workflowAutomation: boolean;
   };
   createdAt: string;
   updatedAt: string;
@@ -243,12 +217,10 @@ export default function SuperAdminCustomerTiers() {
       seatLimit: 5,
       price: 2500,
       pricingModel: "per_seat",
-      maxProjects: 0,
-      maxUsers: 0,
-      maxStorage: 0,
+      maxFileUploadSizeMB: 10,
+      storageGB: 5,
       currency: "USD",
       billingInterval: "month",
-      organizationCount: 0,
       stripeProductId: "",
       stripePriceId: "",
       isPopular: false,
@@ -259,18 +231,10 @@ export default function SuperAdminCustomerTiers() {
         gptCoach: false,
         readinessSurveys: false,
         changeArtifacts: false,
-        hasAdvancedReporting: false,
-        hasAPIAccess: false,
-        hasCustomBranding: false,
-        hasSSO: false,
-        hasPrioritySupport: false,
-        hasAdvancedSecurity: false,
-        hasWorkflowAutomation: false,
-        hasDataExport: false,
-        hasAuditLogs: false,
-        maxProjects: 0,
-        maxUsers: 0,
-        maxStorage: 0,
+        customBranding: false,
+        dataExport: false,
+        auditLogs: false,
+        workflowAutomation: false,
       },
     },
   });
@@ -283,12 +247,10 @@ export default function SuperAdminCustomerTiers() {
       seatLimit: 5,
       price: 2500,
       pricingModel: "per_seat",
-      maxProjects: 0,
-      maxUsers: 0,
-      maxStorage: 0,
+      maxFileUploadSizeMB: 10,
+      storageGB: 5,
       currency: "USD",
       billingInterval: "month",
-      organizationCount: 0,
       stripeProductId: "",
       stripePriceId: "",
       isPopular: false,
@@ -299,18 +261,10 @@ export default function SuperAdminCustomerTiers() {
         gptCoach: false,
         readinessSurveys: false,
         changeArtifacts: false,
-        hasAdvancedReporting: false,
-        hasAPIAccess: false,
-        hasCustomBranding: false,
-        hasSSO: false,
-        hasPrioritySupport: false,
-        hasAdvancedSecurity: false,
-        hasWorkflowAutomation: false,
-        hasDataExport: false,
-        hasAuditLogs: false,
-        maxProjects: 0,
-        maxUsers: 0,
-        maxStorage: 0,
+        customBranding: false,
+        dataExport: false,
+        auditLogs: false,
+        workflowAutomation: false,
       },
     },
   });
@@ -323,12 +277,10 @@ export default function SuperAdminCustomerTiers() {
       seatLimit: tier.seatLimit,
       price: tier.price,
       pricingModel: tier.pricingModel || "per_seat",
-      maxProjects: tier.maxProjects || 0,
-      maxUsers: tier.maxUsers || 0,
-      maxStorage: tier.maxStorage || 0,
+      maxFileUploadSizeMB: tier.maxFileUploadSizeMB || 10,
+      storageGB: tier.storageGB || 5,
       currency: tier.currency || "USD",
       billingInterval: tier.billingInterval || "month",
-      organizationCount: tier.organizationCount || 0,
       stripeProductId: tier.stripeProductId || "",
       stripePriceId: tier.stripePriceId || "",
       isPopular: !!tier.isPopular,
@@ -378,23 +330,19 @@ export default function SuperAdminCustomerTiers() {
           </Badge>
           <Badge variant="outline">
             <Package className="h-3 w-3 mr-1" />
-            {tier.maxProjects ?? tier.features.maxProjects ?? 0} projects
+            {tier.maxFileUploadSizeMB} MB files
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span>Max Projects</span>
-            <span className="font-medium">{tier.maxProjects ?? tier.features.maxProjects ?? 0}</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span>Max Users</span>
-            <span className="font-medium">{tier.maxUsers ?? tier.features.maxUsers ?? 0}</span>
+            <span>Individual File Size</span>
+            <span className="font-medium">{tier.maxFileUploadSizeMB} MB</span>
           </div>
           <div className="flex items-center justify-between text-sm">
             <span>Storage</span>
-            <span className="font-medium">{tier.maxStorage ?? tier.features.maxStorage ?? 0} GB</span>
+            <span className="font-medium">{tier.storageGB} GB</span>
           </div>
         </div>
         <div className="flex items-center justify-between text-sm">
@@ -404,10 +352,6 @@ export default function SuperAdminCustomerTiers() {
         <div className="flex items-center justify-between text-sm">
           <span>Billing Interval</span>
           <span className="font-medium">{tier.billingInterval || "month"}</span>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span>Organization Count</span>
-          <span className="font-medium">{tier.organizationCount ?? 0}</span>
         </div>
         {/* Feature Toggles */}
         <div className="space-y-1 pt-2 border-t">
@@ -685,17 +629,17 @@ export default function SuperAdminCustomerTiers() {
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={createForm.control}
-                        name="maxProjects"
+                        name="maxFileUploadSizeMB"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Max Projects</FormLabel>
+                            <FormLabel>Individual File Size (MB)</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
                                 type="number"
-                                min="0"
+                                min="1"
                                 onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-max-projects"
+                                data-testid="input-max-file-upload-size"
                               />
                             </FormControl>
                             <FormMessage />
@@ -704,55 +648,17 @@ export default function SuperAdminCustomerTiers() {
                       />
                       <FormField
                         control={createForm.control}
-                        name="maxUsers"
+                        name="storageGB"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Max Users</FormLabel>
+                            <FormLabel>Storage (GB)</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
                                 type="number"
-                                min="0"
+                                min="1"
                                 onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-max-users"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={createForm.control}
-                        name="maxStorage"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Max Storage (GB)</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                type="number"
-                                min="0"
-                                onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-max-storage"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={createForm.control}
-                        name="organizationCount"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Organization Count</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                type="number"
-                                min="0"
-                                onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-organization-count"
+                                data-testid="input-storage-gb"
                               />
                             </FormControl>
                             <FormMessage />
@@ -765,13 +671,14 @@ export default function SuperAdminCustomerTiers() {
                     <div className="grid grid-cols-2 gap-4">
                       {Object.entries(FEATURE_DEFINITIONS).map(([key, feature]) => {
                         if (feature.type === "boolean") {
+                          const isDisabled = (feature as any).disabled || false;
                           return (
                             <FormField
                               key={key}
                               control={createForm.control}
                               name={`features.${key}` as any}
                               render={({ field }) => (
-                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                <FormItem className={`flex flex-row items-center justify-between rounded-lg border p-4 ${isDisabled ? 'opacity-50' : ''}`}>
                                   <div className="space-y-0.5">
                                     <FormLabel className="text-base">{feature.name}</FormLabel>
                                     <div className="text-sm text-muted-foreground">
@@ -782,6 +689,7 @@ export default function SuperAdminCustomerTiers() {
                                     <Switch
                                       checked={field.value}
                                       onCheckedChange={field.onChange}
+                                      disabled={isDisabled}
                                       data-testid={`switch-${key}`}
                                     />
                                   </FormControl>
@@ -913,26 +821,18 @@ export default function SuperAdminCustomerTiers() {
                         ))}
                         {/* Numeric features */}
                         <tr className="border-b">
-                          <td className="p-3 font-medium">Max Projects</td>
+                          <td className="p-3 font-medium">Individual File Size (MB)</td>
                           {tiers.map((tier) => (
                             <td key={tier.id} className="text-center p-3">
-                              {tier.maxProjects ?? tier.features.maxProjects ?? 0}
+                              {tier.maxFileUploadSizeMB}
                             </td>
                           ))}
                         </tr>
                         <tr className="border-b">
-                          <td className="p-3 font-medium">Max Users</td>
+                          <td className="p-3 font-medium">Storage (GB)</td>
                           {tiers.map((tier) => (
                             <td key={tier.id} className="text-center p-3">
-                              {tier.maxUsers ?? tier.features.maxUsers ?? 0}
-                            </td>
-                          ))}
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-3 font-medium">Max Storage (GB)</td>
-                          {tiers.map((tier) => (
-                            <td key={tier.id} className="text-center p-3">
-                              {tier.maxStorage ?? tier.features.maxStorage ?? 0}
+                              {tier.storageGB}
                             </td>
                           ))}
                         </tr>
@@ -949,14 +849,6 @@ export default function SuperAdminCustomerTiers() {
                           {tiers.map((tier) => (
                             <td key={tier.id} className="text-center p-3">
                               {tier.billingInterval || "month"}
-                            </td>
-                          ))}
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-3 font-medium">Organization Count</td>
-                          {tiers.map((tier) => (
-                            <td key={tier.id} className="text-center p-3">
-                              {tier.organizationCount ?? 0}
                             </td>
                           ))}
                         </tr>
@@ -1199,17 +1091,17 @@ export default function SuperAdminCustomerTiers() {
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={editForm.control}
-                        name="maxProjects"
+                        name="maxFileUploadSizeMB"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Max Projects</FormLabel>
+                            <FormLabel>Individual File Size (MB)</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
                                 type="number"
-                                min="0"
+                                min="1"
                                 onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-edit-max-projects"
+                                data-testid="input-edit-max-file-upload-size"
                               />
                             </FormControl>
                             <FormMessage />
@@ -1218,55 +1110,17 @@ export default function SuperAdminCustomerTiers() {
                       />
                       <FormField
                         control={editForm.control}
-                        name="maxUsers"
+                        name="storageGB"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Max Users</FormLabel>
+                            <FormLabel>Storage (GB)</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
                                 type="number"
-                                min="0"
+                                min="1"
                                 onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-edit-max-users"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={editForm.control}
-                        name="maxStorage"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Max Storage (GB)</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                type="number"
-                                min="0"
-                                onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-edit-max-storage"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={editForm.control}
-                        name="organizationCount"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Organization Count</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                type="number"
-                                min="0"
-                                onChange={e => field.onChange(Number(e.target.value))}
-                                data-testid="input-edit-organization-count"
+                                data-testid="input-edit-storage-gb"
                               />
                             </FormControl>
                             <FormMessage />
@@ -1279,13 +1133,14 @@ export default function SuperAdminCustomerTiers() {
                     <div className="grid grid-cols-2 gap-4">
                       {Object.entries(FEATURE_DEFINITIONS).map(([key, feature]) => {
                         if (feature.type === "boolean") {
+                          const isDisabled = (feature as any).disabled || false;
                           return (
                             <FormField
                               key={key}
                               control={editForm.control}
                               name={`features.${key}` as any}
                               render={({ field }) => (
-                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                <FormItem className={`flex flex-row items-center justify-between rounded-lg border p-4 ${isDisabled ? 'opacity-50' : ''}`}>
                                   <div className="space-y-0.5">
                                     <FormLabel className="text-base">{feature.name}</FormLabel>
                                     <div className="text-sm text-muted-foreground">
@@ -1296,6 +1151,7 @@ export default function SuperAdminCustomerTiers() {
                                     <Switch
                                       checked={field.value}
                                       onCheckedChange={field.onChange}
+                                      disabled={isDisabled}
                                       data-testid={`switch-edit-${key}`}
                                     />
                                   </FormControl>
