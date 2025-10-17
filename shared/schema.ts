@@ -309,6 +309,7 @@ export const customerTiers = pgTable("customer_tiers", {
   description: text("description"),
   pricingModel: text("pricing_model").notNull().default("per_seat"), // "flat" or "per_seat"
   price: integer("price").notNull(), // Price in cents ($25.00 = 2500 cents)
+  currency: text("currency").notNull().default("USD"), // Currency code (USD, EUR, etc.)
   seatLimit: integer("seat_limit").notNull(), // Maximum users per organization
   maxFileUploadSizeMB: integer("max_file_upload_size_mb").notNull().default(10), // Max file upload size in MB
   storageGB: integer("storage_gb").notNull().default(5), // Storage limit in GB

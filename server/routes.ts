@@ -2065,8 +2065,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: customerTiers.id,
           name: customerTiers.name,
           description: customerTiers.description,
+          pricingModel: customerTiers.pricingModel,
+          price: customerTiers.price,
+          currency: customerTiers.currency,
           seatLimit: customerTiers.seatLimit,
-          pricePerSeatCents: customerTiers.pricePerSeatCents,
           maxFileUploadSizeMB: customerTiers.maxFileUploadSizeMB,
           storageGB: customerTiers.storageGB,
           features: customerTiers.features,
@@ -2076,7 +2078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .from(customerTiers)
         .where(eq(customerTiers.isActive, true))
-        .orderBy(customerTiers.pricePerSeatCents);
+        .orderBy(customerTiers.price);
       
       res.json({ tiers: allTiers });
     } catch (error) {
@@ -2219,7 +2221,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: subscriptions.createdAt,
         tierName: customerTiers.name,
         tierDescription: customerTiers.description,
-        tierPricePerSeatCents: customerTiers.pricePerSeatCents,
+        tierPrice: customerTiers.price,
+        tierCurrency: customerTiers.currency,
+        tierPricingModel: customerTiers.pricingModel,
         tierSeatLimit: customerTiers.seatLimit,
         tierFeatures: customerTiers.features
       })
@@ -2886,7 +2890,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Get customer tier details
           const [tier] = await db.select({ 
             name: customerTiers.name, 
-            pricePerSeatCents: customerTiers.pricePerSeatCents 
+            price: customerTiers.price,
+            currency: customerTiers.currency,
+            pricingModel: customerTiers.pricingModel
           })
             .from(customerTiers)
             .where(eq(customerTiers.id, sub.tierId));
@@ -2899,8 +2905,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tierName: tier?.name || 'Unknown Tier',
             status: sub.status,
             seatsPurchased: sub.seatsPurchased,
-            pricePerSeatCents: tier?.pricePerSeatCents || 0,
-            currency: 'USD',
+            price: tier?.price || 0,
+            currency: tier?.currency || 'USD',
+            pricingModel: tier?.pricingModel || 'per_seat',
             stripeCustomerId: sub.stripeCustomerId,
             stripeSubscriptionId: sub.stripeSubscriptionId,
             cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
@@ -2909,8 +2916,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             currentPeriodEnd: sub.currentPeriodEnd,
             createdAt: sub.createdAt,
             updatedAt: sub.updatedAt,
-            totalMonthlyPrice: sub.seatsPurchased && tier?.pricePerSeatCents 
-              ? (sub.seatsPurchased * tier.pricePerSeatCents) / 100 // Convert cents to dollars
+            totalMonthlyPrice: sub.seatsPurchased && tier?.price 
+              ? (sub.seatsPurchased * tier.price) / 100 // Convert cents to dollars
               : 0
           };
         })
