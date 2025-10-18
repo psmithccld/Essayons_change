@@ -72,7 +72,7 @@ import {
   coachContextPayloadSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload,
   // Add missing schema imports
-  users, projects, organizations, organizationMemberships, customerTiers, subscriptions, roles
+  users, projects, organizations, organizationMemberships, customerTiers, subscriptions, roles, superAdminUsers
 } from "@shared/schema";
 import { db } from "./db"; // Import db from correct location
 import { and, eq, or, sql, count } from "drizzle-orm"; // Add missing drizzle operators
