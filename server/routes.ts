@@ -1413,7 +1413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           path: '/api/super-admin',
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict'
+          sameSite: 'lax'
         });
         return res.status(401).json({ error: "Invalid or expired super admin session" });
       }
@@ -1427,7 +1427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           path: '/api/super-admin',
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict'
+          sameSite: 'lax'
         });
         return res.status(401).json({ error: "Invalid or inactive super admin account" });
       }
@@ -1500,7 +1500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.cookie('superAdminSessionId', session.id, {
         httpOnly: true, // Prevent XSS attacks - cookie not accessible via JavaScript
         secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-        sameSite: 'strict', // CSRF protection - strict same-site policy
+        sameSite: 'lax', // CSRF protection - lax policy for production HTTPS compatibility
         maxAge: 2 * 60 * 60 * 1000, // 2 hours - shorter session for high-privilege access
         path: '/api/super-admin' // Restrict cookie to Super Admin endpoints only
       });
@@ -1589,13 +1589,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         path: '/api/super-admin',
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
+        sameSite: 'lax'
       });
       
       res.cookie('superAdminSessionId', newSession.id, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         maxAge: 2 * 60 * 60 * 1000, // 2 hours
         path: '/api/super-admin'
       });
@@ -1708,7 +1708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         path: '/api/super-admin',
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
+        sameSite: 'lax'
       });
       
       res.json({ message: "Logged out successfully" });
