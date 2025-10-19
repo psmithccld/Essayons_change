@@ -2357,7 +2357,7 @@ export const systemSettings = pgTable("system_settings", {
   maintenance: jsonb("maintenance").default({
     scheduledMaintenanceStart: null,
     scheduledMaintenanceEnd: null,
-    maintenanceMessage: "The platform is currently undergoing maintenance. We'll be back shortly."
+    maintenanceMessage: "The platform is currently undergoing maintenance. We will be back shortly."
   }).notNull(),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
