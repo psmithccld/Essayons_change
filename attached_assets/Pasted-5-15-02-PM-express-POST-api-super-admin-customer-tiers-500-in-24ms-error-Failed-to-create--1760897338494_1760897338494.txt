@@ -1,0 +1,53 @@
+5:15:02 PM [express] POST /api/super-admin/customer-tiers 500 in 24ms :: {"error":"Failed to create …
+5:20:29 PM [express] GET /api/projects 401 in 84ms :: {"error":"Authentication required. Please log …
+5:20:29 PM [express] GET /api/auth/status 401 in 79ms :: {"error":"Not authenticated"}
+5:20:30 PM [express] GET /api/super-admin/auth/status 304 in 115ms :: {"user":{"id":"945db4bb-1676-4…
+Error fetching customer tiers: error: column "pricing_model" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:10812:24 {
+  length: 113,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '37',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+5:20:30 PM [express] GET /api/super-admin/customer-tiers 500 in 9ms :: {"error":"Failed to fetch cus…
+Error creating customer tier: error: column "pricing_model" of relation "customer_tiers" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:10857:25 {
+  length: 140,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '60',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_target.c',
+  line: '1065',
+  routine: 'checkInsertTargets'
+}
+5:22:21 PM [express] POST /api/super-admin/customer-tiers 500 in 22ms :: {"error":"Failed to create …
+SECURITY: Cleanup completed - Rate limits: 0, Login attempts: 0, Suspicious IPs: 0

@@ -1,0 +1,268 @@
+Error fetching platform users: error: column users.role_id does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getAllPlatformUsers (file:///opt/render/project/src/dist/index.js:3065:26)
+    at async file:///opt/render/project/src/dist/index.js:10982:29 {
+  length: 112,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '192',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+7:08:38 PM [express] GET /api/super-admin/users 500 in 55ms :: {"error":"Failed to fetch platform us…
+7:08:38 PM [express] GET /api/super-admin/organizations 200 in 652ms :: [{"id":"ceb876f4-c495-4c64-a…
+ERROR creating platform user: {
+  message: 'column "department" does not exist',
+  code: '42703',
+  constraint: undefined,
+  detail: undefined,
+  stack: 'error: column "department" does not exist\n' +
+    '    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n' +
+    '    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22\n' +
+    '    at async file:///opt/render/project/src/dist/index.js:11007:32'
+}
+7:09:32 PM [express] POST /api/super-admin/users 500 in 33ms :: {"error":"Failed to create user. Ple…
+7:11:50 PM [express] GET /api/auth/status 401 in 20ms :: {"error":"Not authenticated"}
+7:11:50 PM [express] GET /api/projects 401 in 21ms :: {"error":"Authentication required. Please log …
+7:11:51 PM [express] GET /api/super-admin/auth/status 304 in 6ms :: {"user":{"id":"945db4bb-1676-457…
+Error fetching platform users: error: column users.role_id does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getAllPlatformUsers (file:///opt/render/project/src/dist/index.js:3065:26)
+    at async file:///opt/render/project/src/dist/index.js:10982:29 {
+  length: 112,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '192',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+7:11:51 PM [express] GET /api/super-admin/users 500 in 9ms :: {"error":"Failed to fetch platform use…
+7:11:51 PM [express] GET /api/super-admin/organizations 304 in 603ms :: [{"id":"ceb876f4-c495-4c64-a…
+Error fetching customer tiers: error: column "pricing_model" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:10812:24 {
+  length: 113,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '37',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+7:11:53 PM [express] GET /api/super-admin/customer-tiers 500 in 7ms :: {"error":"Failed to fetch cus…
+Error creating customer tier: error: column "pricing_model" of relation "customer_tiers" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:10857:25 {
+  length: 140,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '60',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_target.c',
+  line: '1065',
+  routine: 'checkInsertTargets'
+}
+7:12:18 PM [express] POST /api/super-admin/customer-tiers 500 in 22ms :: {"error":"Failed to create …
+Error creating customer tier: error: column "pricing_model" of relation "customer_tiers" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:10857:25 {
+  length: 140,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '60',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_target.c',
+  line: '1065',
+  routine: 'checkInsertTargets'
+}
+7:12:39 PM [express] POST /api/super-admin/customer-tiers 500 in 25ms :: {"error":"Failed to create …
+Error creating customer tier: error: column "pricing_model" of relation "customer_tiers" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:10857:25 {
+  length: 140,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '60',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_target.c',
+  line: '1065',
+  routine: 'checkInsertTargets'
+}
+7:12:44 PM [express] POST /api/super-admin/customer-tiers 500 in 25ms :: {"error":"Failed to create …
+7:12:56 PM [express] GET /api/projects 401 in 22ms :: {"error":"Authentication required. Please log …
+7:12:56 PM [express] GET /api/auth/status 401 in 41ms :: {"error":"Not authenticated"}
+7:13:00 PM [express] GET /api/projects 401 in 2ms :: {"error":"Authentication required. Please log i…
+7:13:00 PM [express] GET /api/auth/status 401 in 2ms :: {"error":"Not authenticated"}
+7:13:01 PM [express] GET /api/super-admin/auth/status 304 in 6ms :: {"user":{"id":"945db4bb-1676-457…
+7:13:01 PM [express] GET /api/super-admin/dashboard/system-health 200 in 11ms :: {"status":"healthy"…
+Error fetching super admin dashboard stats: error: column subscriptions.tier_id does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:11364:36 {
+  length: 120,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '175',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+7:13:01 PM [express] GET /api/super-admin/dashboard/stats 500 in 464ms :: {"error":"Failed to fetch …
+7:13:01 PM [express] GET /api/super-admin/dashboard/alerts 304 in 468ms :: []
+7:13:01 PM [express] GET /api/super-admin/dashboard/recent-activity 304 in 582ms :: [{"id":"org-bb0d…
+7:13:01 PM [express] GET /api/super-admin/organizations 304 in 585ms :: [{"id":"bb0d3730-8538-4c22-9…
+Error fetching customer tiers: error: column "pricing_model" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:10812:24 {
+  length: 113,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '37',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+7:13:09 PM [express] GET /api/super-admin/customer-tiers 500 in 7ms :: {"error":"Failed to fetch cus…
+Error creating customer tier: error: column "pricing_model" of relation "customer_tiers" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:10857:25 {
+  length: 140,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '60',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_target.c',
+  line: '1065',
+  routine: 'checkInsertTargets'
+}
+7:13:35 PM [express] POST /api/super-admin/customer-tiers 500 in 26ms :: {"error":"Failed to create …
+Error creating customer tier: error: column "pricing_model" of relation "customer_tiers" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:10857:25 {
+  length: 140,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '60',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_target.c',
+  line: '1065',
+  routine: 'checkInsertTargets'
+}
+7:13:40 PM [express] POST /api/super-admin/customer-tiers 500 in 25ms :: {"error":"Failed to create …
