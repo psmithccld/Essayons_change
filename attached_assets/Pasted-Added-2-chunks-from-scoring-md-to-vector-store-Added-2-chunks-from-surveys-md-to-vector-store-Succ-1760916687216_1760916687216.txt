@@ -1,0 +1,52 @@
+Added 2 chunks from scoring.md to vector store
+Added 2 chunks from surveys.md to vector store
+Successfully loaded 9 document chunks into vector store
+Vector store initialized: {
+  totalDocuments: 9,
+  filesCounts: {
+    'communications.md': 2,
+    'framework.md': 3,
+    'scoring.md': 2,
+    'surveys.md': 2
+  },
+  sources: { knowledge_base: 9 }
+}
+Startup: ✅ Vector store initialization complete
+Startup: ✅ Server initialization complete
+11:27:37 PM [express] GET /api/auth/status 401 in 24ms :: {"error":"Not authenticated"}
+11:27:37 PM [express] GET /api/projects 401 in 66ms :: {"error":"Authentication required. Please log …
+11:27:44 PM [express] GET /api/auth/status 401 in 2ms :: {"error":"Not authenticated"}
+11:27:44 PM [express] GET /api/projects 401 in 2ms :: {"error":"Authentication required. Please log i…
+11:27:44 PM [express] GET /api/super-admin/auth/status 304 in 10ms :: {"user":{"id":"87fce4ea-998d-4e…
+Error fetching super admin dashboard stats: error: column customer_tiers.price_per_seat_cents does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:11364:36 {
+  length: 133,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '72',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+11:27:44 PM [express] GET /api/super-admin/dashboard/stats 500 in 55ms :: {"error":"Failed to fetch d…
+11:27:44 PM [express] GET /api/super-admin/dashboard/recent-activity 304 in 55ms :: []
+11:27:44 PM [express] GET /api/super-admin/organizations 304 in 153ms :: []
+11:27:44 PM [express] GET /api/super-admin/dashboard/system-health 200 in 339ms :: {"status":"healthy…
+11:27:44 PM [express] GET /api/super-admin/dashboard/alerts 304 in 335ms :: []
+11:27:50 PM [express] GET /api/super-admin/customer-tiers 304 in 8ms :: {"tiers":[{"id":"17deb7a9-39a…
+11:27:52 PM [express] GET /api/super-admin/organizations 304 in 6ms :: []
+11:29:03 PM [express] POST /api/super-admin/organizations 400 in 24ms :: {"error":"Invalid organizati…
+11:29:10 PM [express] POST /api/super-admin/organizations 400 in 5ms :: {"error":"Invalid organizatio…
