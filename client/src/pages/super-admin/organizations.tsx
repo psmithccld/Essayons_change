@@ -151,7 +151,7 @@ export default function SuperAdminOrganizations() {
         maxUsers: data.maxUsers,
         taxId: data.taxId,
         status: data.isActive ? "active" : "inactive", // Map isActive to status
-        ownerUserId: "bdc321c7-9687-4302-ac33-2d17f552191b", // TODO: Make this configurable/dynamic for production
+        // ownerUserId is optional - can be set later when users are added to organization
       };
       
       const response = await fetch("/api/super-admin/organizations", {

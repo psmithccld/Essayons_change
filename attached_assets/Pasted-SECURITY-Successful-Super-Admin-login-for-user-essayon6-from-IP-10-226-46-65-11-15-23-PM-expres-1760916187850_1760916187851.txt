@@ -1,0 +1,93 @@
+SECURITY: Successful Super Admin login for user 'essayon6' from IP 10.226.46.65
+11:15:23 PM [express] POST /api/super-admin/auth/login 200 in 67ms :: {"user":{"id":"87fce4ea-998d-4e…
+11:15:23 PM [express] GET /api/super-admin/auth/status 200 in 5ms :: {"user":{"id":"87fce4ea-998d-4e0…
+11:15:23 PM [express] GET /api/super-admin/dashboard/alerts 304 in 12ms :: []
+11:15:23 PM [express] GET /api/super-admin/organizations 200 in 303ms :: []
+Error fetching super admin dashboard stats: error: column customer_tiers.price_per_seat_cents does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:11364:36 {
+  length: 133,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '72',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+11:15:23 PM [express] GET /api/super-admin/dashboard/stats 500 in 307ms :: {"error":"Failed to fetch …
+11:15:23 PM [express] GET /api/super-admin/dashboard/recent-activity 200 in 398ms :: []
+11:15:23 PM [express] GET /api/super-admin/dashboard/system-health 200 in 407ms :: {"status":"healthy…
+11:15:26 PM [express] GET /api/super-admin/customer-tiers 304 in 7ms :: {"tiers":[]}
+11:16:03 PM [express] POST /api/super-admin/customer-tiers 201 in 20ms :: {"id":"17deb7a9-39a4-4691-b…
+11:16:03 PM [express] GET /api/super-admin/customer-tiers 200 in 4ms :: {"tiers":[{"id":"17deb7a9-39a…
+11:16:48 PM [express] POST /api/super-admin/customer-tiers 201 in 20ms :: {"id":"71737d24-943d-4b10-a…
+11:16:49 PM [express] GET /api/super-admin/customer-tiers 200 in 5ms :: {"tiers":[{"id":"17deb7a9-39a…
+     ==> Detected service running on port 10000
+     ==> Docs on specifying a port: https://render.com/docs/web-services#port-binding
+11:18:45 PM [express] POST /api/super-admin/customer-tiers 201 in 17ms :: {"id":"42bf42b1-0027-49a2-9…
+11:18:45 PM [express] GET /api/super-admin/customer-tiers 200 in 5ms :: {"tiers":[{"id":"17deb7a9-39a…
+11:18:47 PM [express] GET /api/super-admin/users 200 in 8ms :: []
+11:18:47 PM [express] GET /api/super-admin/organizations 200 in 4ms :: []
+11:18:49 PM [express] GET /api/super-admin/organizations 200 in 5ms :: []
+Error creating organization: error: insert or update on table "organizations" violates foreign key constraint "organizations_owner_user_id_users_id_fk"
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.createOrganization (file:///opt/render/project/src/dist/index.js:5568:27)
+    at async file:///opt/render/project/src/dist/index.js:10609:28 {
+  length: 341,
+  severity: 'ERROR',
+  code: '23503',
+  detail: 'Key (owner_user_id)=(bdc321c7-9687-4302-ac33-2d17f552191b) is not present in table "users".',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'organizations',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'organizations_owner_user_id_users_id_fk',
+  file: 'ri_triggers.c',
+  line: '2599',
+  routine: 'ri_ReportViolation'
+}
+11:20:44 PM [express] POST /api/super-admin/organizations 500 in 20ms :: {"error":"Failed to create o…
+Error creating organization: error: insert or update on table "organizations" violates foreign key constraint "organizations_owner_user_id_users_id_fk"
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.createOrganization (file:///opt/render/project/src/dist/index.js:5568:27)
+    at async file:///opt/render/project/src/dist/index.js:10609:28 {
+  length: 341,
+  severity: 'ERROR',
+  code: '23503',
+  detail: 'Key (owner_user_id)=(bdc321c7-9687-4302-ac33-2d17f552191b) is not present in table "users".',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'organizations',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'organizations_owner_user_id_users_id_fk',
+  file: 'ri_triggers.c',
+  line: '2599',
+  routine: 'ri_ReportViolation'
+}
+11:20:57 PM [express] POST /api/super-admin/organizations 500 in 24ms :: {"error":"Failed to create o…
