@@ -245,7 +245,7 @@ export const organizations = pgTable("organizations", {
   slug: text("slug").notNull().unique(), // URL-friendly identifier
   description: text("description"),
   status: text("status").notNull().default("active"), // active, suspended, trial
-  ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
+  ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "restrict" }), // Optional - can be set later
   // Contact Information
   contactEmail: text("contact_email").notNull(),
   billingEmail: text("billing_email").notNull(), 

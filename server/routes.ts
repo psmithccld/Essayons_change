@@ -2817,7 +2817,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate monthly revenue from active subscriptions with correct column reference
       const monthlyRevenueResult = await db.select({
-        totalRevenue: sql<number>`COALESCE(SUM(CASE WHEN ${subscriptions.status} = 'active' THEN customer_tiers.price_per_seat_cents ELSE 0 END), 0)`
+        totalRevenue: sql<number>`COALESCE(SUM(CASE WHEN ${subscriptions.status} = 'active' THEN ${customerTiers.price} ELSE 0 END), 0)`
       })
       .from(subscriptions)
       .leftJoin(customerTiers, eq(subscriptions.tierId, customerTiers.id));
