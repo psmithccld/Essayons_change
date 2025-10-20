@@ -1108,68 +1108,116 @@ async function seedNewOrganization(organization: any, storage: any): Promise<voi
       canModifySecuritySettings: true
     };
     
-    const adminRole = await storage.createRole({
-      name: `${organization.slug}-Admin`,
-      description: 'Administrator role with full system permissions',
-      permissions: adminPermissions,
-      isActive: true
-    });
+    // Check if role already exists
+    const roleName = `${organization.slug}-Admin`;
+    const existingRoles = await storage.getRoles();
+    let adminRole = existingRoles.find((r: any) => r.name === roleName);
     
-    console.log(`✅ Created Admin role: ${adminRole.name} (${adminRole.id})`);
+    if (!adminRole) {
+      adminRole = await storage.createRole({
+        name: roleName,
+        description: 'Administrator role with full system permissions',
+        permissions: adminPermissions,
+        isActive: true
+      });
+      console.log(`✅ Created Admin role: ${adminRole.name} (${adminRole.id})`);
+    } else {
+      console.log(`ℹ️  Admin role already exists: ${adminRole.name} (${adminRole.id})`);
+    }
     
     // Step 2: Create Admin user
     const adminUsername = `${organization.slug}-admin`;
-    const adminUser = await storage.createUser({
-      username: adminUsername,
-      name: 'Organization Administrator',
-      email: organization.contactEmail,
-      roleId: adminRole.id,
-      currentOrganizationId: organization.id,
-      isActive: true,
-      isEmailVerified: false
-    });
+    const existingUsers = await storage.getUsers();
+    let adminUser = existingUsers.find((u: any) => u.username === adminUsername);
     
-    console.log(`✅ Created Admin user: ${adminUser.username} (${adminUser.id})`);
+    if (!adminUser) {
+      // Generate unique email with retry logic
+      let adminEmail = organization.contactEmail;
+      let emailSuffix = 0;
+      
+      while (existingUsers.find((u: any) => u.email === adminEmail)) {
+        emailSuffix++;
+        if (emailSuffix === 1) {
+          adminEmail = `${organization.slug}-admin@${organization.slug}.local`;
+        } else {
+          adminEmail = `${organization.slug}-admin-${emailSuffix}@${organization.slug}.local`;
+        }
+      }
+      
+      adminUser = await storage.createUser({
+        username: adminUsername,
+        name: 'Organization Administrator',
+        email: adminEmail,
+        roleId: adminRole.id,
+        currentOrganizationId: organization.id,
+        isActive: true,
+        isEmailVerified: false
+      });
+      console.log(`✅ Created Admin user: ${adminUser.username} (${adminUser.id})`);
+    } else {
+      console.log(`ℹ️  Admin user already exists: ${adminUser.username} (${adminUser.id})`);
+    }
     
     // Step 3: Add admin user to organization as owner if no owner exists
-    if (!organization.ownerUserId) {
-      await storage.addUserToOrganization({
-        organizationId: organization.id,
-        userId: adminUser.id,
-        orgRole: 'owner',
-        isActive: true
-      });
-      console.log(`✅ Added ${adminUser.username} as organization owner`);
+    const members = await storage.getOrganizationMembers(organization.id);
+    const existingMembership = members.find((m: any) => m.userId === adminUser.id);
+    
+    if (!existingMembership) {
+      if (!organization.ownerUserId) {
+        await storage.addUserToOrganization({
+          organizationId: organization.id,
+          userId: adminUser.id,
+          orgRole: 'owner',
+          isActive: true
+        });
+        
+        // Update organization ownerUserId to maintain consistency
+        await storage.updateOrganization(organization.id, { ownerUserId: adminUser.id });
+        console.log(`✅ Added ${adminUser.username} as organization owner and updated ownerUserId`);
+      } else {
+        // Add as admin member
+        await storage.addUserToOrganization({
+          organizationId: organization.id,
+          userId: adminUser.id,
+          orgRole: 'admin',
+          isActive: true
+        });
+        console.log(`✅ Added ${adminUser.username} as organization admin`);
+      }
     } else {
-      // Add as admin member
-      await storage.addUserToOrganization({
-        organizationId: organization.id,
-        userId: adminUser.id,
-        orgRole: 'admin',
-        isActive: true
-      });
-      console.log(`✅ Added ${adminUser.username} as organization admin`);
+      console.log(`ℹ️  Admin user already member of organization with role: ${existingMembership.orgRole}`);
     }
     
     // Step 4: Create default "CMIS Integration" initiative
-    const cmisInitiative = await storage.createProject({
-      name: 'CMIS Integration',
-      description: 'Default initiative for CMIS integration and system setup',
-      status: 'identify_need',
-      ownerId: adminUser.id,
-      priority: 'medium',
-      category: 'technology',
-      objectives: 'Successfully integrate CMIS and set up change management processes',
-      currentPhase: 'identify_need'
-    }, organization.id);
+    const existingProjects = await storage.getProjects(organization.id);
+    const cmisExists = existingProjects.find((p: any) => p.name === 'CMIS Integration');
     
-    console.log(`✅ Created default initiative: ${cmisInitiative.name} (${cmisInitiative.id})`);
+    if (!cmisExists) {
+      const cmisInitiative = await storage.createProject({
+        name: 'CMIS Integration',
+        description: 'Default initiative for CMIS integration and system setup',
+        status: 'identify_need',
+        ownerId: adminUser.id,
+        priority: 'medium',
+        category: 'technology',
+        objectives: 'Successfully integrate CMIS and set up change management processes',
+        currentPhase: 'identify_need'
+      }, organization.id);
+      console.log(`✅ Created default initiative: ${cmisInitiative.name} (${cmisInitiative.id})`);
+    } else {
+      console.log(`ℹ️  CMIS Integration initiative already exists`);
+    }
     
     console.log(`🎉 Organization seeding complete for ${organization.name}`);
   } catch (error) {
-    console.error('Error seeding organization:', error);
+    console.error('❌ Error seeding organization:', error);
+    console.error('Error details:', {
+      name: (error as any).name,
+      message: (error as any).message,
+      code: (error as any).code
+    });
     // Don't throw - let organization creation succeed even if seeding fails
-    console.warn('Organization created but seeding failed - admin will need to manually set up');
+    console.warn('⚠️  Organization created but seeding failed - admin will need to manually set up');
   }
 }
 
@@ -2094,6 +2142,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating organization:", error);
       res.status(500).json({ error: "Failed to update organization" });
+    }
+  });
+
+  // Delete organization (Platform-level deletion with cascade)
+  app.delete("/api/super-admin/organizations/:id", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Check if organization exists
+      const organization = await storage.getOrganization(id);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Prevent deletion of default organization
+      if (organization.slug === 'default') {
+        return res.status(400).json({ error: "Cannot delete the default organization" });
+      }
+      
+      console.log(`🗑️  Super admin ${req.superAdminUser!.username} deleting organization: ${organization.name} (${id})`);
+      
+      // Delete organization (cascade should handle related data)
+      // The database schema has ON DELETE CASCADE for:
+      // - organization_memberships
+      // - projects
+      // - tasks
+      // - communications
+      // - etc.
+      const deleted = await storage.deleteOrganization(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Organization not found or already deleted" });
+      }
+      
+      console.log(`✅ Successfully deleted organization: ${organization.name} (${id})`);
+      res.json({ message: "Organization deleted successfully", organizationId: id });
+    } catch (error) {
+      console.error("Error deleting organization:", error);
+      res.status(500).json({ error: "Failed to delete organization" });
     }
   });
 
