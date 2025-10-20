@@ -347,13 +347,8 @@ export default function SuperAdminOrganizations() {
       taxId: org.taxId || "",
     });
     
-    // Find and set current tier if organization has one
-    const orgTier = availableTiers.find((tier: CustomerTier) => tier.name === org.tierName);
-    if (orgTier) {
-      setSelectedTier(orgTier.id);
-    } else {
-      setSelectedTier("");
-    }
+    // Set current tier from subscription
+    setSelectedTier(org.subscription?.tierId || "");
     
     // Reset subscription info for now (could be loaded from API in future)
     setSubscriptionInfo(null);
