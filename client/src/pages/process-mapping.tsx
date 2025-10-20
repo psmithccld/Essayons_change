@@ -154,7 +154,7 @@ export default function DevelopmentMaps() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { currentProject } = useCurrentProject();
-  const { canCreateContent, canDeleteContent, hasPermission } = usePermissions();
+  const { hasPermission } = usePermissions();
 
   const { data: processMaps = [], isLoading } = useQuery<ProcessMap[]>({
     queryKey: ['/api/projects', currentProject?.id, 'process-maps'],
@@ -1232,7 +1232,7 @@ export default function DevelopmentMaps() {
         </div>
         
         <div className="flex items-center gap-2">
-          <PermissionGate customCheck={canCreateContent}>
+          <PermissionGate permissions={['canModifyProjects', 'canEditAllProjects']}>
             <Dialog open={isNewProcessMapOpen} onOpenChange={setIsNewProcessMapOpen}>
               <DialogTrigger asChild>
                 <Button data-testid="button-new-process-map">
@@ -1276,7 +1276,7 @@ export default function DevelopmentMaps() {
                     <Button type="button" variant="outline" onClick={() => setIsNewProcessMapOpen(false)}>
                       Cancel
                     </Button>
-                    <PermissionGate customCheck={canCreateContent}>
+                    <PermissionGate permissions={['canModifyProjects', 'canEditAllProjects']}>
                       <Button type="submit" disabled={createProcessMapMutation.isPending} data-testid="button-create-process-map">
                         {createProcessMapMutation.isPending ? "Creating..." : "Create"}
                       </Button>
@@ -1339,7 +1339,7 @@ export default function DevelopmentMaps() {
                         >
                           Load
                         </Button>
-                        <PermissionGate customCheck={canDeleteContent}>
+                        <PermissionGate permissions={['canDeleteProjects', 'canDeleteUsers']}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button 
@@ -1704,7 +1704,7 @@ export default function DevelopmentMaps() {
                 </div>
                 
                 <div className="grid grid-cols-1 gap-2">
-                  <PermissionGate customCheck={canDeleteContent}>
+                  <PermissionGate permissions={['canDeleteProjects', 'canDeleteUsers']}>
                     <Button
                       variant="outline"
                       size="sm"
