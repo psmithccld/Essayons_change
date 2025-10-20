@@ -42,6 +42,15 @@ Preferred communication style: Simple, everyday language.
 - **Session-based**: Cookie-based session management with PostgreSQL session store
 - **User Management**: Basic user system with roles and permissions
 - **Default User**: Currently uses default user system (ready for full authentication implementation)
+- **Idle Timeout**: Automatic logout after 20 minutes of user inactivity (October 2025)
+  - **Client-side Detection**: Custom `useIdleTimeout` hook tracks user activity via event listeners
+  - **Tracked Events**: mousedown, mousemove, keydown, scroll, touchstart, click
+  - **Debouncing**: Timer resets debounced to 500ms to prevent excessive timer churn during continuous activity
+  - **Toast Notification**: Shows "Session Expired" message before automatic logout
+  - **Implementation**: Hook integrated in AuthenticatedApp component (client/src/App.tsx)
+  - **Limitation**: Client-only timeout; doesn't prevent persistent login across browser sessions unless 20 minutes elapse
+  - **Type Safety**: Uses `ReturnType<typeof setTimeout>` for cross-environment compatibility
+  - Files: client/src/hooks/useIdleTimeout.ts, client/src/App.tsx
 - **Super Admin System**: Separate identity system for platform administrators
   - Super admin users stored in `super_admin_users` table (separate from platform users in `users` table)
   - Platform users cannot use reserved super admin usernames to prevent confusion
