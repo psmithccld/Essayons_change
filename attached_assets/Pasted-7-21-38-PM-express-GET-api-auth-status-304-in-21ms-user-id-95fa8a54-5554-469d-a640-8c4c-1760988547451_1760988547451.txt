@@ -1,0 +1,61 @@
+7:21:38 PM [express] GET /api/auth/status 304 in 21ms :: {"user":{"id":"95fa8a54-5554-469d-a640-8c4c…
+7:21:38 PM [express] GET /api/projects 304 in 25ms :: []
+7:21:39 PM [express] GET /api/notifications/unread-count 304 in 1098ms :: {"count":0}
+7:21:39 PM [express] GET /api/users/me/permissions 304 in 1426ms :: {"user":{"id":"95fa8a54-5554-469…
+7:21:40 PM [express] GET /api/organization/features 304 in 805ms :: {"reports":true,"gptCoach":true,…
+7:21:40 PM [express] GET /api/notifications 304 in 1903ms :: {"notifications":[],"total":0}
+7:21:40 PM [express] GET /api/my/initiatives 304 in 799ms :: []
+7:21:40 PM [express] GET /api/my/dashboard-metrics 304 in 801ms :: {"activeInitiatives":0,"pendingSu…
+7:21:52 PM [express] GET /api/auth/status 304 in 74ms :: {"user":{"id":"95fa8a54-5554-469d-a640-8c4c…
+7:21:52 PM [express] GET /api/projects 304 in 171ms :: []
+7:21:53 PM [express] GET /api/super-admin/auth/status 401 in 4ms :: {"error":"Super admin authentica…
+SECURITY: Successful Super Admin login for user 'essayon6' from IP 172.70.35.209
+7:22:05 PM [express] POST /api/super-admin/auth/login 200 in 97ms :: {"user":{"id":"87fce4ea-998d-4e…
+7:22:05 PM [express] GET /api/super-admin/auth/status 200 in 6ms :: {"user":{"id":"87fce4ea-998d-4e0…
+7:22:05 PM [express] GET /api/super-admin/dashboard/recent-activity 200 in 14ms :: [{"id":"sub-a92fa…
+7:22:05 PM [express] GET /api/super-admin/dashboard/system-health 200 in 211ms :: {"status":"healthy…
+7:22:05 PM [express] GET /api/super-admin/organizations 200 in 109ms :: [{"id":"a809b0f9-b54a-4093-8…
+7:22:05 PM [express] GET /api/super-admin/dashboard/alerts 200 in 303ms :: []
+7:22:05 PM [express] GET /api/super-admin/dashboard/stats 200 in 308ms :: {"totalOrganizations":1,"a…
+7:22:08 PM [express] GET /api/super-admin/customer-tiers 200 in 6ms :: {"tiers":[{"id":"17deb7a9-39a…
+7:22:14 PM [express] GET /api/super-admin/organizations 200 in 8ms :: [{"id":"a809b0f9-b54a-4093-836…
+7:22:21 PM [express] DELETE /api/super-admin/organizations/a809b0f9-b54a-4093-836a-7f55563e1d62 200 …
+7:22:21 PM [express] GET /api/super-admin/organizations 304 in 7ms :: [{"id":"a809b0f9-b54a-4093-836…
+7:22:46 PM [express] DELETE /api/super-admin/organizations/a809b0f9-b54a-4093-836a-7f55563e1d62 200 …
+7:22:46 PM [express] GET /api/super-admin/organizations 304 in 57ms :: [{"id":"a809b0f9-b54a-4093-83…
+7:22:50 PM [express] GET /api/auth/status 304 in 499ms :: {"user":{"id":"95fa8a54-5554-469d-a640-8c4…
+7:22:50 PM [express] GET /api/projects 304 in 500ms :: []
+7:22:50 PM [express] GET /api/super-admin/auth/status 304 in 22ms :: {"user":{"id":"87fce4ea-998d-4e…
+7:22:50 PM [express] GET /api/super-admin/organizations 304 in 8ms :: [{"id":"a809b0f9-b54a-4093-836…
+7:22:50 PM [express] GET /api/super-admin/customer-tiers 304 in 7ms :: {"tiers":[{"id":"17deb7a9-39a…
+🌱 Seeding organization: Essayons Change Demo v2 (f60b3599-fadb-47ff-9f28-9d132df5fa89)
+✅ Created Admin role: Essayons-Change-Demo-v2-Admin (7a1f3c56-0a3c-4d70-bd08-1e502ec5d0c4)
+Error seeding organization: Error: data and salt arguments required
+    at Object.hash (/opt/render/project/src/node_modules/bcrypt/bcrypt.js:133:17)
+    at /opt/render/project/src/node_modules/bcrypt/promises.js:26:12
+    at new Promise (<anonymous>)
+    at Object.promise (/opt/render/project/src/node_modules/bcrypt/promises.js:17:12)
+Super admin Essayon6 created organization: Essayons Change Demo v2 (f60b3599-fadb-47ff-9f28-9d132df5fa89)
+    at Object.hash (/opt/render/project/src/node_modules/bcrypt/bcrypt.js:129:25)
+    at DatabaseStorage.createUser (file:///opt/render/project/src/dist/index.js:2434:45)
+    at seedNewOrganization (file:///opt/render/project/src/dist/index.js:10118:38)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/dist/index.js:10727:7
+Organization created but seeding failed - admin will need to manually set up
+7:24:28 PM [express] POST /api/super-admin/organizations 201 in 52ms :: {"id":"f60b3599-fadb-47ff-9f…
+7:24:28 PM [express] GET /api/super-admin/organizations 200 in 242ms :: [{"id":"a809b0f9-b54a-4093-8…
+Super admin Essayon6 created active subscription for organization: Essayons Change Demo v2
+Super admin Essayon6 updated organization: Essayons Change Demo v2 (f60b3599-fadb-47ff-9f28-9d132df5fa89)
+7:24:36 PM [express] PUT /api/super-admin/organizations/f60b3599-fadb-47ff-9f28-9d132df5fa89 200 in …
+7:24:36 PM [express] GET /api/super-admin/organizations 200 in 8ms :: [{"id":"a809b0f9-b54a-4093-836…
+7:25:10 PM [express] GET /api/super-admin/users 200 in 297ms :: [{"id":"95fa8a54-5554-469d-a640-8c4c…
+7:25:10 PM [express] GET /api/super-admin/organizations 200 in 507ms :: [{"id":"a809b0f9-b54a-4093-8…
+7:25:57 PM [express] GET /api/auth/status 304 in 1092ms :: {"user":{"id":"95fa8a54-5554-469d-a640-8c…
+7:25:57 PM [express] GET /api/super-admin/auth/status 304 in 32ms :: {"user":{"id":"87fce4ea-998d-4e…
+7:25:57 PM [express] GET /api/projects 304 in 907ms :: []
+7:25:57 PM [express] GET /api/super-admin/customer-tiers 304 in 7ms :: {"tiers":[{"id":"17deb7a9-39a…
+7:26:00 PM [express] GET /api/super-admin/organizations 304 in 53ms :: [{"id":"a809b0f9-b54a-4093-83…
+7:26:07 PM [express] DELETE /api/super-admin/organizations/a809b0f9-b54a-4093-836a-7f55563e1d62 200 …
+7:26:07 PM [express] GET /api/super-admin/organizations 304 in 10ms :: [{"id":"a809b0f9-b54a-4093-83…
+7:27:57 PM [express] GET /api/super-admin/users 304 in 403ms :: [{"id":"95fa8a54-5554-469d-a640-8c4c…
+7:27:57 PM [express] GET /api/super-admin/organizations 304 in 506ms :: [{"id":"a809b0f9-b54a-4093-8…
