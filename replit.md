@@ -35,6 +35,8 @@ Preferred communication style: Simple, everyday language.
   - Feature resolution flow: Organization → Active Subscription → Customer Tier → Features
   - Standardized features: reports, gptCoach, communications, changeArtifacts, readinessSurveys, dataExport, auditLogs, customBranding, workflowAutomation
   - **Organization Defaults System**: REMOVED - Customer Tiers are now the sole source of feature and limit configuration
+  - **Subscription Auto-Creation**: When Super Admin assigns a Customer Tier to an organization, an active subscription is automatically created/updated
+  - **Feature Resolution Helper**: Centralized `resolveOrganizationFeatures()` function ensures consistent feature resolution across API endpoints and middleware
 
 ### Authentication and Authorization
 - **Session-based**: Cookie-based session management with PostgreSQL session store
