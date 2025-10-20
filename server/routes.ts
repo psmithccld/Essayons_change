@@ -2415,7 +2415,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(customerTiers.isActive, true))
         .orderBy(customerTiers.price);
       
-      res.json({ tiers: allTiers });
+      // Get enrollment counts for each tier
+      const tiersWithCounts = await Promise.all(allTiers.map(async (tier) => {
+        const [countResult] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(subscriptions)
+          .where(eq(subscriptions.tierId, tier.id));
+        
+        return {
+          ...tier,
+          enrollmentCount: countResult?.count || 0
+        };
+      }));
+      
+      res.json({ tiers: tiersWithCounts });
     } catch (error) {
       console.error("Error fetching customer tiers:", error);
       res.status(500).json({ error: "Failed to fetch customer tiers" });
