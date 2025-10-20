@@ -1892,16 +1892,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { tierId, tierName, ...orgData } = req.body;
       
       // Validate tier if provided
-      let validatedTierId = undefined;
-      if (tierId) {
-        const [tier] = await db.select({ id: customerTiers.id, name: customerTiers.name })
-          .from(customerTiers)
-          .where(and(eq(customerTiers.id, tierId), eq(customerTiers.isActive, true)));
-        
-        if (!tier) {
-          return res.status(400).json({ error: "Invalid customer tier selected" });
+      let validatedTierId: string | null = undefined as any;
+      let tierIdProvided = 'tierId' in req.body;
+      
+      if (tierIdProvided) {
+        if (tierId === null) {
+          // Explicit tier removal
+          validatedTierId = null;
+        } else if (tierId) {
+          // Tier assignment - validate it exists and is active
+          const [tier] = await db.select({ id: customerTiers.id, name: customerTiers.name })
+            .from(customerTiers)
+            .where(and(eq(customerTiers.id, tierId), eq(customerTiers.isActive, true)));
+          
+          if (!tier) {
+            return res.status(400).json({ error: "Invalid customer tier selected" });
+          }
+          validatedTierId = tierId;
         }
-        validatedTierId = tierId;
       }
       
       // Partial validation since this is an update (ignoring tierName from client)
@@ -1913,15 +1921,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Include validated tierId in update data
+      // Include validated tierId in update data (including explicit null for tier removal)
       const updateData = {
         ...validation.data,
-        ...(validatedTierId && { tierId: validatedTierId })
+        ...(tierIdProvided && { tierId: validatedTierId })
       };
 
       const organization = await storage.updateOrganization(id, updateData);
       if (!organization) {
         return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // FEATURE ACTIVATION: Auto-create/update subscription when tier is assigned or removed
+      if (tierIdProvided && validatedTierId !== null) {
+        // Tier assigned or changed - create/update subscription
+        const existingSubscription = await storage.getActiveSubscription(id);
+        
+        if (existingSubscription) {
+          // Update existing subscription to new tier
+          await db
+            .update(subscriptions)
+            .set({ 
+              tierId: validatedTierId,
+              updatedAt: new Date()
+            })
+            .where(eq(subscriptions.id, existingSubscription.id));
+          
+          console.log(`Super admin ${req.superAdminUser!.username} updated subscription tier for organization: ${organization.name}`);
+        } else {
+          // Create new active subscription
+          await db.insert(subscriptions).values({
+            organizationId: id,
+            tierId: validatedTierId!,
+            status: 'active',
+            seatsPurchased: 10, // Default seats, can be adjusted later
+            currentPeriodStart: new Date(),
+            currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
+          });
+          
+          console.log(`Super admin ${req.superAdminUser!.username} created active subscription for organization: ${organization.name}`);
+        }
+      } else if (tierIdProvided && validatedTierId === null) {
+        // Tier explicitly removed - cancel existing subscription
+        const existingSubscription = await storage.getActiveSubscription(id);
+        if (existingSubscription) {
+          await db
+            .update(subscriptions)
+            .set({ 
+              status: 'cancelled',
+              updatedAt: new Date()
+            })
+            .where(eq(subscriptions.id, existingSubscription.id));
+          
+          console.log(`Super admin ${req.superAdminUser!.username} cancelled subscription for organization: ${organization.name}`);
+        }
       }
       
       console.log(`Super admin ${req.superAdminUser!.username} updated organization: ${organization.name} (${id})`);
