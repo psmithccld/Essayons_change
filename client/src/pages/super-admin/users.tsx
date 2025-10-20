@@ -64,6 +64,13 @@ interface Organization {
   userCount: number;
 }
 
+interface Role {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+}
+
 interface UserAssignment {
   userId: string;
   organizationId: string;
@@ -86,6 +93,8 @@ const createUserSchema = z.object({
   isActive: z.boolean().default(true),
   organizationId: z.string().optional(),
   isAdmin: z.boolean().default(false),
+  roleId: z.string().optional(),
+  isSuperAdmin: z.boolean().default(false),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"]
@@ -266,7 +275,26 @@ export default function SuperAdminUsers() {
       isActive: true,
       organizationId: "",
       isAdmin: false,
+      roleId: "",
+      isSuperAdmin: false,
     },
+  });
+
+  // Watch organization selection to fetch roles
+  const selectedOrgId = createForm.watch("organizationId");
+  
+  // Fetch roles for selected organization
+  const { data: orgRoles = [], isLoading: rolesLoading } = useQuery({
+    queryKey: ["/api/super-admin/organizations", selectedOrgId, "roles"],
+    queryFn: async () => {
+      if (!selectedOrgId || selectedOrgId === "none") return [];
+      const response = await fetch(`/api/super-admin/organizations/${selectedOrgId}/roles`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error("Failed to fetch roles");
+      return response.json() as Promise<Role[]>;
+    },
+    enabled: !!selectedOrgId && selectedOrgId !== "none",
   });
 
   // Filter users
@@ -512,14 +540,22 @@ export default function SuperAdminUsers() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Initial Organization (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select 
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            // Reset roleId when organization changes
+                            createForm.setValue("roleId", "");
+                            createForm.setValue("isAdmin", false);
+                          }} 
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-initial-org">
                               <SelectValue placeholder="Select organization" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="none">No Organization</SelectItem>
+                            <SelectItem value="none">No Organization (Homeless User)</SelectItem>
                             {organizations.filter(org => org.isActive).map((org) => (
                               <SelectItem key={org.id} value={org.id}>
                                 {org.name} ({org.domain})
@@ -531,6 +567,66 @@ export default function SuperAdminUsers() {
                       </FormItem>
                     )}
                   />
+
+                  {/* Show role selector when organization is selected */}
+                  {selectedOrgId && selectedOrgId !== "none" && (
+                    <FormField
+                      control={createForm.control}
+                      name="roleId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Security Role</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-role">
+                                <SelectValue placeholder={rolesLoading ? "Loading roles..." : "Select a role"} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {orgRoles.map((role) => (
+                                <SelectItem key={role.id} value={role.id}>
+                                  {role.name}
+                                  {role.description && ` - ${role.description}`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                          <div className="text-xs text-muted-foreground">
+                            Select a specific security role for this user in the organization
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {/* Show super admin toggle for homeless users */}
+                  {(!selectedOrgId || selectedOrgId === "none") && (
+                    <FormField
+                      control={createForm.control}
+                      name="isSuperAdmin"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-purple-50 dark:bg-purple-950 border-purple-300 dark:border-purple-700">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base flex items-center gap-2">
+                              <Crown className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                              Make Super Admin
+                            </FormLabel>
+                            <div className="text-sm text-muted-foreground">
+                              Grant platform-wide super admin privileges (homeless users only)
+                            </div>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-super-admin"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
@@ -555,27 +651,30 @@ export default function SuperAdminUsers() {
                       )}
                     />
                     
-                    <FormField
-                      control={createForm.control}
-                      name="isAdmin"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">Organization Admin</FormLabel>
-                            <div className="text-sm text-muted-foreground">
-                              Admin in selected org
+                    {/* Only show isAdmin toggle for organization users when roleId is NOT selected */}
+                    {selectedOrgId && selectedOrgId !== "none" && !createForm.watch("roleId") && (
+                      <FormField
+                        control={createForm.control}
+                        name="isAdmin"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Organization Admin</FormLabel>
+                              <div className="text-sm text-muted-foreground">
+                                Admin in selected org (legacy)
+                              </div>
                             </div>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              data-testid="switch-initial-admin"
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-initial-admin"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </div>
 
                   <div className="flex justify-end gap-2">
