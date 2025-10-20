@@ -14,6 +14,8 @@ import { LoginPage } from "@/pages/auth/login";
 import { EmailVerifyPage } from "@/pages/auth/verify-email";
 import { Loader2 } from "lucide-react";
 import { AppBreadcrumbs } from "@/components/layout/AppBreadcrumbs";
+import { useIdleTimeout } from "@/hooks/useIdleTimeout";
+import { useToast } from "@/hooks/use-toast";
 
 // Code splitting: Lazy load all pages except login/verify to reduce initial bundle size
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -55,7 +57,22 @@ function LoadingSpinner() {
 }
 
 function AuthenticatedApp() {
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
+  const { toast } = useToast();
+
+  // Idle timeout: logout after 20 minutes of inactivity
+  useIdleTimeout({
+    onIdle: () => {
+      toast({
+        title: "Session Expired",
+        description: "You've been logged out due to inactivity.",
+        variant: "default",
+      });
+      logout();
+    },
+    idleTime: 20 * 60 * 1000, // 20 minutes
+    enabled: true,
+  });
 
   return (
     <div className="flex h-screen overflow-hidden">
