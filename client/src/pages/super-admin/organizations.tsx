@@ -637,11 +637,15 @@ export default function SuperAdminOrganizations() {
               {filteredOrgs.map((org) => (
                 <div key={org.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex-1">
-Active ? "Active" : "Inactive"}
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="font-semibold" data-testid={`org-name-${org.id}`}>{org.name}</h3>
+                      <Badge variant={org.isActive ? "default" : "secondary"}>
+                        {org.isActive ? "Active" : "Inactive"}
                       </Badge>
-                      {org.tierName && (
-                        <Badge variant="outline">
-                          {org.tierName}
+                      {org.subscription?.tier?.name && (
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          <Package className="h-3 w-3" />
+                          {org.subscription.tier.name}
                         </Badge>
                       )}
                     </div>
@@ -656,7 +660,7 @@ Active ? "Active" : "Inactive"}
                       </div>
                       <div className="flex items-center gap-1">
                         <Users className="h-3 w-3" />
-                        {org.userCount}/{org.maxUsers} users
+                        {org.memberCount || org.userCount}/{org.maxUsers} users
                       </div>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
