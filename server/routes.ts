@@ -1065,9 +1065,10 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
 }
 
 // Helper function to seed a new organization with default data
-async function seedNewOrganization(organization: any, storage: any): Promise<void> {
+async function seedNewOrganization(organization: any, storage: any): Promise<{ adminPassword?: string }> {
   try {
     console.log(`🌱 Seeding organization: ${organization.name} (${organization.id})`);
+    let generatedPassword: string | undefined;
     
     // Step 1: Create Admin role with all permissions enabled
     const adminPermissions = {
@@ -1144,17 +1145,21 @@ async function seedNewOrganization(organization: any, storage: any): Promise<voi
         }
       }
       
+      // Generate a secure random password for the admin user
+      generatedPassword = crypto.randomBytes(16).toString('base64').slice(0, 16);
+      
       adminUser = await storage.createUser({
         username: adminUsername,
         name: 'Organization Administrator',
         email: adminEmail,
-        password: 'ChangeMe123!', // Default password - admin should change on first login
+        password: generatedPassword,
         roleId: adminRole.id,
         currentOrganizationId: organization.id,
         isActive: true,
         isEmailVerified: false
       });
       console.log(`✅ Created Admin user: ${adminUser.username} (${adminUser.id})`);
+      console.log(`🔑 Admin password: ${generatedPassword} (store this securely - it cannot be retrieved later)`);
     } else {
       console.log(`ℹ️  Admin user already exists: ${adminUser.username} (${adminUser.id})`);
     }
@@ -1210,6 +1215,7 @@ async function seedNewOrganization(organization: any, storage: any): Promise<voi
     }
     
     console.log(`🎉 Organization seeding complete for ${organization.name}`);
+    return { adminPassword: generatedPassword };
   } catch (error) {
     console.error('❌ Error seeding organization:', error);
     console.error('Error details:', {
@@ -1219,6 +1225,7 @@ async function seedNewOrganization(organization: any, storage: any): Promise<voi
     });
     // Don't throw - let organization creation succeed even if seeding fails
     console.warn('⚠️  Organization created but seeding failed - admin will need to manually set up');
+    return {};
   }
 }
 
@@ -1993,10 +2000,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Seed new organization with Admin role, Admin user, and default initiative
-      await seedNewOrganization(organization, storage);
+      const seedingResult = await seedNewOrganization(organization, storage);
       
       console.log(`Super admin ${req.superAdminUser!.username} created organization: ${organization.name} (${organization.id})`);
-      res.status(201).json(organization);
+      
+      // Include admin password in response if generated
+      const response: any = { ...organization };
+      if (seedingResult.adminPassword) {
+        response.adminCredentials = {
+          username: `${organization.slug}-admin`,
+          password: seedingResult.adminPassword,
+          message: 'Store these credentials securely - the password cannot be retrieved later'
+        };
+      }
+      
+      res.status(201).json(response);
     } catch (error) {
       console.error("Error creating organization:", error);
       res.status(500).json({ error: "Failed to create organization" });

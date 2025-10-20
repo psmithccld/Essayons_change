@@ -48,12 +48,23 @@ Preferred communication style: Simple, everyday language.
   - Comprehensive error handling for user creation with specific validation messages
   - Database roles: Admin, Manager, User (default role for new platform users)
 - **Organization Seeding**: Automatic setup when Super Admin creates new organizations
+  - **Idempotent Seeding**: Checks for existing resources before creating to prevent duplicates
   - Creates Admin Security Role with name `${orgSlug}-Admin` (globally unique with all permissions enabled)
   - Creates Admin User with username `${orgSlug}-admin` linked to Admin role
+  - **Secure Random Passwords**: Generates cryptographically secure random password for each admin user
+  - **Email Uniqueness Handling**: Implements retry logic with fallback emails when contact email already exists
+  - **Owner Linkage**: Updates organization.ownerUserId after creating admin user to maintain consistency
   - Adds Admin User to organization as owner (if no owner exists) or admin member
   - Creates default "CMIS Integration" initiative owned by Admin User
+  - **Admin Credentials in API Response**: Returns admin username and password to Super Admin in create organization response
   - Seeding failures are logged but don't block organization creation
-  - Implementation in `server/routes.ts` lines 1070-1177 (seedNewOrganization function)
+  - Implementation in `server/routes.ts` lines 1070-1232 (seedNewOrganization function)
+- **Organization Deletion**: DELETE /api/super-admin/organizations/:id endpoint
+  - Protected by requireSuperAdminAuth middleware (line 2140)
+  - Prevents deletion of default organization
+  - Relies on database CASCADE constraints for cleanup of related data
+  - Returns proper error codes (404 for not found, 400 for default org, 500 for server errors)
+  - Logs deletion activity for audit trail
 
 ### AI Integration
 - **OpenAI GPT-5**: AI-powered coaching system for change management insights
