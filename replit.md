@@ -65,6 +65,13 @@ Preferred communication style: Simple, everyday language.
   - Relies on database CASCADE constraints for cleanup of related data
   - Returns proper error codes (404 for not found, 400 for default org, 500 for server errors)
   - Logs deletion activity for audit trail
+- **Super Admin UI Enhancements**: Tier visibility and enrollment tracking (October 2025)
+  - **Organization Tier Display**: Organizations page shows tier badge on each org card displaying subscription tier name
+  - **Tier Pre-selection**: Edit organization dialog automatically pre-selects current tier based on active subscription
+  - **Enrollment Counts**: Customer Tiers page displays enrollment count badge showing number of organizations enrolled in each tier
+  - **Backend Optimizations**: Uses single GROUP BY query for enrollment counts (avoiding O(n) queries)
+  - **Data Flow**: GET /api/super-admin/organizations joins subscriptions and tiers; GET /api/super-admin/customer-tiers includes enrollmentCount
+  - Implementation: server/routes.ts (API endpoints), client/src/pages/super-admin/organizations.tsx, client/src/pages/super-admin/customer-tiers.tsx
 
 ### AI Integration
 - **OpenAI GPT-5**: AI-powered coaching system for change management insights
