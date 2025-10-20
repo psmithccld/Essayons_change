@@ -527,6 +527,53 @@ interface AuthenticatedRequest extends SessionRequest {
   };
 }
 
+// SECURITY: Helper function to resolve organization features from Customer Tier subscription
+// This is the single source of truth for feature resolution
+async function resolveOrganizationFeatures(organizationId: string): Promise<{
+  readinessSurveys: boolean;
+  gptCoach: boolean;
+  communications: boolean;
+  changeArtifacts: boolean;
+  reports: boolean;
+}> {
+  // SECURITY: Default features - all DISABLED by default (fail closed)
+  const defaultFeatures = {
+    readinessSurveys: false,
+    gptCoach: false,
+    communications: false,
+    changeArtifacts: false,
+    reports: false
+  };
+
+  try {
+    // Get organization's active subscription to determine customer tier
+    const subscription = await storage.getActiveSubscription(organizationId);
+    
+    if (!subscription) {
+      return defaultFeatures;
+    }
+    
+    // Get customer tier features - this is the single source of truth
+    const tier = await storage.getCustomerTier(subscription.tierId);
+    
+    if (!tier || !tier.features) {
+      return defaultFeatures;
+    }
+    
+    // Return features from customer tier
+    return tier.features as {
+      readinessSurveys: boolean;
+      gptCoach: boolean;
+      communications: boolean;
+      changeArtifacts: boolean;
+      reports: boolean;
+    };
+  } catch (error) {
+    console.error("Error resolving organization features:", error);
+    return defaultFeatures;
+  }
+}
+
 // SECURITY: Feature gate middleware factory - protects API routes based on organization feature flags
 function requireFeature(featureName: 'readinessSurveys' | 'gptCoach' | 'communications' | 'changeArtifacts' | 'reports') {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -536,21 +583,8 @@ function requireFeature(featureName: 'readinessSurveys' | 'gptCoach' | 'communic
         return res.status(401).json({ error: "Organization context required" });
       }
       
-      const organization = await storage.getOrganization(organizationId);
-      if (!organization) {
-        return res.status(404).json({ error: "Organization not found" });
-      }
-      
-      // SECURITY: Default features - all DISABLED by default (fail closed)
-      const defaultFeatures = {
-        readinessSurveys: false,
-        gptCoach: false,
-        communications: false,
-        changeArtifacts: false,
-        reports: false
-      };
-      
-      const enabledFeatures = organization.enabledFeatures || defaultFeatures;
+      // Resolve features from Customer Tier subscription
+      const enabledFeatures = await resolveOrganizationFeatures(organizationId);
       
       if (!enabledFeatures[featureName]) {
         return res.status(403).json({ 
@@ -7588,36 +7622,10 @@ Please provide coaching guidance based on their question and current context.`;
     try {
       const organizationId = req.organizationId!;
       
-      // Get organization's active subscription to determine customer tier
-      const subscription = await storage.getActiveSubscription(organizationId);
+      // Use shared helper function to resolve features from Customer Tier
+      const features = await resolveOrganizationFeatures(organizationId);
       
-      if (!subscription) {
-        // SECURITY: No subscription = no features (fail closed)
-        return res.json({
-          readinessSurveys: false,
-          gptCoach: false,
-          communications: false,
-          changeArtifacts: false,
-          reports: false
-        });
-      }
-      
-      // Get customer tier features - this is the single source of truth
-      const tier = await storage.getCustomerTier(subscription.tierId);
-      
-      if (!tier || !tier.features) {
-        // SECURITY: No tier or features = fail closed with defaults
-        return res.json({
-          readinessSurveys: false,
-          gptCoach: false,
-          communications: false,
-          changeArtifacts: false,
-          reports: false
-        });
-      }
-      
-      // Return features from customer tier
-      res.json(tier.features);
+      res.json(features);
     } catch (error) {
       console.error("Error fetching organization features:", error);
       res.status(500).json({ error: "Failed to fetch organization features" });
