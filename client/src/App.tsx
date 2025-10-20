@@ -78,8 +78,10 @@ function AuthenticatedApp() {
             <Route path="/surveys/take/:surveyId" component={SurveyTake} />
             <Route path="/gpt-coach" component={GptCoach} />
             <Route path="/user-management" component={UserManagement} />
+            <Route path="/users" component={UserManagement} />
             <Route path="/initiatives" component={InitiativeManagement} />
             <Route path="/security" component={SecurityManagement} />
+            <Route path="/security/roles" component={SecurityManagement} />
             <Route path="/organization" component={OrganizationSettings} />
             <Route path="/process-mapping" component={ProcessMapping} />
             <Route path="/change-process-flow" component={ChangeProcessFlow} />
