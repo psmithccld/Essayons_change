@@ -1064,6 +1064,115 @@ function buildRaidInsertFromTemplate(type: string, baseData: any): any {
   return finalData;
 }
 
+// Helper function to seed a new organization with default data
+async function seedNewOrganization(organization: any, storage: any): Promise<void> {
+  try {
+    console.log(`🌱 Seeding organization: ${organization.name} (${organization.id})`);
+    
+    // Step 1: Create Admin role with all permissions enabled
+    const adminPermissions = {
+      canSeeRoles: true,
+      canSeeTasks: true,
+      canSeeUsers: true,
+      canEditRoles: true,
+      canEditTasks: true,
+      canEditUsers: true,
+      canSeeGroups: true,
+      canEditGroups: true,
+      canSeeReports: true,
+      canSendEmails: true,
+      canDeleteRoles: true,
+      canDeleteTasks: true,
+      canDeleteUsers: true,
+      canModifyRoles: true,
+      canModifyTasks: true,
+      canModifyUsers: true,
+      canSeeProjects: true,
+      canDeleteGroups: true,
+      canEditProjects: true,
+      canManageSystem: true,
+      canModifyGroups: true,
+      canDeleteProjects: true,
+      canModifyProjects: true,
+      canSeeAllProjects: true,
+      canEditAllProjects: true,
+      canDeleteAllProjects: true,
+      canModifyAllProjects: true,
+      canSeeCommunications: true,
+      canEditCommunications: true,
+      canSeeSecuritySettings: true,
+      canDeleteCommunications: true,
+      canEditSecuritySettings: true,
+      canModifyCommunications: true,
+      canDeleteSecuritySettings: true,
+      canModifySecuritySettings: true
+    };
+    
+    const adminRole = await storage.createRole({
+      name: `${organization.slug}-Admin`,
+      description: 'Administrator role with full system permissions',
+      permissions: adminPermissions,
+      isActive: true
+    });
+    
+    console.log(`✅ Created Admin role: ${adminRole.name} (${adminRole.id})`);
+    
+    // Step 2: Create Admin user
+    const adminUsername = `${organization.slug}-admin`;
+    const adminUser = await storage.createUser({
+      username: adminUsername,
+      name: 'Organization Administrator',
+      email: organization.contactEmail,
+      roleId: adminRole.id,
+      currentOrganizationId: organization.id,
+      isActive: true,
+      isEmailVerified: false
+    });
+    
+    console.log(`✅ Created Admin user: ${adminUser.username} (${adminUser.id})`);
+    
+    // Step 3: Add admin user to organization as owner if no owner exists
+    if (!organization.ownerUserId) {
+      await storage.addUserToOrganization({
+        organizationId: organization.id,
+        userId: adminUser.id,
+        orgRole: 'owner',
+        isActive: true
+      });
+      console.log(`✅ Added ${adminUser.username} as organization owner`);
+    } else {
+      // Add as admin member
+      await storage.addUserToOrganization({
+        organizationId: organization.id,
+        userId: adminUser.id,
+        orgRole: 'admin',
+        isActive: true
+      });
+      console.log(`✅ Added ${adminUser.username} as organization admin`);
+    }
+    
+    // Step 4: Create default "CMIS Integration" initiative
+    const cmisInitiative = await storage.createProject({
+      name: 'CMIS Integration',
+      description: 'Default initiative for CMIS integration and system setup',
+      status: 'identify_need',
+      ownerId: adminUser.id,
+      priority: 'medium',
+      category: 'technology',
+      objectives: 'Successfully integrate CMIS and set up change management processes',
+      currentPhase: 'identify_need'
+    }, organization.id);
+    
+    console.log(`✅ Created default initiative: ${cmisInitiative.name} (${cmisInitiative.id})`);
+    
+    console.log(`🎉 Organization seeding complete for ${organization.name}`);
+  } catch (error) {
+    console.error('Error seeding organization:', error);
+    // Don't throw - let organization creation succeed even if seeding fails
+    console.warn('Organization created but seeding failed - admin will need to manually set up');
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // CRITICAL SECURITY: Apply global read-only enforcement middleware
   // This must run early to block writes during read-only impersonation sessions
@@ -1833,6 +1942,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isConsultationComplete: false,
         setupProgress: { created: true }
       });
+      
+      // Seed new organization with Admin role, Admin user, and default initiative
+      await seedNewOrganization(organization, storage);
       
       console.log(`Super admin ${req.superAdminUser!.username} created organization: ${organization.name} (${organization.id})`);
       res.status(201).json(organization);
