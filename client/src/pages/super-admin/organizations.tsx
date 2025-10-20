@@ -73,9 +73,22 @@ interface Organization {
   billingEmail: string;
   taxId?: string;
   userCount: number;
+  memberCount?: number;
   tierName?: string;
   createdAt: string;
   updatedAt: string;
+  subscription?: {
+    id: string;
+    tierId: string;
+    status: string;
+    seatsPurchased: number;
+    tier: {
+      name: string;
+      price: number;
+      currency: string;
+      features: Record<string, boolean>;
+    } | null;
+  } | null;
 }
 
 interface CustomerTier {
@@ -624,10 +637,7 @@ export default function SuperAdminOrganizations() {
               {filteredOrgs.map((org) => (
                 <div key={org.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold" data-testid={`org-name-${org.id}`}>{org.name}</h3>
-                      <Badge variant={org.isActive ? "default" : "secondary"}>
-                        {org.isActive ? "Active" : "Inactive"}
+Active ? "Active" : "Inactive"}
                       </Badge>
                       {org.tierName && (
                         <Badge variant="outline">
