@@ -2382,10 +2382,8 @@ function InitiativeManagementContent() {
 }
 
 export default function InitiativeManagement() {
-  const { canAccessInitiativeManagement } = usePermissions();
-  
   return (
-    <RouteGuard customCheck={canAccessInitiativeManagement}>
+    <RouteGuard permissions={['canSeeAllProjects', 'canModifyProjects', 'canEditAllProjects']}>
       <InitiativeManagementContent />
     </RouteGuard>
   );

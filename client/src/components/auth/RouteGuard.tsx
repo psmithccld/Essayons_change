@@ -15,7 +15,6 @@ interface RouteGuardProps {
   requireAll?: boolean;
   redirectTo?: string;
   fallback?: ReactNode;
-  customCheck?: () => boolean;
 }
 
 export function RouteGuard({
@@ -24,8 +23,7 @@ export function RouteGuard({
   permissions = [],
   requireAll = false,
   redirectTo,
-  fallback,
-  customCheck
+  fallback
 }: RouteGuardProps) {
   const { isLoading, isError, hasPermission, hasAllPermissions, hasAnyPermission, permissions: userPermissions } = usePermissions();
 
@@ -68,10 +66,7 @@ export function RouteGuard({
   // Check permissions
   let hasAccess = false;
 
-  if (customCheck) {
-    hasAccess = customCheck();
-    console.log("[RouteGuard] CustomCheck result:", { hasAccess, timestamp: new Date().toISOString() });
-  } else if (permission) {
+  if (permission) {
     hasAccess = hasPermission(permission);
     console.log("[RouteGuard] Single permission check:", { 
       permission, 
@@ -161,15 +156,13 @@ export function ProtectedRoute({
   children, 
   permission, 
   permissions, 
-  requireAll = false,
-  customCheck 
+  requireAll = false
 }: RouteGuardProps) {
   return (
     <RouteGuard
       permission={permission}
       permissions={permissions}
       requireAll={requireAll}
-      customCheck={customCheck}
       redirectTo="/"
     >
       {children}

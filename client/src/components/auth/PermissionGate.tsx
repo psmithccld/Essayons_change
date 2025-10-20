@@ -11,7 +11,6 @@ interface PermissionGateProps {
   requireAll?: boolean; // If true, user must have ALL permissions. If false, ANY permission
   fallback?: ReactNode;
   showFallback?: boolean;
-  customCheck?: () => boolean; // Custom permission check function
 }
 
 export function PermissionGate({ 
@@ -20,8 +19,7 @@ export function PermissionGate({
   permissions = [], 
   requireAll = false,
   fallback,
-  showFallback = false,
-  customCheck
+  showFallback = false
 }: PermissionGateProps) {
   const { isLoading, hasPermission, hasAllPermissions, hasAnyPermission } = usePermissions();
 
@@ -32,9 +30,7 @@ export function PermissionGate({
 
   let hasAccess = false;
 
-  if (customCheck) {
-    hasAccess = customCheck();
-  } else if (permission) {
+  if (permission) {
     hasAccess = hasPermission(permission);
   } else if (permissions.length > 0) {
     hasAccess = requireAll ? hasAllPermissions(...permissions) : hasAnyPermission(...permissions);
@@ -66,7 +62,6 @@ export function PermissionButton({
   permission, 
   permissions, 
   requireAll,
-  customCheck,
   className,
   disabled,
   ...props 
@@ -83,9 +78,7 @@ export function PermissionButton({
 
   let hasAccess = false;
 
-  if (customCheck) {
-    hasAccess = customCheck();
-  } else if (permission) {
+  if (permission) {
     hasAccess = hasPermission(permission);
   } else if (permissions && permissions.length > 0) {
     hasAccess = requireAll ? hasAllPermissions(...permissions) : hasAnyPermission(...permissions);
