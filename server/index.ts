@@ -29,6 +29,11 @@ console.log("Startup: All imports completed.");
 const app = express();
 console.log("Startup: Express initialized.");
 
+// TRUST PROXY - Required for production on Render.com and other platforms
+// This allows Express to trust the proxy headers (X-Forwarded-Proto, X-Forwarded-For, etc.)
+// Without this, secure cookies won't work because Express thinks the connection is insecure
+app.set('trust proxy', 1);
+
 // Create a single shared Postgres pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -100,7 +105,7 @@ app.use(
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000,
-      sameSite: "strict",
+      sameSite: "lax", // Changed from "strict" to "lax" for production compatibility
     },
   })
 );
