@@ -1940,11 +1940,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         organizations = organizations.slice(0, limit);
       }
       
-      // Enhance with admin and membership info
+      // Enhance with admin, membership info, and subscription/tier data
       const enhancedOrgs = await Promise.all(organizations.map(async (org) => {
-        const [members, settings] = await Promise.all([
+        const [members, settings, subscription] = await Promise.all([
           storage.getOrganizationMembers(org.id),
-          storage.getOrganizationSettings(org.id)
+          storage.getOrganizationSettings(org.id),
+          // Get subscription with tier details
+          db.select({
+            id: subscriptions.id,
+            tierId: subscriptions.tierId,
+            status: subscriptions.status,
+            seatsPurchased: subscriptions.seatsPurchased,
+            tierName: customerTiers.name,
+            tierPrice: customerTiers.price,
+            tierCurrency: customerTiers.currency,
+            tierFeatures: customerTiers.features
+          })
+          .from(subscriptions)
+          .leftJoin(customerTiers, eq(subscriptions.tierId, customerTiers.id))
+          .where(eq(subscriptions.organizationId, org.id))
+          .orderBy(sql`${subscriptions.createdAt} DESC`)
+          .limit(1)
+          .then(rows => rows[0] || null)
         ]);
         
         const adminMembers = members.filter(m => m.orgRole === 'admin' || m.orgRole === 'owner');
@@ -1956,7 +1973,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           setupComplete: settings?.isConsultationComplete || false,
           // Add domain mapping for frontend compatibility
           domain: org.slug,
-          isActive: org.status === 'active'
+          isActive: org.status === 'active',
+          // Add subscription and tier info
+          subscription: subscription ? {
+            id: subscription.id,
+            tierId: subscription.tierId,
+            status: subscription.status,
+            seatsPurchased: subscription.seatsPurchased,
+            tier: subscription.tierName ? {
+              name: subscription.tierName,
+              price: subscription.tierPrice,
+              currency: subscription.tierCurrency,
+              features: subscription.tierFeatures
+            } : null
+          } : null
         };
       }));
       
