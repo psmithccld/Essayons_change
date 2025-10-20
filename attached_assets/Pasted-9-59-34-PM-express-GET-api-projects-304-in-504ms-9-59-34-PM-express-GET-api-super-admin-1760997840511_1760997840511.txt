@@ -1,0 +1,73 @@
+9:59:34 PM [express] GET /api/projects 304 in 504ms :: []
+9:59:34 PM [express] GET /api/super-admin/auth/status 401 in 18ms :: {"error":"Super admin authentic…
+9:59:34 PM [express] GET /api/auth/status 304 in 700ms :: {"user":{"id":"95fa8a54-5554-469d-a640-8c4…
+SECURITY: Successful Super Admin login for user 'essayon6' from IP 104.23.211.224
+9:59:51 PM [express] POST /api/super-admin/auth/login 200 in 122ms :: {"user":{"id":"87fce4ea-998d-4…
+9:59:51 PM [express] GET /api/super-admin/auth/status 200 in 5ms :: {"user":{"id":"87fce4ea-998d-4e0…
+9:59:52 PM [express] GET /api/super-admin/organizations 304 in 316ms :: [{"id":"a809b0f9-b54a-4093-8…
+9:59:52 PM [express] GET /api/super-admin/customer-tiers 304 in 611ms :: {"tiers":[{"id":"17deb7a9-3…
+🗑️  Super admin Essayon6 deleting organization: Essayons Change Demo (a809b0f9-b54a-4093-836a-7f55563e1d62)
+✅ Successfully deleted organization: Essayons Change Demo (a809b0f9-b54a-4093-836a-7f55563e1d62)
+9:59:56 PM [express] DELETE /api/super-admin/organizations/a809b0f9-b54a-4093-836a-7f55563e1d62 200 …
+9:59:56 PM [express] GET /api/super-admin/organizations 200 in 7ms :: [{"id":"f60b3599-fadb-47ff-9f2…
+10:00:01 PM [express] GET /api/super-admin/users 200 in 12ms :: [{"id":"95fa8a54-5554-469d-a640-8c4c9…
+10:00:01 PM [express] GET /api/super-admin/organizations 200 in 9ms :: [{"id":"f60b3599-fadb-47ff-9f2…
+Super admin Essayon6 assigned PSmith as admin to organization: Essayons Change Demo v2
+10:00:15 PM [express] POST /api/super-admin/organizations/f60b3599-fadb-47ff-9f28-9d132df5fa89/admins…
+10:00:15 PM [express] GET /api/super-admin/organizations 200 in 141ms :: [{"id":"f60b3599-fadb-47ff-9…
+10:00:15 PM [express] GET /api/super-admin/users 200 in 210ms :: [{"id":"95fa8a54-5554-469d-a640-8c4c…
+10:00:18 PM [express] GET /api/super-admin/organizations 200 in 15ms :: [{"id":"f60b3599-fadb-47ff-9f…
+Super admin Essayon6 updated subscription tier for organization: Essayons Change Demo v2
+Super admin Essayon6 updated organization: Essayons Change Demo v2 (f60b3599-fadb-47ff-9f28-9d132df5fa89)
+10:00:27 PM [express] PUT /api/super-admin/organizations/f60b3599-fadb-47ff-9f28-9d132df5fa89 200 in …
+10:00:27 PM [express] GET /api/super-admin/organizations 200 in 203ms :: [{"id":"f60b3599-fadb-47ff-9…
+10:00:36 PM [express] GET /api/auth/status 304 in 683ms :: {"user":{"id":"95fa8a54-5554-469d-a640-8c4…
+10:00:36 PM [express] GET /api/projects 304 in 695ms :: []
+10:00:36 PM [express] GET /api/super-admin/auth/status 304 in 30ms :: {"user":{"id":"87fce4ea-998d-4e…
+10:00:36 PM [express] GET /api/super-admin/customer-tiers 304 in 5ms :: {"tiers":[{"id":"17deb7a9-39a…
+10:00:42 PM [express] GET /api/super-admin/organizations 304 in 55ms :: [{"id":"f60b3599-fadb-47ff-9f…
+10:00:51 PM [express] GET /api/projects 304 in 55ms :: []
+10:00:51 PM [express] GET /api/auth/status 304 in 95ms :: {"user":{"id":"95fa8a54-5554-469d-a640-8c4c…
+10:00:52 PM [express] GET /api/users/me/permissions 304 in 697ms :: {"user":{"id":"95fa8a54-5554-469d…
+10:00:52 PM [express] GET /api/notifications/unread-count 304 in 304ms :: {"count":0}
+10:00:53 PM [express] GET /api/notifications 304 in 1200ms :: {"notifications":[],"total":0}
+10:00:53 PM [express] GET /api/organization/features 304 in 1005ms :: {"reports":true,"gptCoach":true…
+10:00:53 PM [express] GET /api/my/initiatives 304 in 103ms :: []
+10:00:53 PM [express] GET /api/my/dashboard-metrics 304 in 355ms :: {"activeInitiatives":0,"pendingSu…
+10:00:56 PM [express] GET /api/auth/status 304 in 6ms :: {"user":{"id":"95fa8a54-5554-469d-a640-8c4c9…
+10:00:56 PM [express] GET /api/projects 304 in 9ms :: []
+10:00:57 PM [express] GET /api/notifications 304 in 102ms :: {"notifications":[],"total":0}
+10:00:57 PM [express] GET /api/notifications/unread-count 304 in 101ms :: {"count":0}
+10:00:57 PM [express] GET /api/users/me/permissions 304 in 103ms :: {"user":{"id":"95fa8a54-5554-469d…
+10:00:57 PM [express] GET /api/organization/features 304 in 197ms :: {"reports":true,"gptCoach":true,…
+10:00:57 PM [express] GET /api/my/dashboard-metrics 304 in 61ms :: {"activeInitiatives":0,"pendingSur…
+10:00:57 PM [express] GET /api/my/initiatives 304 in 61ms :: []
+10:00:59 PM [express] POST /api/auth/logout 200 in 3ms :: {"message":"Logged out successfully"}
+10:00:59 PM [express] GET /api/auth/status 401 in 2ms :: {"error":"Not authenticated"}
+10:01:05 PM [express] POST /api/auth/login 200 in 64ms :: {"user":{"id":"95fa8a54-5554-469d-a640-8c4c…
+10:01:05 PM [express] GET /api/auth/status 200 in 6ms :: {"user":{"id":"95fa8a54-5554-469d-a640-8c4c9…
+10:01:06 PM [express] GET /api/users/me/permissions 304 in 67ms :: {"user":{"id":"95fa8a54-5554-469d-…
+10:01:06 PM [express] GET /api/notifications/unread-count 304 in 66ms :: {"count":0}
+10:01:06 PM [express] GET /api/organization/features 304 in 69ms :: {"reports":true,"gptCoach":true,"…
+10:01:06 PM [express] GET /api/auth/status 304 in 102ms :: {"user":{"id":"95fa8a54-5554-469d-a640-8c4…
+10:01:06 PM [express] GET /api/notifications 304 in 262ms :: {"notifications":[],"total":0}
+10:01:06 PM [express] GET /api/my/dashboard-metrics 304 in 358ms :: {"activeInitiatives":0,"pendingSu…
+10:01:06 PM [express] GET /api/my/initiatives 304 in 379ms :: []
+10:01:36 PM [express] GET /api/notifications/unread-count 304 in 301ms :: {"count":0}
+10:01:36 PM [express] GET /api/notifications 304 in 311ms :: {"notifications":[],"total":0}
+10:01:42 PM [express] GET /api/users/me/permissions 304 in 8ms :: {"user":{"id":"95fa8a54-5554-469d-a…
+10:02:07 PM [express] GET /api/notifications/unread-count 304 in 146ms :: {"count":0}
+10:02:07 PM [express] GET /api/notifications 304 in 109ms :: {"notifications":[],"total":0}
+10:02:12 PM [express] GET /api/users/me/permissions 304 in 7ms :: {"user":{"id":"95fa8a54-5554-469d-a…
+10:02:37 PM [express] GET /api/notifications/unread-count 304 in 47ms :: {"count":0}
+10:02:37 PM [express] GET /api/notifications 304 in 60ms :: {"notifications":[],"total":0}
+10:02:42 PM [express] GET /api/users/me/permissions 304 in 7ms :: {"user":{"id":"95fa8a54-5554-469d-a…
+10:02:59 PM [express] GET /api/projects 200 in 61ms :: []
+10:02:59 PM [express] GET /api/auth/status 200 in 57ms :: {"user":{"id":"95fa8a54-5554-469d-a640-8c4c…
+10:03:00 PM [express] GET /api/organization/features 200 in 896ms :: {"reports":true,"gptCoach":true,…
+10:03:00 PM [express] GET /api/notifications/unread-count 200 in 893ms :: {"count":0}
+10:03:00 PM [express] GET /api/notifications 200 in 504ms :: {"notifications":[],"total":0}
+10:03:00 PM [express] GET /api/users/me/permissions 200 in 607ms :: {"user":{"id":"95fa8a54-5554-469d…
+10:03:31 PM [express] GET /api/notifications/unread-count 304 in 204ms :: {"count":0}
+10:03:31 PM [express] GET /api/users/me/permissions 304 in 302ms :: {"user":{"id":"95fa8a54-5554-469d…
+10:03:31 PM [express] GET /api/notifications 304 in 304ms :: {"notifications":[],"total":0}
