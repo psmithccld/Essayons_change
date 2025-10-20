@@ -1148,6 +1148,7 @@ async function seedNewOrganization(organization: any, storage: any): Promise<voi
         username: adminUsername,
         name: 'Organization Administrator',
         email: adminEmail,
+        password: 'ChangeMe123!', // Default password - admin should change on first login
         roleId: adminRole.id,
         currentOrganizationId: organization.id,
         isActive: true,
