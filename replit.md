@@ -47,6 +47,13 @@ Preferred communication style: Simple, everyday language.
   - Platform users cannot use reserved super admin usernames to prevent confusion
   - Comprehensive error handling for user creation with specific validation messages
   - Database roles: Admin, Manager, User (default role for new platform users)
+- **Organization Seeding**: Automatic setup when Super Admin creates new organizations
+  - Creates Admin Security Role with name `${orgSlug}-Admin` (globally unique with all permissions enabled)
+  - Creates Admin User with username `${orgSlug}-admin` linked to Admin role
+  - Adds Admin User to organization as owner (if no owner exists) or admin member
+  - Creates default "CMIS Integration" initiative owned by Admin User
+  - Seeding failures are logged but don't block organization creation
+  - Implementation in `server/routes.ts` lines 1070-1177 (seedNewOrganization function)
 
 ### AI Integration
 - **OpenAI GPT-5**: AI-powered coaching system for change management insights
