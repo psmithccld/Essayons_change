@@ -2091,6 +2091,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/super-admin/organizations/:orgId/roles - Get all security roles for a specific organization
+  app.get("/api/super-admin/organizations/:orgId/roles", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { orgId } = req.params;
+      
+      // Verify organization exists
+      const organization = await storage.getOrganization(orgId);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Get all roles - we'll need to filter by organization if roles are org-specific
+      // For now, return all active roles (they're currently global in the schema)
+      const allRoles = await storage.getRoles();
+      
+      // Filter to only active roles and sort with Admin role first
+      const activeRoles = allRoles
+        .filter(role => role.isActive)
+        .sort((a, b) => {
+          // Prioritize roles with organization slug in the name (org-specific roles)
+          const aIsOrgRole = a.name.startsWith(`${organization.slug}-`);
+          const bIsOrgRole = b.name.startsWith(`${organization.slug}-`);
+          
+          if (aIsOrgRole && !bIsOrgRole) return -1;
+          if (!aIsOrgRole && bIsOrgRole) return 1;
+          
+          // Then prioritize roles with "Admin" in the name
+          const aIsAdmin = a.name.toLowerCase().includes('admin');
+          const bIsAdmin = b.name.toLowerCase().includes('admin');
+          
+          if (aIsAdmin && !bIsAdmin) return -1;
+          if (!aIsAdmin && bIsAdmin) return 1;
+          
+          // Finally sort alphabetically
+          return a.name.localeCompare(b.name);
+        });
+      
+      res.json(activeRoles);
+    } catch (error) {
+      console.error("Error fetching organization roles:", error);
+      res.status(500).json({ error: "Failed to fetch organization roles" });
+    }
+  });
+
   // Update organization (Unrestricted platform-level editing)
   app.put("/api/super-admin/organizations/:id", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
@@ -2672,15 +2716,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/super-admin/users - Create new platform user
+  // POST /api/super-admin/users - Create new platform user or super admin
   app.post("/api/super-admin/users", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
-      const { name, username, email, password, isActive, organizationId, isAdmin } = req.body;
+      const { name, username, email, password, isActive, organizationId, isAdmin, roleId, isSuperAdmin } = req.body;
       
       // Validate required fields
       if (!name || !username || !email || !password) {
         return res.status(400).json({ 
           error: "Name, username, email, and password are required" 
+        });
+      }
+
+      // Check if creating super admin (homeless users who opted for super admin)
+      if (isSuperAdmin && (!organizationId || organizationId === 'none')) {
+        // Create super admin user instead of platform user
+        const { default: bcrypt } = await import("bcryptjs");
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          return res.status(400).json({ error: "Invalid email format" });
+        }
+
+        // Validate username format
+        const usernameRegex = /^[a-zA-Z0-9_-]{3,30}$/;
+        if (!usernameRegex.test(username)) {
+          return res.status(400).json({ 
+            error: "Username must be 3-30 characters and contain only letters, numbers, underscores, and dashes" 
+          });
+        }
+
+        // Check if username already exists in super admin users
+        const existingSuperAdmin = await db.select()
+          .from(superAdminUsers)
+          .where(eq(superAdminUsers.username, username))
+          .limit(1);
+        
+        if (existingSuperAdmin.length > 0) {
+          return res.status(409).json({ error: "Super admin username already exists" });
+        }
+
+        // Check if email already exists in super admin users
+        const existingSuperAdminEmail = await db.select()
+          .from(superAdminUsers)
+          .where(eq(superAdminUsers.email, email))
+          .limit(1);
+        
+        if (existingSuperAdminEmail.length > 0) {
+          return res.status(409).json({ error: "Super admin email already exists" });
+        }
+
+        // Hash password
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        // Create super admin user
+        const [newSuperAdmin] = await db.insert(superAdminUsers).values({
+          name,
+          username,
+          email,
+          passwordHash,
+          role: 'super_admin',
+          isActive: isActive !== undefined ? isActive : true,
+        }).returning();
+
+        console.log(`✓ Super admin ${req.superAdminUser!.username} created new super admin user: ${username}`);
+
+        return res.status(201).json({
+          id: newSuperAdmin.id,
+          name: newSuperAdmin.name,
+          username: newSuperAdmin.username,
+          email: newSuperAdmin.email,
+          isActive: newSuperAdmin.isActive,
+          isSuperAdmin: true,
+          createdAt: newSuperAdmin.createdAt,
         });
       }
 
@@ -2744,15 +2853,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { default: bcrypt } = await import("bcryptjs");
       const passwordHash = await bcrypt.hash(password, 10);
 
-      // Get a default role (User role for basic access)
-      const [defaultRole] = await db.select()
-        .from(roles)
-        .where(eq(roles.name, 'User'))
-        .limit(1);
+      // Determine which role to use
+      let selectedRoleId: string;
+      
+      if (roleId) {
+        // Validate provided role exists
+        const [providedRole] = await db.select()
+          .from(roles)
+          .where(eq(roles.id, roleId))
+          .limit(1);
+        
+        if (!providedRole) {
+          return res.status(400).json({ error: "Selected role not found" });
+        }
+        
+        selectedRoleId = roleId;
+        console.log(`Using selected role: ${providedRole.name} (${providedRole.id})`);
+      } else {
+        // Get a default role (User role for basic access)
+        const [defaultRole] = await db.select()
+          .from(roles)
+          .where(eq(roles.name, 'User'))
+          .limit(1);
 
-      if (!defaultRole) {
-        console.error("CRITICAL: Default 'User' role not found in database. Available roles should be: Admin, Manager, User");
-        return res.status(500).json({ error: "System error: Default user role not configured. Please contact support." });
+        if (!defaultRole) {
+          console.error("CRITICAL: Default 'User' role not found in database. Available roles should be: Admin, Manager, User");
+          return res.status(500).json({ error: "System error: Default user role not configured. Please contact support." });
+        }
+        
+        selectedRoleId = defaultRole.id;
       }
 
       // Create the user with organization context if provided
@@ -2761,7 +2890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username,
         email,
         passwordHash,
-        roleId: defaultRole.id,
+        roleId: selectedRoleId,
         isActive: isActive !== undefined ? isActive : true,
         isEmailVerified: true, // Super admin created users are auto-verified
         currentOrganizationId: (organizationId && organizationId !== 'none') ? organizationId : null, // Set current org
