@@ -108,6 +108,7 @@ interface CustomerTier {
     auditLogs: boolean;
     workflowAutomation: boolean;
   };
+  enrollmentCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -320,7 +321,7 @@ export default function SuperAdminCustomerTiers() {
         {tier.description && (
           <CardDescription className="mt-2">{tier.description}</CardDescription>
         )}
-        <div className="flex items-center justify-center gap-2 mt-3">
+        <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
           <Badge variant={tier.isActive ? "default" : "secondary"}>
             {tier.isActive ? "Active" : "Inactive"}
           </Badge>
@@ -332,6 +333,12 @@ export default function SuperAdminCustomerTiers() {
             <Package className="h-3 w-3 mr-1" />
             {tier.maxFileUploadSizeMB} MB files
           </Badge>
+          {tier.enrollmentCount !== undefined && (
+            <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+              <Building2 className="h-3 w-3 mr-1" />
+              {tier.enrollmentCount} {tier.enrollmentCount === 1 ? 'org' : 'orgs'}
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
