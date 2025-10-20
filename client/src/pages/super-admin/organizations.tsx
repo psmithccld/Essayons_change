@@ -82,9 +82,11 @@ interface CustomerTier {
   id: string;
   name: string;
   description?: string;
-  maxSeats: number;
-  priceCents: number;
+  seatLimit: number;
+  price: number;
   features: Record<string, boolean>;
+  pricingModel?: string;
+  currency?: string;
 }
 
 interface SubscriptionInfo {
@@ -109,11 +111,11 @@ export default function SuperAdminOrganizations() {
   const { toast } = useToast();
   
   // Fetch available customer tiers from API
-  const { data: tiersData } = useQuery({
+  const { data: tiersData } = useQuery<{ tiers: CustomerTier[] }>({
     queryKey: ["/api/super-admin/customer-tiers"],
     enabled: isAuthenticated
   });
-  const availableTiers = tiersData?.tiers || [];
+  const availableTiers: CustomerTier[] = tiersData?.tiers || [];
 
   // Fetch organizations
   const { data: organizations = [], isLoading, refetch } = useQuery({
@@ -204,7 +206,7 @@ export default function SuperAdminOrganizations() {
         status: data.isActive ? "active" : "inactive", // Map isActive to status
         // Include selected customer tier information
         tierId: selectedTier || undefined,
-        tierName: selectedTier ? availableTiers.find(t => t.id === selectedTier)?.name : undefined
+        tierName: selectedTier ? availableTiers.find((t: CustomerTier) => t.id === selectedTier)?.name : undefined
       };
       
       const response = await fetch(`/api/super-admin/organizations/${id}`, {
@@ -333,7 +335,7 @@ export default function SuperAdminOrganizations() {
     });
     
     // Find and set current tier if organization has one
-    const orgTier = availableTiers.find(tier => tier.name === org.tierName);
+    const orgTier = availableTiers.find((tier: CustomerTier) => tier.name === org.tierName);
     if (orgTier) {
       setSelectedTier(orgTier.id);
     } else {
@@ -855,7 +857,7 @@ export default function SuperAdminOrganizations() {
                       </div>
                       
                       <div className="grid gap-4">
-                        {availableTiers.map((tier) => (
+                        {availableTiers.map((tier: CustomerTier) => (
                           <Card key={tier.id} className={`cursor-pointer transition-all ${selectedTier === tier.id ? 'ring-2 ring-primary' : ''}`} onClick={() => setSelectedTier(tier.id)}>
                             <CardContent className="pt-4">
                               <div className="flex items-center justify-between">
@@ -863,15 +865,15 @@ export default function SuperAdminOrganizations() {
                                   <div className="flex items-center gap-3 mb-2">
                                     <h4 className="font-semibold">{tier.name}</h4>
                                     <Badge variant="outline">
-                                      ${(tier.priceCents / 100).toFixed(2)}/seat/month
+                                      ${(tier.price / 100).toFixed(2)}/seat/month
                                     </Badge>
                                     <Badge variant="secondary">
-                                      Up to {tier.maxSeats} seats
+                                      Up to {tier.seatLimit} seats
                                     </Badge>
                                   </div>
                                   <p className="text-sm text-muted-foreground mb-2">{tier.description}</p>
                                   <div className="flex flex-wrap gap-1">
-                                    {Object.entries(tier.features).map(([feature, enabled]) => enabled && (
+                                    {Object.entries(tier.features || {}).map(([feature, enabled]) => enabled && (
                                       <Badge key={feature} variant="outline" className="text-xs">
                                         {feature}
                                       </Badge>
@@ -904,15 +906,15 @@ export default function SuperAdminOrganizations() {
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
                                 <span className="text-muted-foreground">Selected Tier:</span>
-                                <div className="font-medium">{availableTiers.find(t => t.id === selectedTier)?.name}</div>
+                                <div className="font-medium">{availableTiers.find((t: CustomerTier) => t.id === selectedTier)?.name}</div>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Price per Seat:</span>
-                                <div className="font-medium">${(availableTiers.find(t => t.id === selectedTier)?.priceCents || 0) / 100}/month</div>
+                                <div className="font-medium">${(availableTiers.find((t: CustomerTier) => t.id === selectedTier)?.price || 0) / 100}/month</div>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Max Seats:</span>
-                                <div className="font-medium">{availableTiers.find(t => t.id === selectedTier)?.maxSeats}</div>
+                                <div className="font-medium">{availableTiers.find((t: CustomerTier) => t.id === selectedTier)?.seatLimit}</div>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Current Users:</span>
@@ -1001,7 +1003,7 @@ export default function SuperAdminOrganizations() {
                   <div>
                     {selectedTier && selectedTier !== selectedOrg?.tierName && (
                       <p className="text-sm text-muted-foreground">
-                        Tier will be updated to: <strong>{availableTiers.find(t => t.id === selectedTier)?.name}</strong>
+                        Tier will be updated to: <strong>{availableTiers.find((t: CustomerTier) => t.id === selectedTier)?.name}</strong>
                       </p>
                     )}
                   </div>
