@@ -2401,7 +2401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "System error: Default user role not configured. Please contact support." });
       }
 
-      // Create the user
+      // Create the user with organization context if provided
       const [newUser] = await db.insert(users).values({
         name,
         username,
@@ -2410,6 +2410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         roleId: defaultRole.id,
         isActive: isActive !== undefined ? isActive : true,
         isEmailVerified: true, // Super admin created users are auto-verified
+        currentOrganizationId: (organizationId && organizationId !== 'none') ? organizationId : null, // Set current org
       }).returning();
 
       // If organizationId is provided and it's not 'none', add user to organization
