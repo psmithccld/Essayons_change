@@ -65,11 +65,10 @@ export function EmailVerifyPage({ onAuthSuccess }: EmailVerifyPageProps) {
 
   const verificationMutation = useMutation({
     mutationFn: async (data: VerificationFormData): Promise<AuthResponse> => {
-      const response = await apiRequest('POST', '/api/auth/verify-email', {
+      return await apiRequest('POST', '/api/auth/verify-email', {
         token: data.token,
         password: data.password,
       });
-      return response.json();
     },
     onSuccess: (data: AuthResponse) => {
       setVerificationComplete(true);

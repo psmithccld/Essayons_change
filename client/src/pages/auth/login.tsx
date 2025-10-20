@@ -77,8 +77,7 @@ export function LoginPage({ onAuthSuccess }: LoginPageProps) {
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginFormData): Promise<AuthResponse> => {
-      const response = await apiRequest('POST', '/api/auth/login', data);
-      return response.json();
+      return await apiRequest('POST', '/api/auth/login', data);
     },
     onSuccess: (data: AuthResponse) => {
       toast({
@@ -99,8 +98,7 @@ export function LoginPage({ onAuthSuccess }: LoginPageProps) {
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterFormData): Promise<{ message: string; email: string; emailSent: boolean }> => {
-      const response = await apiRequest('POST', '/api/auth/register', data);
-      return response.json();
+      return await apiRequest('POST', '/api/auth/register', data);
     },
     onSuccess: (data: { message: string; email: string; emailSent: boolean }) => {
       setRegistrationComplete(true);
