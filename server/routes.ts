@@ -2415,17 +2415,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(customerTiers.isActive, true))
         .orderBy(customerTiers.price);
       
-      // Get enrollment counts for each tier
-      const tiersWithCounts = await Promise.all(allTiers.map(async (tier) => {
-        const [countResult] = await db
-          .select({ count: sql<number>`count(*)` })
-          .from(subscriptions)
-          .where(eq(subscriptions.tierId, tier.id));
-        
-        return {
-          ...tier,
-          enrollmentCount: countResult?.count || 0
-        };
+      // Get enrollment counts with a single efficient GROUP BY query
+      const enrollmentCounts = await db
+        .select({
+          tierId: subscriptions.tierId,
+          count: sql<number>`count(*)::int`
+        })
+        .from(subscriptions)
+        .where(eq(subscriptions.status, 'active'))
+        .groupBy(subscriptions.tierId);
+      
+      // Create a map for quick lookup
+      const countMap = new Map(enrollmentCounts.map(ec => [ec.tierId, ec.count]));
+      
+      // Add enrollment counts to tiers
+      const tiersWithCounts = allTiers.map(tier => ({
+        ...tier,
+        enrollmentCount: countMap.get(tier.id) || 0
       }));
       
       res.json({ tiers: tiersWithCounts });

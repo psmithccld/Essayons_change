@@ -33,7 +33,8 @@ import {
   Users,
   Zap,
   Shield,
-  Settings
+  Settings,
+  Building2
 } from "lucide-react";
 import { useSuperAdmin } from "@/contexts/SuperAdminContext";
 import { useToast } from "@/hooks/use-toast";
