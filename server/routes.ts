@@ -4603,7 +4603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard/stats", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
-      const stats = await storage.getDashboardStats(userId);
+      const stats = await storage.getDashboardStats(userId, req.organizationId!);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
@@ -5257,11 +5257,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const searchParams = req.body;
       
       // SECURITY: Override client-sent projectIds with server-validated project access
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       
       // If client sent specific projectIds, validate them against authorized projects
       if (searchParams.projectIds && Array.isArray(searchParams.projectIds)) {
-        searchParams.projectIds = await storage.validateUserProjectAccess(req.userId!, searchParams.projectIds);
+        searchParams.projectIds = await storage.validateUserProjectAccess(req.userId!, req.organizationId!, searchParams.projectIds);
         if (searchParams.projectIds.length === 0) {
           return res.status(403).json({ error: 'Access denied to requested projects' });
         }
@@ -5289,7 +5289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { projectId, type } = req.query;
       
       // SECURITY: ALWAYS get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       
       // SECURITY: Validate project access if specific project requested
       if (projectId && !authorizedProjectIds.includes(projectId as string)) {
@@ -5315,7 +5315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       
       // SECURITY: Get user's authorized projects for access control
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       
       // SECURITY: Storage method now validates communication access internally
       const versions = await storage.getCommunicationVersionHistory(id, authorizedProjectIds);
@@ -5345,7 +5345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // SECURITY: Validate that user has access to all communications being archived
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       
       // Check each communication to ensure user has access to its project
       for (const id of ids) {
@@ -5384,7 +5384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // SECURITY: Validate project access if specific project requested
       if (projectId) {
-        const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+        const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
         if (!authorizedProjectIds.includes(projectId as string)) {
           return res.status(403).json({ error: 'Access denied to requested project' });
         }
@@ -6512,7 +6512,7 @@ Return the refined content in JSON format:
       }
       
       // Project authorization check
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       if (!authorizedProjectIds.includes(projectId)) {
         return res.status(403).json({ error: 'Access denied to requested project' });
       }
@@ -6556,7 +6556,7 @@ Return the refined content in JSON format:
       }
       
       // Project authorization check
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       if (!authorizedProjectIds.includes(projectId)) {
         return res.status(403).json({ error: 'Access denied to requested project' });
       }
@@ -6599,7 +6599,7 @@ Return the refined content in JSON format:
       }
       
       // Project authorization check
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       if (!authorizedProjectIds.includes(projectId)) {
         return res.status(403).json({ error: 'Access denied to requested project' });
       }
@@ -6639,7 +6639,7 @@ Return the refined content in JSON format:
       }
       
       // Project authorization check
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       if (!authorizedProjectIds.includes(projectId)) {
         return res.status(403).json({ error: 'Access denied to requested project' });
       }
@@ -7061,11 +7061,11 @@ Please provide coaching guidance based on their question and current context.`;
       const filterType = (req.query.filterType as 'all' | 'assigned_only' | 'my_initiatives' | 'exclude_owned_only') || 'assigned_only';
       
       const [activeInitiatives, pendingSurveys, pendingTasks, openIssues, initiativesByPhase] = await Promise.all([
-        storage.getUserActiveInitiatives(userId),
-        storage.getUserPendingSurveys(userId),
-        storage.getUserPendingTasks(userId),
-        storage.getUserOpenIssues(userId),
-        storage.getUserInitiativesByPhase(userId, filterType)
+        storage.getUserActiveInitiatives(userId, req.organizationId!),
+        storage.getUserPendingSurveys(userId, req.organizationId!),
+        storage.getUserPendingTasks(userId, req.organizationId!),
+        storage.getUserOpenIssues(userId, req.organizationId!),
+        storage.getUserInitiativesByPhase(userId, req.organizationId!, filterType)
       ]);
 
       res.json({
@@ -7806,7 +7806,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       
       // Override with authorized projects for security
       params.authorizedProjectIds = authorizedProjectIds;
@@ -7828,7 +7828,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       const report = await storage.getRoleAssignmentReport(params);
@@ -7844,7 +7844,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       const report = await storage.getInitiativesParticipationReport(params);
@@ -7861,7 +7861,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       // Convert date strings to Date objects
@@ -7881,7 +7881,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       // Default to 30 days ahead if not specified
@@ -7900,7 +7900,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       const report = await storage.getOverdueTasksReport(params);
@@ -7916,7 +7916,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       // Convert date strings to Date objects
@@ -7937,7 +7937,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       // Convert date strings to Date objects
@@ -7957,7 +7957,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       const report = await storage.getHighSeverityRisksReport(params);
@@ -7973,7 +7973,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       const report = await storage.getOpenIssuesByInitiativeReport(params);
@@ -7989,7 +7989,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       // Default to 30 days ahead if not specified
@@ -8009,7 +8009,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       const report = await storage.getStakeholderDirectoryReport(params);
@@ -8025,7 +8025,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       const report = await storage.getCrossInitiativeStakeholderLoadReport(params);
@@ -8041,7 +8041,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       // Convert date strings to Date objects
@@ -8062,7 +8062,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       const report = await storage.getPhaseReadinessScoreReport(params);
@@ -8078,7 +8078,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       // Convert date strings to Date objects
@@ -8098,7 +8098,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       // Convert date strings to Date objects
@@ -8118,7 +8118,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       const report = await storage.getUnderstandingGapsReport(params);
@@ -8134,7 +8134,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       const report = await storage.getPostMortemSuccessReport(params);
@@ -8150,7 +8150,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       // Convert date strings to Date objects
@@ -8171,7 +8171,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       const report = await storage.getChangeHealthDashboard(params);
@@ -8187,7 +8187,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       const report = await storage.getOrgReadinessHeatmap(params);
@@ -8203,7 +8203,7 @@ Please provide coaching guidance based on their question and current context.`;
       const params = req.body;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
       
       // Convert date strings to Date objects
@@ -8361,7 +8361,7 @@ Please provide coaching guidance based on their question and current context.`;
       }
 
       // SECURITY: Check if user has access to this artifact's project
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       if (!authorizedProjectIds.includes(artifact.projectId)) {
         return res.status(403).json({ error: 'Access denied' });
       }

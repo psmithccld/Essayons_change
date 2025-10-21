@@ -91,9 +91,9 @@ export interface IStorage {
   updateProject(id: string, organizationId: string, project: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: string, organizationId: string): Promise<boolean>;
   
-  // SECURITY: Authorization helpers for BOLA prevention
-  getUserAuthorizedProjectIds(userId: string): Promise<string[]>;
-  validateUserProjectAccess(userId: string, projectIds: string[]): Promise<string[]>;
+  // SECURITY: Authorization helpers for BOLA prevention (organization-scoped)
+  getUserAuthorizedProjectIds(userId: string, organizationId: string): Promise<string[]>;
+  validateUserProjectAccess(userId: string, organizationId: string, projectIds: string[]): Promise<string[]>;
 
   // Tasks
   getTasksByProject(projectId: string, organizationId: string): Promise<Task[]>;
@@ -230,7 +230,7 @@ export interface IStorage {
   }): Promise<{ artifacts: ChangeArtifact[]; total: number; }>;
 
   // Dashboard Analytics
-  getDashboardStats(userId: string): Promise<{
+  getDashboardStats(userId: string, organizationId: string): Promise<{
     activeProjects: number;
     totalTasks: number;
     completedTasks: number;
@@ -241,11 +241,11 @@ export interface IStorage {
   }>;
 
   // User-specific Dashboard Analytics  
-  getUserActiveInitiatives(userId: string): Promise<number>;
-  getUserPendingSurveys(userId: string): Promise<number>;
-  getUserPendingTasks(userId: string): Promise<number>;
-  getUserOpenIssues(userId: string): Promise<number>;
-  getUserInitiativesByPhase(userId: string): Promise<Record<string, number>>;
+  getUserActiveInitiatives(userId: string, organizationId: string): Promise<number>;
+  getUserPendingSurveys(userId: string, organizationId: string): Promise<number>;
+  getUserPendingTasks(userId: string, organizationId: string): Promise<number>;
+  getUserOpenIssues(userId: string, organizationId: string): Promise<number>;
+  getUserInitiativesByPhase(userId: string, organizationId: string): Promise<Record<string, number>>;
 
   // User-Initiative Assignments
   getUserInitiativeAssignments(userId: string): Promise<UserInitiativeAssignment[]>;
@@ -2053,25 +2053,28 @@ export class DatabaseStorage implements IStorage {
     return allProjects.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  // SECURITY: Get project IDs that user has access to (CRITICAL for BOLA prevention)
-  async getUserAuthorizedProjectIds(userId: string): Promise<string[]> {
+  // SECURITY: Get project IDs that user has access to (CRITICAL for BOLA prevention, organization-scoped)
+  async getUserAuthorizedProjectIds(userId: string, organizationId: string): Promise<string[]> {
     const userProjects = await db.select({ id: projects.id })
       .from(projects)
-      .where(eq(projects.ownerId, userId));
+      .where(and(eq(projects.ownerId, userId), eq(projects.organizationId, organizationId)));
     
     const assignedProjects = await db.select({ id: projects.id })
       .from(projects)
       .innerJoin(userInitiativeAssignments, eq(userInitiativeAssignments.projectId, projects.id))
-      .where(eq(userInitiativeAssignments.userId, userId));
+      .where(and(
+        eq(userInitiativeAssignments.userId, userId),
+        eq(projects.organizationId, organizationId)
+      ));
 
     // Combine and deduplicate project IDs
     const allProjectIds = new Set([...userProjects.map(p => p.id), ...assignedProjects.map(p => p.id)]);
     return Array.from(allProjectIds);
   }
 
-  // SECURITY: Validate that all provided project IDs are authorized for the user
-  async validateUserProjectAccess(userId: string, projectIds: string[]): Promise<string[]> {
-    const authorizedProjectIds = await this.getUserAuthorizedProjectIds(userId);
+  // SECURITY: Validate that all provided project IDs are authorized for the user (organization-scoped)
+  async validateUserProjectAccess(userId: string, organizationId: string, projectIds: string[]): Promise<string[]> {
+    const authorizedProjectIds = await this.getUserAuthorizedProjectIds(userId, organizationId);
     return projectIds.filter(id => authorizedProjectIds.includes(id));
   }
 
@@ -2992,7 +2995,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Dashboard Analytics
-  async getDashboardStats(userId: string): Promise<{
+  async getDashboardStats(userId: string, organizationId: string): Promise<{
     activeProjects: number;
     totalTasks: number;
     completedTasks: number;
@@ -3002,7 +3005,7 @@ export class DatabaseStorage implements IStorage {
     changeReadiness: number;
   }> {
     // Get all user's accessible projects (owned + assigned)
-    const projectIds = await this.getUserAuthorizedProjectIds(userId);
+    const projectIds = await this.getUserAuthorizedProjectIds(userId, organizationId);
     const allUserProjects = await Promise.all(
       projectIds.map(id => this.getProject(id))
     );
@@ -3098,15 +3101,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   // User-specific Dashboard Analytics Implementations
-  async getUserActiveInitiatives(userId: string): Promise<number> {
+  async getUserActiveInitiatives(userId: string, organizationId: string): Promise<number> {
     // Return count of initiatives assigned to the user (keep original behavior for "My Active Initiatives")
     const initiatives = await this.getUserInitiativesWithRoles(userId);
     return initiatives.filter(i => i.project.status !== 'completed' && i.project.status !== 'cancelled').length;
   }
 
-  async getUserPendingSurveys(userId: string): Promise<number> {
+  async getUserPendingSurveys(userId: string, organizationId: string): Promise<number> {
     // Get all surveys from user's projects that user hasn't responded to yet
-    const userProjects = await this.getUserAuthorizedProjectIds(userId);
+    const userProjects = await this.getUserAuthorizedProjectIds(userId, organizationId);
     if (userProjects.length === 0) return 0;
     
     const allSurveys = await db.select()
@@ -3130,8 +3133,8 @@ export class DatabaseStorage implements IStorage {
     return pendingCount;
   }
 
-  async getUserPendingTasks(userId: string): Promise<number> {
-    const userProjects = await this.getUserAuthorizedProjectIds(userId);
+  async getUserPendingTasks(userId: string, organizationId: string): Promise<number> {
+    const userProjects = await this.getUserAuthorizedProjectIds(userId, organizationId);
     if (userProjects.length === 0) return 0;
     
     const [result] = await db.select({ count: count() })
@@ -3145,8 +3148,8 @@ export class DatabaseStorage implements IStorage {
     return Number(result.count);
   }
 
-  async getUserOpenIssues(userId: string): Promise<number> {
-    const userProjects = await this.getUserAuthorizedProjectIds(userId);
+  async getUserOpenIssues(userId: string, organizationId: string): Promise<number> {
+    const userProjects = await this.getUserAuthorizedProjectIds(userId, organizationId);
     if (userProjects.length === 0) return 0;
     
     const [result] = await db.select({ count: count() })
@@ -3161,7 +3164,7 @@ export class DatabaseStorage implements IStorage {
     return Number(result.count);
   }
 
-  async getUserInitiativesByPhase(userId: string, filterType: 'all' | 'assigned_only' | 'my_initiatives' | 'exclude_owned_only' = 'assigned_only'): Promise<Record<string, number>> {
+  async getUserInitiativesByPhase(userId: string, organizationId: string, filterType: 'all' | 'assigned_only' | 'my_initiatives' | 'exclude_owned_only' = 'assigned_only'): Promise<Record<string, number>> {
     const phaseCount: Record<string, number> = {
       'identify_need': 0,
       'identify_stakeholders': 0,
@@ -3175,7 +3178,7 @@ export class DatabaseStorage implements IStorage {
     switch (filterType) {
       case 'all':
         // Original logic: Get ALL authorized projects (owned + assigned)
-        const userProjectIds = await this.getUserAuthorizedProjectIds(userId);
+        const userProjectIds = await this.getUserAuthorizedProjectIds(userId, organizationId);
         if (userProjectIds.length === 0) return phaseCount;
         
         relevantProjects = await db.select()
