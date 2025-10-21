@@ -48,6 +48,9 @@ Preferred communication style: Simple, everyday language.
   - **Authorization Helper**: `storage.getUserAuthorizedProjectIds()` accepts organizationId parameter and filters all queries by organization
   - **Dashboard Methods**: All dashboard analytics methods (getUserActiveInitiatives, getUserPendingSurveys, getUserPendingTasks, getUserOpenIssues, getUserInitiativesByPhase, getDashboardStats) accept organizationId
   - **API Endpoints**: All 38+ call sites updated to pass req.organizationId for proper tenant isolation
+  - **User Endpoints Fixed**: GET /api/users and GET /api/users/with-roles now use req.organizationId instead of req.user.currentOrganizationId
+  - **getUsersWithRoles() Method**: Updated to accept organizationId parameter and filter by organization_memberships table
+  - **Roles Endpoint Fixed**: GET /api/roles now uses req.organizationId for proper filtering
   - **Verified**: End-to-end tests confirm users cannot access projects/users from other organizations
 - **Idle Timeout**: Automatic logout after 20 minutes of user inactivity (October 2025)
   - **Client-side Detection**: Custom `useIdleTimeout` hook tracks user activity via event listeners

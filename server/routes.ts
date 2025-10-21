@@ -1309,7 +1309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Roles - filtered by user's current organization for compartmentalization
   app.get("/api/roles", requireAuthAndOrg, requirePermission('canSeeRoles'), async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const organizationId = req.user.currentOrganizationId;
+      const organizationId = req.organizationId!;
       
       // Fetch only roles that belong to the user's current organization
       const allRoles = await storage.getRoles();
@@ -4589,7 +4589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Users
   app.get("/api/users", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const organizationId = req.user.currentOrganizationId;
+      const organizationId = req.organizationId!;
       
       // SECURITY: Only return users who are members of the current organization
       const members = await storage.getOrganizationMembers(organizationId);
@@ -7202,7 +7202,8 @@ Please provide coaching guidance based on their question and current context.`;
   // Enhanced User Management Routes
   app.get("/api/users/with-roles", requireAuthAndOrg, requirePermission('canSeeUsers'), async (req, res) => {
     try {
-      const usersWithRoles = await storage.getUsersWithRoles();
+      const organizationId = req.organizationId!;
+      const usersWithRoles = await storage.getUsersWithRoles(organizationId);
       res.json(usersWithRoles);
     } catch (error) {
       console.error("Error fetching users with roles:", error);

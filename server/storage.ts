@@ -261,7 +261,7 @@ export interface IStorage {
   }>>;
 
   // Enhanced User Methods
-  getUsersWithRoles(): Promise<(Omit<User, 'passwordHash'> & { role: Role })[]>;
+  getUsersWithRoles(organizationId: string): Promise<(Omit<User, 'passwordHash'> & { role: Role })[]>;
   updateUserRole(userId: string, roleId: string): Promise<User | undefined>;
   getUsersByRole(roleId: string): Promise<User[]>;
 
@@ -3312,7 +3312,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Enhanced User Methods
-  async getUsersWithRoles(): Promise<(Omit<User, 'passwordHash'> & { role: Role })[]> {
+  async getUsersWithRoles(organizationId: string): Promise<(Omit<User, 'passwordHash'> & { role: Role })[]> {
+    // SECURITY: Get user IDs for members of the organization only
+    const members = await db.select({ userId: organizationMemberships.userId })
+      .from(organizationMemberships)
+      .where(eq(organizationMemberships.organizationId, organizationId));
+    
+    const memberUserIds = members.map(m => m.userId);
+    
+    // Return empty array if no members
+    if (memberUserIds.length === 0) {
+      return [];
+    }
+    
     const result = await db.select({
       id: users.id,
       username: users.username,
@@ -3334,6 +3346,7 @@ export class DatabaseStorage implements IStorage {
     })
     .from(users)
     .leftJoin(roles, eq(users.roleId, roles.id))
+    .where(inArray(users.id, memberUserIds))
     .orderBy(users.name);
 
     return result.map(row => ({
