@@ -59,10 +59,13 @@ Preferred communication style: Simple, everyday language.
 - **Organization-Scoped Security Roles** (October 2025)
   - **Schema**: Roles table includes `organizationId` foreign key to organizations (nullable for migration compatibility)
   - **Compartmentalization**: Each organization has its own isolated set of security roles
-  - **Role Filtering**: GET /api/super-admin/organizations/:orgId/roles returns only roles for that specific organization
+  - **Role Filtering**: 
+    - GET /api/super-admin/organizations/:orgId/roles returns only roles for that specific organization (Super Admin interface)
+    - GET /api/roles filters by user's currentOrganizationId (Client UI user management)
   - **Validation**: POST /api/super-admin/users validates roleId belongs to selected organization (prevents privilege escalation)
   - **Migration**: Existing global roles (Admin, User, Viewer) maintained for backward compatibility; new roles are org-scoped
   - **Cleanup**: Orphaned org-specific roles from deleted organizations are removed during migration
+  - **Security**: Both Super Admin and client UI interfaces enforce organization boundaries for role selection
   - Implementation: shared/schema.ts (roles table), server/routes.ts (API endpoints), server/seed.ts
 - **Organization Seeding**: Automatic setup when Super Admin creates new organizations
   - **Idempotent Seeding**: Checks for existing resources before creating to prevent duplicates
