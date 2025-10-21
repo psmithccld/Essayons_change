@@ -672,17 +672,24 @@ const requireOrgContext = async (req: AuthenticatedRequest, res: Response, next:
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    // Get user's organization membership (for now, use first active membership)
-    // TODO: In production, resolve from URL slug, header, or user preference
-    const memberships = await storage.getUserOrganizationMemberships(req.userId);
-    const activeMembership = memberships.find(m => m.isActive);
+    // SECURITY: Use user's currentOrganizationId as source of truth for organization context
+    const user = await storage.getUser(req.userId);
+    if (!user || !user.currentOrganizationId) {
+      return res.status(403).json({ error: "No organization context. Please contact your administrator." });
+    }
 
-    if (!activeMembership) {
-      return res.status(403).json({ error: "No organization access. Please contact your administrator." });
+    // Verify user has active membership in their current organization
+    const memberships = await storage.getUserOrganizationMemberships(req.userId);
+    const currentMembership = memberships.find(m => 
+      m.organizationId === user.currentOrganizationId && m.isActive
+    );
+
+    if (!currentMembership) {
+      return res.status(403).json({ error: "No active membership in current organization. Please contact your administrator." });
     }
 
     // Get organization details
-    const organization = await storage.getOrganization(activeMembership.organizationId);
+    const organization = await storage.getOrganization(user.currentOrganizationId);
     if (!organization || organization.status !== 'active') {
       return res.status(403).json({ error: "Organization unavailable or suspended" });
     }
@@ -696,8 +703,8 @@ const requireOrgContext = async (req: AuthenticatedRequest, res: Response, next:
       status: organization.status
     };
     req.organizationMembership = {
-      role: activeMembership.orgRole,
-      isActive: activeMembership.isActive
+      role: currentMembership.orgRole,
+      isActive: currentMembership.isActive
     };
 
     next();

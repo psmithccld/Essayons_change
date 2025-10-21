@@ -42,6 +42,13 @@ Preferred communication style: Simple, everyday language.
 - **Session-based**: Cookie-based session management with PostgreSQL session store
 - **User Management**: Basic user system with roles and permissions
 - **Default User**: Currently uses default user system (ready for full authentication implementation)
+- **Critical Security Fixes (October 2025)**: Comprehensive multi-tenant isolation enforcement
+  - **Middleware Fix**: `requireOrgContext` now uses `user.currentOrganizationId` as source of truth (previously used first active membership)
+  - **Project Filtering**: `storage.getProjects()` assignedProjects query now filters by organizationId
+  - **Authorization Helper**: `storage.getUserAuthorizedProjectIds()` accepts organizationId parameter and filters all queries by organization
+  - **Dashboard Methods**: All dashboard analytics methods (getUserActiveInitiatives, getUserPendingSurveys, getUserPendingTasks, getUserOpenIssues, getUserInitiativesByPhase, getDashboardStats) accept organizationId
+  - **API Endpoints**: All 38+ call sites updated to pass req.organizationId for proper tenant isolation
+  - **Verified**: End-to-end tests confirm users cannot access projects/users from other organizations
 - **Idle Timeout**: Automatic logout after 20 minutes of user inactivity (October 2025)
   - **Client-side Detection**: Custom `useIdleTimeout` hook tracks user activity via event listeners
   - **Tracked Events**: mousedown, mousemove, keydown, scroll, touchstart, click
