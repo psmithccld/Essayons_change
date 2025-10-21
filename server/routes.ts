@@ -1299,11 +1299,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This checks maintenance mode, registration blocking, and other platform-wide controls
   app.use('/api', enforceGlobalPlatformSettings);
   
-  // Roles
+  // Roles - filtered by user's current organization for compartmentalization
   app.get("/api/roles", requireAuthAndOrg, requirePermission('canSeeRoles'), async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const roles = await storage.getRoles();
-      res.json(roles);
+      const organizationId = req.user.currentOrganizationId;
+      
+      // Fetch only roles that belong to the user's current organization
+      const allRoles = await storage.getRoles();
+      const orgRoles = allRoles.filter(role => role.organizationId === organizationId);
+      
+      res.json(orgRoles);
     } catch (error) {
       console.error("Error fetching roles:", error);
       res.status(500).json({ error: "Failed to fetch roles" });
