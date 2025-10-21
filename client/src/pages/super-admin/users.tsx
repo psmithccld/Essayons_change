@@ -111,7 +111,6 @@ export default function SuperAdminUsers() {
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  const { sessionId } = useSuperAdmin();
   const { toast } = useToast();
 
   // Fetch platform users

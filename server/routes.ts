@@ -2106,9 +2106,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For now, return all active roles (they're currently global in the schema)
       const allRoles = await storage.getRoles();
       
-      // Filter to only active roles and sort with Admin role first
+      // Filter to only active roles with valid names and sort with Admin role first
       const activeRoles = allRoles
-        .filter(role => role.isActive)
+        .filter(role => role.isActive && role.name && role.name.trim().length > 0)
         .sort((a, b) => {
           // Prioritize roles with organization slug in the name (org-specific roles)
           const aIsOrgRole = a.name.startsWith(`${organization.slug}-`);
@@ -2728,8 +2728,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Security: Prevent super admin creation with organization assignment (privilege escalation attack)
+      if (isSuperAdmin && organizationId && organizationId !== 'none' && organizationId !== '') {
+        return res.status(400).json({ 
+          error: "Super admin users cannot be assigned to organizations. Remove organization selection to create super admin." 
+        });
+      }
+
+      // Security: Prevent role assignment for super admin users
+      if (isSuperAdmin && roleId) {
+        return res.status(400).json({ 
+          error: "Super admin users cannot have organization-specific roles. Remove role selection." 
+        });
+      }
+
+      // Normalize organizationId (treat "", "none", undefined as homeless user)
+      const normalizedOrgId = (organizationId && organizationId !== 'none' && organizationId !== '') ? organizationId : null;
+
       // Check if creating super admin (homeless users who opted for super admin)
-      if (isSuperAdmin && (!organizationId || organizationId === 'none')) {
+      if (isSuperAdmin && !normalizedOrgId) {
         // Create super admin user instead of platform user
         const { default: bcrypt } = await import("bcryptjs");
         
@@ -2838,14 +2855,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // If organizationId is provided, verify organization exists before creating user
-      if (organizationId && organizationId !== 'none') {
+      if (normalizedOrgId) {
         const [org] = await db.select()
           .from(organizations)
-          .where(eq(organizations.id, organizationId))
+          .where(eq(organizations.id, normalizedOrgId))
           .limit(1);
 
         if (!org) {
           return res.status(404).json({ error: "Organization not found. Please select a valid organization." });
+        }
+      }
+
+      // If roleId is provided, validate it exists and is active
+      if (roleId) {
+        const [providedRole] = await db.select()
+          .from(roles)
+          .where(eq(roles.id, roleId))
+          .limit(1);
+        
+        if (!providedRole) {
+          return res.status(400).json({ error: "Selected role does not exist" });
+        }
+        
+        if (!providedRole.isActive) {
+          return res.status(400).json({ error: "Selected role is not active" });
         }
       }
 
@@ -2878,7 +2911,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (!defaultRole) {
           console.error("CRITICAL: Default 'User' role not found in database. Available roles should be: Admin, Manager, User");
-          return res.status(500).json({ error: "System error: Default user role not configured. Please contact support." });
+          return res.status(400).json({ 
+            error: "System configuration error: Default user role not found. Please ensure the 'User' role exists in the database or select a specific role." 
+          });
         }
         
         selectedRoleId = defaultRole.id;
@@ -2893,30 +2928,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         roleId: selectedRoleId,
         isActive: isActive !== undefined ? isActive : true,
         isEmailVerified: true, // Super admin created users are auto-verified
-        currentOrganizationId: (organizationId && organizationId !== 'none') ? organizationId : null, // Set current org
+        currentOrganizationId: normalizedOrgId, // Set current org
       }).returning();
 
       // If organizationId is provided and it's not 'none', add user to organization
-      if (organizationId && organizationId !== 'none') {
+      if (normalizedOrgId) {
         try {
           // Get organization name for logging
           const [org] = await db.select({ name: organizations.name })
             .from(organizations)
-            .where(eq(organizations.id, organizationId))
+            .where(eq(organizations.id, normalizedOrgId))
             .limit(1);
 
           // Create organization membership
           await db.insert(organizationMemberships).values({
-            organizationId,
+            organizationId: normalizedOrgId,
             userId: newUser.id,
             orgRole: isAdmin ? 'admin' : 'member',
             isActive: true,
           });
 
-          console.log(`✓ Super admin ${req.superAdminUser!.username} created user ${username} and assigned to organization ${org?.name || organizationId} as ${isAdmin ? 'admin' : 'member'}`);
+          console.log(`✓ Super admin ${req.superAdminUser!.username} created user ${username} and assigned to organization ${org?.name || normalizedOrgId} as ${isAdmin ? 'admin' : 'member'}`);
         } catch (membershipError: any) {
           // Log detailed error but user is already created
-          console.error(`ERROR: Failed to assign user ${username} to organization ${organizationId}:`, {
+          console.error(`ERROR: Failed to assign user ${username} to organization ${normalizedOrgId}:`, {
             error: membershipError.message,
             code: membershipError.code,
             constraint: membershipError.constraint,
@@ -2925,7 +2960,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Check if it's a duplicate membership error
           if (membershipError.code === '23505') {
-            console.warn(`User ${username} already has membership in organization ${organizationId}`);
+            console.warn(`User ${username} already has membership in organization ${normalizedOrgId}`);
           } else {
             // Return error but note that user was created
             return res.status(500).json({ 
