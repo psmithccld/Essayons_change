@@ -81,6 +81,16 @@ Preferred communication style: Simple, everyday language.
   - **Backend Optimizations**: Uses single GROUP BY query for enrollment counts (avoiding O(n) queries)
   - **Data Flow**: GET /api/super-admin/organizations joins subscriptions and tiers; GET /api/super-admin/customer-tiers includes enrollmentCount
   - Implementation: server/routes.ts (API endpoints), client/src/pages/super-admin/organizations.tsx, client/src/pages/super-admin/customer-tiers.tsx
+- **Enhanced User Creation with Role Selection** (October 2025)
+  - **API Endpoint**: GET /api/super-admin/organizations/:orgId/roles returns active, non-empty security roles for organization
+  - **Role Assignment**: POST /api/super-admin/users accepts optional `roleId` parameter to assign specific security role during user creation
+  - **Super Admin Creation**: `isSuperAdmin` parameter creates super admin users (homeless users only)
+  - **Security Validations**: Server-side enforcement prevents privilege escalation (isSuperAdmin rejected if organizationId present, roleId must exist and be active)
+  - **Organization ID Normalization**: Treats "", "none", undefined as homeless user consistently across backend
+  - **Fallback Role**: Defaults to "User" role if no roleId provided; returns 400 if User role missing
+  - **UI Features**: Dynamic Security Role dropdown appears when organization selected; "Make Super Admin" toggle with purple styling and Crown icon for homeless users
+  - **State Management**: Role selection resets when organization changes to prevent stale assignments
+  - Implementation: server/routes.ts (API endpoints lines 2087-2140, 2722-2990), client/src/pages/super-admin/users.tsx
 
 ### AI Integration
 - **OpenAI GPT-5**: AI-powered coaching system for change management insights
