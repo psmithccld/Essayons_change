@@ -1109,14 +1109,17 @@ async function seedNewOrganization(organization: any, storage: any): Promise<{ a
       canModifySecuritySettings: true
     };
     
-    // Check if role already exists
-    const roleName = `${organization.slug}-Admin`;
+    // Create organization-scoped roles: Admin, Manager, User
     const existingRoles = await storage.getRoles();
-    let adminRole = existingRoles.find((r: any) => r.name === roleName);
+    
+    // Admin Role
+    const adminRoleName = `${organization.slug}-Admin`;
+    let adminRole = existingRoles.find((r: any) => r.name === adminRoleName && r.organizationId === organization.id);
     
     if (!adminRole) {
       adminRole = await storage.createRole({
-        name: roleName,
+        organizationId: organization.id,
+        name: adminRoleName,
         description: 'Administrator role with full system permissions',
         permissions: adminPermissions,
         isActive: true
@@ -1124,6 +1127,64 @@ async function seedNewOrganization(organization: any, storage: any): Promise<{ a
       console.log(`✅ Created Admin role: ${adminRole.name} (${adminRole.id})`);
     } else {
       console.log(`ℹ️  Admin role already exists: ${adminRole.name} (${adminRole.id})`);
+    }
+    
+    // Manager Role
+    const managerRoleName = `${organization.slug}-Manager`;
+    let managerRole = existingRoles.find((r: any) => r.name === managerRoleName && r.organizationId === organization.id);
+    
+    if (!managerRole) {
+      managerRole = await storage.createRole({
+        organizationId: organization.id,
+        name: managerRoleName,
+        description: 'Manager role with project and team management permissions',
+        permissions: {
+          ...adminPermissions,
+          canManageSystem: false,
+          canDeleteSecuritySettings: false,
+          canModifySecuritySettings: false,
+          canEditSecuritySettings: false,
+          canSeeSecuritySettings: false
+        },
+        isActive: true
+      });
+      console.log(`✅ Created Manager role: ${managerRole.name} (${managerRole.id})`);
+    } else {
+      console.log(`ℹ️  Manager role already exists: ${managerRole.name} (${managerRole.id})`);
+    }
+    
+    // User Role
+    const userRoleName = `${organization.slug}-User`;
+    let userRole = existingRoles.find((r: any) => r.name === userRoleName && r.organizationId === organization.id);
+    
+    if (!userRole) {
+      userRole = await storage.createRole({
+        organizationId: organization.id,
+        name: userRoleName,
+        description: 'Standard user role with basic access permissions',
+        permissions: {
+          ...adminPermissions,
+          canManageSystem: false,
+          canDeleteSecuritySettings: false,
+          canModifySecuritySettings: false,
+          canEditSecuritySettings: false,
+          canSeeSecuritySettings: false,
+          canDeleteRoles: false,
+          canEditRoles: false,
+          canModifyRoles: false,
+          canDeleteUsers: false,
+          canEditUsers: false,
+          canModifyUsers: false,
+          canDeleteAllProjects: false,
+          canEditAllProjects: false,
+          canModifyAllProjects: false,
+          canSeeAllProjects: false
+        },
+        isActive: true
+      });
+      console.log(`✅ Created User role: ${userRole.name} (${userRole.id})`);
+    } else {
+      console.log(`ℹ️  User role already exists: ${userRole.name} (${userRole.id})`);
     }
     
     // Step 2: Create Admin user
@@ -2102,20 +2163,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Organization not found" });
       }
       
-      // Get all roles - we'll need to filter by organization if roles are org-specific
-      // For now, return all active roles (they're currently global in the schema)
-      const allRoles = await storage.getRoles();
+      // Get organization-specific roles only
+      const allRoles = await db.select()
+        .from(roles)
+        .where(eq(roles.organizationId, orgId));
       
-      // Filter to only active roles with valid names and sort with Admin role first
+      // Filter to only active roles with valid names and sort alphabetically
       const activeRoles = allRoles
         .filter(role => role.isActive && role.name && role.name.trim().length > 0)
         .sort((a, b) => {
-          // Prioritize roles with organization slug in the name (org-specific roles)
-          const aIsOrgRole = a.name.startsWith(`${organization.slug}-`);
-          const bIsOrgRole = b.name.startsWith(`${organization.slug}-`);
-          
-          if (aIsOrgRole && !bIsOrgRole) return -1;
-          if (!aIsOrgRole && bIsOrgRole) return 1;
+          // Sort alphabetically, with Admin first
+          if (a.name.endsWith('-Admin')) return -1;
+          if (b.name.endsWith('-Admin')) return 1;
           
           // Then prioritize roles with "Admin" in the name
           const aIsAdmin = a.name.toLowerCase().includes('admin');
@@ -2898,7 +2957,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // If roleId is provided, validate it exists and is active
+      // If roleId is provided, validate it exists, is active, and belongs to the selected organization
       if (roleId) {
         const [providedRole] = await db.select()
           .from(roles)
@@ -2911,6 +2970,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (!providedRole.isActive) {
           return res.status(400).json({ error: "Selected role is not active" });
+        }
+        
+        // Security: Ensure role belongs to the selected organization
+        if (normalizedOrgId && providedRole.organizationId !== normalizedOrgId) {
+          return res.status(400).json({ 
+            error: "Selected role does not belong to the selected organization" 
+          });
         }
       }
 

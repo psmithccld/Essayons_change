@@ -154,16 +154,6 @@ export const permissionsSchema = z.object({
 
 export type Permissions = z.infer<typeof permissionsSchema>;
 
-export const roles = pgTable("roles", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull().unique(),
-  description: text("description"),
-  permissions: jsonb("permissions").notNull().$type<Permissions>(), // Strongly typed permissions object
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
@@ -171,7 +161,7 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(), // Added email for verification
   department: text("department"), // Department for stakeholder auto-population
-  roleId: uuid("role_id").references(() => roles.id, { onDelete: "restrict" }).notNull(),
+  roleId: uuid("role_id").notNull(), // Foreign key constraint added later to avoid circular dependency
   currentOrganizationId: uuid("current_organization_id"), // Fixed circular reference - constraints added via relations
   isActive: boolean("is_active").notNull().default(true),
   isEmailVerified: boolean("is_email_verified").notNull().default(false), // Email verification status
@@ -267,6 +257,20 @@ export const organizations = pgTable("organizations", {
 }, (table) => ({
   slugIdx: index("organizations_slug_idx").on(table.slug),
   ownerIdx: index("organizations_owner_idx").on(table.ownerUserId),
+}));
+
+// Security Roles - organization-scoped roles with permissions
+export const roles = pgTable("roles", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }), // Nullable for migration
+  name: text("name").notNull(),
+  description: text("description"),
+  permissions: jsonb("permissions").notNull().$type<Permissions>(), // Strongly typed permissions object
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgRoleIdx: index("roles_organization_id_idx").on(table.organizationId),
 }));
 
 // Organization memberships - users belong to organizations with roles

@@ -33,87 +33,10 @@ export async function seedDatabase() {
   }
 
   try {
-    // Check if roles already exist
-    const existingRoles = await db.select().from(roles);
-
-    if (existingRoles.length === 0) {
-      console.log('Creating default roles...');
-      const roleData = [
-        {
-          name: 'Admin',
-          description: 'Full system access with all permissions',
-          permissions: createPermissions(DEFAULT_PERMISSIONS.SUPER_ADMIN),
-          isActive: true,
-        },
-        {
-          name: 'Manager',
-          description: 'Can create and manage projects, view reports',
-          permissions: createPermissions(DEFAULT_PERMISSIONS.PROJECT_MANAGER),
-          isActive: true,
-        },
-        {
-          name: 'User',
-          description: 'Basic project access for team collaboration',
-          permissions: createPermissions(DEFAULT_PERMISSIONS.TEAM_MEMBER),
-          isActive: true,
-        },
-      ];
-      await db.insert(roles).values(roleData);
-      console.log(`✅ Created ${roleData.length} roles: ${roleData.map(r => r.name).join(', ')}`);
-    } else {
-      console.log('Roles already exist, skipping role creation.');
-    }
-
-    // Get the Admin role for default user creation with defensive check
-    let [adminRole] = await db.select().from(roles).where(eq(roles.name, 'Admin'));
-
-    if (!adminRole) {
-      // Try to create the Admin role if it doesn't exist
-      console.log('⚠️ Admin role not found, attempting to create it...');
-      await db.insert(roles).values({
-        name: 'Admin',
-        description: 'Full system access with all permissions',
-        permissions: createPermissions(DEFAULT_PERMISSIONS.SUPER_ADMIN),
-        isActive: true,
-      });
-      [adminRole] = await db.select().from(roles).where(eq(roles.name, 'Admin'));
-      if (!adminRole) {
-        console.error('❌ Failed to create or retrieve Admin role');
-        console.log('⚠️ Continuing with reduced functionality - some features may not work');
-        return;
-      }
-    }
-
-    // Check if default admin user exists
-    const existingUsers = await db.select().from(users);
-
-    // Only create default users in dev environment
-    if (
-      existingUsers.length === 0 &&
-      process.env.NODE_ENV === 'development' &&
-      process.env.SEED_DEMO_DATA === 'true'
-    ) {
-      console.log('Creating default admin user for development...');
-      const defaultPassword = 'admin123'; // Should be changed on first login
-      const hashedPassword = await bcrypt.hash(defaultPassword, SALT_ROUNDS);
-
-      await db.insert(users).values({
-        username: 'admin',
-        email: 'admin@platform.local',
-        passwordHash: hashedPassword,
-        name: 'System Administrator',
-        roleId: adminRole.id,
-        isActive: true,
-      });
-
-      console.log('✅ Created default admin user for development');
-      console.log('   Username: admin');
-      console.log('   ⚠️  IMPORTANT: This is for development only!');
-    } else if (existingUsers.length === 0) {
-      console.log('⚠️ No users found - use proper onboarding flow to create first admin user');
-    } else {
-      console.log('Users already exist, skipping default user creation.');
-    }
+    // Note: Roles are now organization-scoped and created per-organization via seedNewOrganization
+    // Global roles are no longer created here
+    // Default platform users are created per-organization by seedNewOrganization
+    console.log('ℹ️ Roles and users are organization-scoped - created per organization during onboarding');
 
     // Check if Super Admin users exist
     const existingSuperAdmins = await db

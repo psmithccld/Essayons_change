@@ -56,9 +56,20 @@ Preferred communication style: Simple, everyday language.
   - Platform users cannot use reserved super admin usernames to prevent confusion
   - Comprehensive error handling for user creation with specific validation messages
   - Database roles: Admin, Manager, User (default role for new platform users)
+- **Organization-Scoped Security Roles** (October 2025)
+  - **Schema**: Roles table includes `organizationId` foreign key to organizations (nullable for migration compatibility)
+  - **Compartmentalization**: Each organization has its own isolated set of security roles
+  - **Role Filtering**: GET /api/super-admin/organizations/:orgId/roles returns only roles for that specific organization
+  - **Validation**: POST /api/super-admin/users validates roleId belongs to selected organization (prevents privilege escalation)
+  - **Migration**: Existing global roles (Admin, User, Viewer) maintained for backward compatibility; new roles are org-scoped
+  - **Cleanup**: Orphaned org-specific roles from deleted organizations are removed during migration
+  - Implementation: shared/schema.ts (roles table), server/routes.ts (API endpoints), server/seed.ts
 - **Organization Seeding**: Automatic setup when Super Admin creates new organizations
   - **Idempotent Seeding**: Checks for existing resources before creating to prevent duplicates
-  - Creates Admin Security Role with name `${orgSlug}-Admin` (globally unique with all permissions enabled)
+  - **Three Default Roles**: Creates Admin, Manager, and User roles for each organization
+    - Admin: Full permissions including system/security settings
+    - Manager: Project management permissions (no system/security access)
+    - User: Basic access (no admin capabilities, limited project visibility)
   - Creates Admin User with username `${orgSlug}-admin` linked to Admin role
   - **Secure Random Passwords**: Generates cryptographically secure random password for each admin user
   - **Email Uniqueness Handling**: Implements retry logic with fallback emails when contact email already exists
@@ -67,7 +78,7 @@ Preferred communication style: Simple, everyday language.
   - Creates default "CMIS Integration" initiative owned by Admin User
   - **Admin Credentials in API Response**: Returns admin username and password to Super Admin in create organization response
   - Seeding failures are logged but don't block organization creation
-  - Implementation in `server/routes.ts` lines 1070-1232 (seedNewOrganization function)
+  - Implementation in `server/routes.ts` lines 1068-1240 (seedNewOrganization function)
 - **Organization Deletion**: DELETE /api/super-admin/organizations/:id endpoint
   - Protected by requireSuperAdminAuth middleware (line 2140)
   - Prevents deletion of default organization
