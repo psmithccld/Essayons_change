@@ -2008,9 +2008,10 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(projects.ownerId, userId), eq(projects.organizationId, organizationId)))
       .orderBy(desc(projects.createdAt));
     
-    // Get projects where user has assignments
+    // Get projects where user has assignments (SECURITY: filter by organization)
     const assignedProjects = await db.select({
       id: projects.id,
+      organizationId: projects.organizationId,
       name: projects.name,
       description: projects.description,
       status: projects.status,
@@ -2036,7 +2037,10 @@ export class DatabaseStorage implements IStorage {
     })
       .from(projects)
       .innerJoin(userInitiativeAssignments, eq(userInitiativeAssignments.projectId, projects.id))
-      .where(eq(userInitiativeAssignments.userId, userId));
+      .where(and(
+        eq(userInitiativeAssignments.userId, userId),
+        eq(projects.organizationId, organizationId)
+      ));
 
     // Combine and deduplicate projects
     const allProjects = [...userProjects];

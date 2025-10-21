@@ -4580,10 +4580,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Users
-  app.get("/api/users", requireAuthAndOrg, async (req, res) => {
+  app.get("/api/users", requireAuthAndOrg, async (req: AuthenticatedRequest, res) => {
     try {
-      const users = await storage.getUsers();
-      res.json(users);
+      const organizationId = req.user.currentOrganizationId;
+      
+      // SECURITY: Only return users who are members of the current organization
+      const members = await storage.getOrganizationMembers(organizationId);
+      const userIds = members.map(m => m.userId);
+      
+      // Fetch full user details for organization members only
+      const allUsers = await storage.getUsers();
+      const orgUsers = allUsers.filter(user => userIds.includes(user.id));
+      
+      res.json(orgUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ error: "Failed to fetch users" });
