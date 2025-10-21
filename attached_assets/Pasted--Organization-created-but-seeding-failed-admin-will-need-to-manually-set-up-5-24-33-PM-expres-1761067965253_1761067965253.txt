@@ -1,0 +1,137 @@
+⚠️  Organization created but seeding failed - admin will need to manually set up
+5:24:33 PM [express] POST /api/super-admin/organizations 201 in 25ms :: {"id":"4d4a48cb-602c-4733-84…
+5:24:34 PM [express] GET /api/super-admin/organizations 200 in 436ms :: [{"id":"4d4a48cb-602c-4733-8…
+Super admin Essayon6 created active subscription for organization: Dan Rausch Test Environment
+Super admin Essayon6 updated organization: Dan Rausch Test Environment (4d4a48cb-602c-4733-84c3-c7f79788f626)
+5:24:44 PM [express] PUT /api/super-admin/organizations/4d4a48cb-602c-4733-84c3-c7f79788f626 200 in …
+5:24:44 PM [express] GET /api/super-admin/organizations 200 in 351ms :: [{"id":"4d4a48cb-602c-4733-8…
+5:25:04 PM [express] GET /api/super-admin/organizations 200 in 499ms :: [{"id":"4d4a48cb-602c-4733-8…
+     ==> Detected service running on port 10000
+     ==> Docs on specifying a port: https://render.com/docs/web-services#port-binding
+Error fetching organization roles: error: column "organization_id" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:10912:24 {
+  length: 115,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '14',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+5:25:52 PM [express] GET /api/super-admin/organizations/4d4a48cb-602c-4733-84c3-c7f79788f626/roles 5…
+Error fetching organization roles: error: column "organization_id" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async file:///opt/render/project/src/dist/index.js:10912:24 {
+  length: 115,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '14',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+5:27:15 PM [express] GET /api/super-admin/organizations/f4eebcd6-b0cd-4c25-9840-579f8e7b4515/roles 5…
+5:27:23 PM [express] GET /api/auth/status 401 in 10ms :: {"error":"Not authenticated"}
+5:27:23 PM [express] GET /api/projects 401 in 1ms :: {"error":"Authentication required. Please log i…
+Error during login: error: column "organization_id" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getRole (file:///opt/render/project/src/dist/index.js:2401:24)
+    at async file:///opt/render/project/src/dist/index.js:10393:20 {
+  length: 115,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '14',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+5:27:29 PM [express] POST /api/auth/login 500 in 61ms :: {"error":"Login failed"}
+5:28:28 PM [express] GET /api/projects 401 in 16ms :: {"error":"Authentication required. Please log …
+5:28:28 PM [express] GET /api/auth/status 401 in 15ms :: {"error":"Not authenticated"}
+Error during login: error: column "organization_id" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getRole (file:///opt/render/project/src/dist/index.js:2401:24)
+    at async file:///opt/render/project/src/dist/index.js:10393:20 {
+  length: 115,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '14',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+5:28:34 PM [express] POST /api/auth/login 500 in 59ms :: {"error":"Login failed"}
+Error during login: error: column "organization_id" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getRole (file:///opt/render/project/src/dist/index.js:2401:24)
+    at async file:///opt/render/project/src/dist/index.js:10393:20 {
+  length: 115,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '14',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+5:28:54 PM [express] POST /api/auth/login 500 in 70ms :: {"error":"Login failed"}
