@@ -47,6 +47,7 @@ interface PlatformUser {
   isActive: boolean;
   createdAt: string;
   lastLoginAt?: string;
+  isSuperAdmin: boolean;
   organizations: {
     id: string;
     name: string;
@@ -100,8 +101,15 @@ const createUserSchema = z.object({
   path: ["confirmPassword"]
 });
 
+const editUserSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Valid email is required"),
+});
+
 type AssignUserFormData = z.infer<typeof assignUserSchema>;
 type CreateUserFormData = z.infer<typeof createUserSchema>;
+type EditUserFormData = z.infer<typeof editUserSchema>;
 
 export default function SuperAdminUsers() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -111,6 +119,8 @@ export default function SuperAdminUsers() {
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<PlatformUser | null>(null);
   const { toast } = useToast();
 
   // Fetch platform users
@@ -253,6 +263,104 @@ export default function SuperAdminUsers() {
     },
   });
 
+  // Edit user mutation
+  const editUserMutation = useMutation({
+    mutationFn: async ({ userId, data, isSuperAdmin }: { userId: string; data: { name: string; email: string; username: string }; isSuperAdmin: boolean }) => {
+      const response = await fetch(`/api/super-admin/users/${userId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: 'include',
+        body: JSON.stringify({ ...data, isSuperAdmin }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update user");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/users"] });
+      setIsEditDialogOpen(false);
+      editForm.reset();
+      toast({
+        title: "Success",
+        description: "User updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async ({ userId, isSuperAdmin }: { userId: string; isSuperAdmin: boolean }) => {
+      const response = await fetch(`/api/super-admin/users/${userId}?isSuperAdmin=${isSuperAdmin}`, {
+        method: "DELETE",
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete user");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/users"] });
+      setIsDetailDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Toggle user active status mutation
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ userId, isSuperAdmin }: { userId: string; isSuperAdmin: boolean }) => {
+      const response = await fetch(`/api/super-admin/users/${userId}/toggle-active`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: 'include',
+        body: JSON.stringify({ isSuperAdmin }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to toggle user status");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/users"] });
+      toast({
+        title: "Success",
+        description: "User status updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Forms
   const assignForm = useForm<AssignUserFormData>({
     resolver: zodResolver(assignUserSchema),
@@ -276,6 +384,15 @@ export default function SuperAdminUsers() {
       isAdmin: false,
       roleId: "",
       isSuperAdmin: false,
+    },
+  });
+
+  const editForm = useForm<EditUserFormData>({
+    resolver: zodResolver(editUserSchema),
+    defaultValues: {
+      name: "",
+      username: "",
+      email: "",
     },
   });
 
@@ -318,6 +435,31 @@ export default function SuperAdminUsers() {
   const handleRemoveUserFromOrg = (userId: string, organizationId: string, orgName: string) => {
     if (confirm(`Remove user from ${orgName}? This action cannot be undone.`)) {
       removeUserMutation.mutate({ organizationId, userId });
+    }
+  };
+
+  const handleEditUser = (user: PlatformUser) => {
+    setUserToEdit(user);
+    editForm.reset({
+      name: user.name,
+      username: user.username,
+      email: user.email,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteUser = (user: PlatformUser) => {
+    const confirmMsg = `Are you sure you want to delete ${user.name}? This action cannot be undone.`;
+    if (confirm(confirmMsg)) {
+      deleteUserMutation.mutate({ userId: user.id, isSuperAdmin: user.isSuperAdmin });
+    }
+  };
+
+  const handleToggleActive = (user: PlatformUser) => {
+    const action = user.isActive ? 'deactivate' : 'activate';
+    const confirmMsg = `Are you sure you want to ${action} ${user.name}?`;
+    if (confirm(confirmMsg)) {
+      toggleActiveMutation.mutate({ userId: user.id, isSuperAdmin: user.isSuperAdmin });
     }
   };
 
@@ -863,11 +1005,37 @@ export default function SuperAdminUsers() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => handleEditUser(user)}
+                      data-testid={`button-edit-user-${user.id}`}
+                    >
+                      <Settings className="h-3 w-3 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant={user.isActive ? "outline" : "default"}
+                      size="sm"
+                      onClick={() => handleToggleActive(user)}
+                      data-testid={`button-toggle-active-${user.id}`}
+                      disabled={toggleActiveMutation.isPending}
+                    >
+                      {user.isActive ? "Deactivate" : "Activate"}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteUser(user)}
+                      data-testid={`button-delete-user-${user.id}`}
+                      disabled={deleteUserMutation.isPending}
+                    >
+                      Delete
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleViewUserDetails(user)}
                       data-testid={`button-view-user-${user.id}`}
                     >
-                      <Settings className="h-3 w-3 mr-1" />
-                      Details
+                      <Settings className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
@@ -952,6 +1120,83 @@ export default function SuperAdminUsers() {
                 )}
               </div>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update user details for {userToEdit?.name}
+            </DialogDescription>
+          </DialogHeader>
+          {userToEdit && (
+            <Form {...editForm}>
+              <form 
+                onSubmit={editForm.handleSubmit((data) => {
+                  editUserMutation.mutate({ userId: userToEdit.id, data, isSuperAdmin: userToEdit.isSuperAdmin });
+                })} 
+                className="space-y-4"
+              >
+                <FormField
+                  control={editForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="John Doe" data-testid="input-edit-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="johndoe" data-testid="input-edit-username" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="email" placeholder="john@example.com" data-testid="input-edit-email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsEditDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={editUserMutation.isPending} data-testid="button-submit-edit">
+                    {editUserMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
           )}
         </DialogContent>
       </Dialog>

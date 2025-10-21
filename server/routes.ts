@@ -2705,14 +2705,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Super Admin User Management Endpoints
   
-  // GET /api/super-admin/users - List all platform users with organization memberships
+  // GET /api/super-admin/users - List all platform users and super admin users
   app.get("/api/super-admin/users", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
     try {
+      // Get all platform users with their organization memberships
       const platformUsers = await storage.getAllPlatformUsers();
-      res.json(platformUsers);
+      
+      // Add isSuperAdmin flag to platform users
+      const platformUsersWithFlag = platformUsers.map(user => ({
+        ...user,
+        isSuperAdmin: false,
+      }));
+
+      // Get all super admin users
+      const superAdmins = await db.select({
+        id: superAdminUsers.id,
+        username: superAdminUsers.username,
+        name: superAdminUsers.name,
+        email: superAdminUsers.email,
+        isActive: superAdminUsers.isActive,
+        createdAt: superAdminUsers.createdAt,
+        lastLoginAt: superAdminUsers.lastLoginAt,
+      })
+      .from(superAdminUsers)
+      .orderBy(superAdminUsers.createdAt);
+
+      // Add isSuperAdmin flag and empty organizations array to super admin users
+      const superAdminsWithFlag = superAdmins.map(user => ({
+        ...user,
+        isSuperAdmin: true,
+        organizations: [],
+        roleName: 'Super Admin',
+      }));
+
+      // Combine both lists
+      const allUsers = [...platformUsersWithFlag, ...superAdminsWithFlag];
+      
+      res.json(allUsers);
     } catch (error) {
-      console.error("Error fetching platform users:", error);
-      res.status(500).json({ error: "Failed to fetch platform users" });
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
     }
   });
 
@@ -3074,6 +3106,304 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error forcing password reset:", error);
       res.status(500).json({ error: "Failed to force password reset" });
+    }
+  });
+
+  // PUT /api/super-admin/users/:id - Update platform user or super admin user details
+  app.put("/api/super-admin/users/:id", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const userId = req.params.id;
+      const { name, email, username, isSuperAdmin } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+
+      // Validate that at least one field is being updated
+      if (!name && !email && !username) {
+        return res.status(400).json({ error: "At least one field (name, email, or username) must be provided" });
+      }
+
+      // Check if this is a super admin user or platform user
+      if (isSuperAdmin) {
+        // Update super admin user
+        const [existingSuperAdmin] = await db.select()
+          .from(superAdminUsers)
+          .where(eq(superAdminUsers.id, userId))
+          .limit(1);
+
+        if (!existingSuperAdmin) {
+          return res.status(404).json({ error: "Super admin user not found" });
+        }
+
+        // Check for duplicate username if username is being changed
+        if (username && username !== existingSuperAdmin.username) {
+          const [duplicateUsername] = await db.select()
+            .from(superAdminUsers)
+            .where(eq(superAdminUsers.username, username))
+            .limit(1);
+          
+          if (duplicateUsername) {
+            return res.status(409).json({ error: "Username already exists" });
+          }
+        }
+
+        // Check for duplicate email if email is being changed
+        if (email && email !== existingSuperAdmin.email) {
+          const [duplicateEmail] = await db.select()
+            .from(superAdminUsers)
+            .where(eq(superAdminUsers.email, email))
+            .limit(1);
+          
+          if (duplicateEmail) {
+            return res.status(409).json({ error: "Email already exists" });
+          }
+        }
+
+        // Update super admin user
+        const [updatedSuperAdmin] = await db.update(superAdminUsers)
+          .set({
+            name: name || existingSuperAdmin.name,
+            email: email || existingSuperAdmin.email,
+            username: username || existingSuperAdmin.username,
+          })
+          .where(eq(superAdminUsers.id, userId))
+          .returning();
+
+        console.log(`✓ Super admin ${req.superAdminUser!.username} updated super admin user: ${updatedSuperAdmin.username}`);
+
+        return res.json({
+          id: updatedSuperAdmin.id,
+          name: updatedSuperAdmin.name,
+          username: updatedSuperAdmin.username,
+          email: updatedSuperAdmin.email,
+          isActive: updatedSuperAdmin.isActive,
+          isSuperAdmin: true,
+        });
+      } else {
+        // Update platform user
+        const [existingUser] = await db.select()
+          .from(users)
+          .where(eq(users.id, userId))
+          .limit(1);
+
+        if (!existingUser) {
+          return res.status(404).json({ error: "Platform user not found" });
+        }
+
+        // Check for duplicate username if username is being changed
+        if (username && username !== existingUser.username) {
+          const [duplicateUsername] = await db.select()
+            .from(users)
+            .where(eq(users.username, username))
+            .limit(1);
+          
+          if (duplicateUsername) {
+            return res.status(409).json({ error: "Username already exists" });
+          }
+
+          // Also check super admin users to prevent reserved username
+          const [reservedUsername] = await db.select()
+            .from(superAdminUsers)
+            .where(eq(superAdminUsers.username, username))
+            .limit(1);
+          
+          if (reservedUsername) {
+            return res.status(409).json({ error: "Username is reserved and cannot be used" });
+          }
+        }
+
+        // Check for duplicate email if email is being changed
+        if (email && email !== existingUser.email) {
+          const [duplicateEmail] = await db.select()
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1);
+          
+          if (duplicateEmail) {
+            return res.status(409).json({ error: "Email already exists" });
+          }
+        }
+
+        // Update platform user
+        const [updatedUser] = await db.update(users)
+          .set({
+            name: name || existingUser.name,
+            email: email || existingUser.email,
+            username: username || existingUser.username,
+          })
+          .where(eq(users.id, userId))
+          .returning();
+
+        console.log(`✓ Super admin ${req.superAdminUser!.username} updated platform user: ${updatedUser.username}`);
+
+        return res.json({
+          id: updatedUser.id,
+          name: updatedUser.name,
+          username: updatedUser.username,
+          email: updatedUser.email,
+          isActive: updatedUser.isActive,
+          isSuperAdmin: false,
+        });
+      }
+    } catch (error: any) {
+      console.error("ERROR updating user:", error);
+
+      // Handle database errors
+      if (error.code === '23505') {
+        if (error.constraint?.includes('username')) {
+          return res.status(409).json({ error: "Username already exists" });
+        } else if (error.constraint?.includes('email')) {
+          return res.status(409).json({ error: "Email already exists" });
+        }
+      }
+
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // POST /api/super-admin/users/:userId/toggle-active - Toggle user active status
+  app.post("/api/super-admin/users/:userId/toggle-active", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const userId = req.params.userId;
+      const { isSuperAdmin } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+
+      // Prevent self-deactivation
+      if (userId === req.superAdminUser!.id) {
+        return res.status(400).json({ error: "Cannot deactivate your own account" });
+      }
+
+      if (isSuperAdmin) {
+        // Toggle super admin user status
+        const [existingSuperAdmin] = await db.select()
+          .from(superAdminUsers)
+          .where(eq(superAdminUsers.id, userId))
+          .limit(1);
+
+        if (!existingSuperAdmin) {
+          return res.status(404).json({ error: "Super admin user not found" });
+        }
+
+        const newStatus = !existingSuperAdmin.isActive;
+
+        await db.update(superAdminUsers)
+          .set({ isActive: newStatus })
+          .where(eq(superAdminUsers.id, userId));
+
+        console.log(`✓ Super admin ${req.superAdminUser!.username} ${newStatus ? 'activated' : 'deactivated'} super admin user: ${existingSuperAdmin.username}`);
+
+        return res.json({ 
+          message: `User ${newStatus ? 'activated' : 'deactivated'} successfully`,
+          isActive: newStatus 
+        });
+      } else {
+        // Toggle platform user status
+        const [existingUser] = await db.select()
+          .from(users)
+          .where(eq(users.id, userId))
+          .limit(1);
+
+        if (!existingUser) {
+          return res.status(404).json({ error: "Platform user not found" });
+        }
+
+        const newStatus = !existingUser.isActive;
+
+        await db.update(users)
+          .set({ isActive: newStatus })
+          .where(eq(users.id, userId));
+
+        console.log(`✓ Super admin ${req.superAdminUser!.username} ${newStatus ? 'activated' : 'deactivated'} platform user: ${existingUser.username}`);
+
+        return res.json({ 
+          message: `User ${newStatus ? 'activated' : 'deactivated'} successfully`,
+          isActive: newStatus 
+        });
+      }
+    } catch (error) {
+      console.error("Error toggling user status:", error);
+      res.status(500).json({ error: "Failed to toggle user status" });
+    }
+  });
+
+  // DELETE /api/super-admin/users/:id - Delete platform user or super admin user
+  app.delete("/api/super-admin/users/:id", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const userId = req.params.id;
+      const { isSuperAdmin } = req.query;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+
+      // Prevent self-deletion
+      if (userId === req.superAdminUser!.id) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+
+      if (isSuperAdmin === 'true') {
+        // Delete super admin user
+        const [existingSuperAdmin] = await db.select()
+          .from(superAdminUsers)
+          .where(eq(superAdminUsers.id, userId))
+          .limit(1);
+
+        if (!existingSuperAdmin) {
+          return res.status(404).json({ error: "Super admin user not found" });
+        }
+
+        await db.delete(superAdminUsers)
+          .where(eq(superAdminUsers.id, userId));
+
+        console.log(`✓ Super admin ${req.superAdminUser!.username} deleted super admin user: ${existingSuperAdmin.username}`);
+
+        return res.json({ message: "Super admin user deleted successfully" });
+      } else {
+        // Delete platform user
+        const [existingUser] = await db.select()
+          .from(users)
+          .where(eq(users.id, userId))
+          .limit(1);
+
+        if (!existingUser) {
+          return res.status(404).json({ error: "Platform user not found" });
+        }
+
+        // Check if user is the owner of any organizations
+        const ownedOrganizations = await db.select()
+          .from(organizations)
+          .where(eq(organizations.ownerUserId, userId))
+          .limit(1);
+
+        if (ownedOrganizations.length > 0) {
+          return res.status(400).json({ 
+            error: "Cannot delete user who owns organizations. Please reassign ownership first." 
+          });
+        }
+
+        // Delete user (organization memberships will cascade delete)
+        await db.delete(users)
+          .where(eq(users.id, userId));
+
+        console.log(`✓ Super admin ${req.superAdminUser!.username} deleted platform user: ${existingUser.username}`);
+
+        return res.json({ message: "Platform user deleted successfully" });
+      }
+    } catch (error: any) {
+      console.error("ERROR deleting user:", error);
+
+      // Handle foreign key constraint errors
+      if (error.code === '23503') {
+        return res.status(400).json({ 
+          error: "Cannot delete user due to existing dependencies. Please remove all associations first." 
+        });
+      }
+
+      res.status(500).json({ error: "Failed to delete user" });
     }
   });
 
