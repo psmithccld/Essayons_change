@@ -1,0 +1,130 @@
+Added 2 chunks from surveys.md to vector store
+Successfully loaded 9 document chunks into vector store
+Vector store initialized: {
+  totalDocuments: 9,
+  filesCounts: {
+    'communications.md': 2,
+    'framework.md': 3,
+    'scoring.md': 2,
+    'surveys.md': 2
+  },
+  sources: { knowledge_base: 9 }
+}
+Startup: ✅ Vector store initialization complete
+Startup: ✅ Server initialization complete
+12:27:17 PM [express] GET /api/notifications/unread-count 304 in 195ms :: {"count":0}
+12:27:17 PM [express] GET /api/notifications 304 in 198ms :: {"notifications":[],"total":0}
+12:27:26 PM [express] GET /api/users/me/permissions 304 in 11ms :: {"user":{"id":"cca94cb5-5de9-4780-…
+12:27:39 PM [express] GET /api/users/with-roles 304 in 63ms :: [{"id":"cca94cb5-5de9-4780-85b3-a24e5b…
+12:27:44 PM [express] POST /api/users 201 in 232ms :: {"id":"88530127-f484-47e7-bde1-7eb747ddf1ca","u…
+12:27:44 PM [express] GET /api/users/with-roles 304 in 12ms :: [{"id":"cca94cb5-5de9-4780-85b3-a24e5b…
+12:27:47 PM [express] GET /api/notifications/unread-count 304 in 9ms :: {"count":0}
+12:27:47 PM [express] GET /api/notifications 304 in 22ms :: {"notifications":[],"total":0}
+12:27:52 PM [express] GET /api/auth/status 304 in 7ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24e5…
+12:27:52 PM [express] GET /api/projects 200 in 12ms :: [{"id":"cb57ee2c-3b91-4a4d-8a30-8a474638a72b",…
+12:27:53 PM [express] GET /api/organization/features 304 in 599ms :: {"reports":true,"gptCoach":true,…
+12:27:53 PM [express] GET /api/notifications 304 in 707ms :: {"notifications":[],"total":0}
+12:27:53 PM [express] GET /api/notifications/unread-count 304 in 103ms :: {"count":0}
+12:27:53 PM [express] GET /api/users/me/permissions 304 in 703ms :: {"user":{"id":"cca94cb5-5de9-4780…
+12:27:53 PM [express] GET /api/roles 304 in 48ms :: [{"id":"0ef4b6a7-f964-48e8-aedf-0fe1602254be","or…
+12:27:53 PM [express] GET /api/users/with-roles 304 in 47ms :: [{"id":"cca94cb5-5de9-4780-85b3-a24e5b…
+12:27:53 PM [express] GET /api/user-groups 304 in 47ms :: []
+12:28:09 PM [express] GET /api/my/initiatives 200 in 439ms :: []
+12:28:09 PM [express] GET /api/my/dashboard-metrics 200 in 608ms :: {"activeInitiatives":0,"pendingSu…
+12:28:23 PM [express] GET /api/users/me/permissions 304 in 300ms :: {"user":{"id":"cca94cb5-5de9-4780…
+12:28:23 PM [express] GET /api/notifications 304 in 622ms :: {"notifications":[],"total":0}
+12:28:23 PM [express] GET /api/notifications/unread-count 304 in 106ms :: {"count":0}
+12:28:42 PM [express] GET /api/users/with-roles 304 in 52ms :: [{"id":"cca94cb5-5de9-4780-85b3-a24e5b…
+Error creating user: error: duplicate key value violates unique constraint "users_username_unique"
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.createUser (file:///opt/render/project/src/dist/index.js:2445:24)
+    at async file:///opt/render/project/src/dist/index.js:14813:20 {
+  length: 213,
+  severity: 'ERROR',
+  code: '23505',
+  detail: 'Key (username)=(ISmith) already exists.',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'users',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'users_username_unique',
+  file: 'nbtinsert.c',
+  line: '666',
+  routine: '_bt_check_unique'
+}
+12:28:46 PM [express] POST /api/users 400 in 230ms :: {"error":"Failed to create user"}
+Error creating user: error: duplicate key value violates unique constraint "users_username_unique"
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.createUser (file:///opt/render/project/src/dist/index.js:2445:24)
+    at async file:///opt/render/project/src/dist/index.js:14813:20 {
+  length: 213,
+  severity: 'ERROR',
+  code: '23505',
+  detail: 'Key (username)=(ISmith) already exists.',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'users',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'users_username_unique',
+  file: 'nbtinsert.c',
+  line: '666',
+  routine: '_bt_check_unique'
+}
+12:28:49 PM [express] POST /api/users 400 in 298ms :: {"error":"Failed to create user"}
+12:28:54 PM [express] GET /api/notifications/unread-count 304 in 143ms :: {"count":0}
+12:28:55 PM [express] GET /api/notifications 304 in 251ms :: {"notifications":[],"total":0}
+12:29:12 PM [express] GET /api/users/with-roles 304 in 39ms :: [{"id":"cca94cb5-5de9-4780-85b3-a24e5b…
+12:29:13 PM [express] GET /api/projects 200 in 11ms :: [{"id":"cb57ee2c-3b91-4a4d-8a30-8a474638a72b",…
+12:29:13 PM [express] GET /api/auth/status 200 in 4ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24e5…
+12:29:14 PM [express] GET /api/users/me/permissions 200 in 693ms :: {"user":{"id":"cca94cb5-5de9-4780…
+12:29:15 PM [express] GET /api/roles 200 in 356ms :: [{"id":"0ef4b6a7-f964-48e8-aedf-0fe1602254be","o…
+12:29:15 PM [express] GET /api/notifications/unread-count 200 in 1099ms :: {"count":0}
+12:29:15 PM [express] GET /api/organization/features 200 in 702ms :: {"reports":true,"gptCoach":true,…
+12:29:15 PM [express] GET /api/users/with-roles 200 in 548ms :: [{"id":"cca94cb5-5de9-4780-85b3-a24e5…
+12:29:15 PM [express] GET /api/notifications 200 in 1098ms :: {"notifications":[],"total":0}
+12:29:15 PM [express] GET /api/user-groups 200 in 514ms :: []
+12:29:44 PM [express] GET /api/users/me/permissions 304 in 46ms :: {"user":{"id":"cca94cb5-5de9-4780-…
+12:29:45 PM [express] GET /api/notifications/unread-count 304 in 7ms :: {"count":0}
+12:29:45 PM [express] GET /api/notifications 304 in 19ms :: {"notifications":[],"total":0}
+12:29:45 PM [express] GET /api/users/with-roles 304 in 42ms :: [{"id":"cca94cb5-5de9-4780-85b3-a24e5b…
+Error creating user: error: duplicate key value violates unique constraint "users_username_unique"
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.createUser (file:///opt/render/project/src/dist/index.js:2445:24)
+    at async file:///opt/render/project/src/dist/index.js:14813:20 {
+  length: 213,
+  severity: 'ERROR',
+  code: '23505',
+  detail: 'Key (username)=(ISmith) already exists.',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'users',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'users_username_unique',
+  file: 'nbtinsert.c',
+  line: '666',
+  routine: '_bt_check_unique'
+}
+12:29:51 PM [express] POST /api/users 400 in 234ms :: {"error":"Failed to create user"}
+12:30:16 PM [express] GET /api/notifications/unread-count 304 in 205ms :: {"count":0}
+12:30:16 PM [express] GET /api/notifications 304 in 265ms :: {"notifications":[],"total":0}
