@@ -1,0 +1,80 @@
+}
+12:29:51 PM [express] POST /api/users 400 in 234ms :: {"error":"Failed to create user"}
+12:30:16 PM [express] GET /api/notifications/unread-count 304 in 205ms :: {"count":0}
+12:30:16 PM [express] GET /api/notifications 304 in 265ms :: {"notifications":[],"total":0}
+12:30:45 PM [express] GET /api/users/me/permissions 304 in 86ms :: {"user":{"id":"cca94cb5-5de9-4780-…
+12:30:45 PM [express] GET /api/users/with-roles 304 in 13ms :: [{"id":"cca94cb5-5de9-4780-85b3-a24e5b…
+12:30:46 PM [express] GET /api/notifications/unread-count 304 in 8ms :: {"count":0}
+12:30:46 PM [express] GET /api/notifications 304 in 19ms :: {"notifications":[],"total":0}
+12:31:17 PM [express] GET /api/notifications/unread-count 304 in 232ms :: {"count":0}
+12:31:17 PM [express] GET /api/notifications 304 in 242ms :: {"notifications":[],"total":0}
+12:31:48 PM [express] GET /api/notifications/unread-count 304 in 238ms :: {"count":0}
+12:31:48 PM [express] GET /api/notifications 304 in 201ms :: {"notifications":[],"total":0}
+     ==> Detected service running on port 10000
+     ==> Docs on specifying a port: https://render.com/docs/web-services#port-binding
+12:32:19 PM [express] GET /api/notifications 304 in 269ms :: {"notifications":[],"total":0}
+12:32:19 PM [express] GET /api/notifications/unread-count 304 in 205ms :: {"count":0}
+12:32:24 PM [express] GET /api/users/me/permissions 304 in 12ms :: {"user":{"id":"cca94cb5-5de9-4780-…
+Error creating user: error: duplicate key value violates unique constraint "users_username_unique"
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.createUser (file:///opt/render/project/src/dist/index.js:2445:24)
+    at async file:///opt/render/project/src/dist/index.js:14813:20 {
+  length: 213,
+  severity: 'ERROR',
+  code: '23505',
+  detail: 'Key (username)=(ISmith) already exists.',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'users',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'users_username_unique',
+  file: 'nbtinsert.c',
+  line: '666',
+  routine: '_bt_check_unique'
+}
+12:32:27 PM [express] POST /api/users 400 in 236ms :: {"error":"Failed to create user"}
+12:32:33 PM [express] GET /api/auth/status 200 in 16ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24e…
+12:32:33 PM [express] GET /api/projects 200 in 25ms :: [{"id":"cb57ee2c-3b91-4a4d-8a30-8a474638a72b",…
+12:32:34 PM [express] GET /api/organization/features 200 in 400ms :: {"reports":true,"gptCoach":true,…
+12:32:34 PM [express] GET /api/notifications 200 in 599ms :: {"notifications":[],"total":0}
+12:32:34 PM [express] GET /api/users/me/permissions 200 in 101ms :: {"user":{"id":"cca94cb5-5de9-4780…
+12:32:34 PM [express] GET /api/notifications/unread-count 200 in 11ms :: {"count":0}
+12:32:34 PM [express] GET /api/roles 200 in 26ms :: [{"id":"0ef4b6a7-f964-48e8-aedf-0fe1602254be","or…
+12:32:34 PM [express] GET /api/user-groups 200 in 124ms :: []
+12:32:34 PM [express] GET /api/users/with-roles 200 in 149ms :: [{"id":"cca94cb5-5de9-4780-85b3-a24e5…
+Error creating user: error: duplicate key value violates unique constraint "users_username_unique"
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.createUser (file:///opt/render/project/src/dist/index.js:2445:24)
+    at async file:///opt/render/project/src/dist/index.js:14813:20 {
+  length: 213,
+  severity: 'ERROR',
+  code: '23505',
+  detail: 'Key (username)=(ISmith) already exists.',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'users',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'users_username_unique',
+  file: 'nbtinsert.c',
+  line: '666',
+  routine: '_bt_check_unique'
+}
+12:33:00 PM [express] POST /api/users 400 in 301ms :: {"error":"Failed to create user"}
+12:33:04 PM [express] GET /api/users/me/permissions 304 in 241ms :: {"user":{"id":"cca94cb5-5de9-4780…
+12:33:04 PM [express] GET /api/notifications 304 in 250ms :: {"notifications":[],"total":0}
+12:33:04 PM [express] GET /api/notifications/unread-count 304 in 331ms :: {"count":0}
+12:33:04 PM [express] GET /api/users/with-roles 304 in 106ms :: [{"id":"cca94cb5-5de9-4780-85b3-a24e5…
