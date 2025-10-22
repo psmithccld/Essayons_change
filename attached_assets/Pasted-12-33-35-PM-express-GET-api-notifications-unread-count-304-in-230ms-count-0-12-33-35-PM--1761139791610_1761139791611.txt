@@ -1,0 +1,110 @@
+12:33:35 PM [express] GET /api/notifications/unread-count 304 in 230ms :: {"count":0}
+12:33:35 PM [express] GET /api/notifications 304 in 107ms :: {"notifications":[],"total":0}
+12:34:05 PM [express] GET /api/notifications/unread-count 304 in 110ms :: {"count":0}
+12:34:06 PM [express] GET /api/notifications 304 in 276ms :: {"notifications":[],"total":0}
+12:34:37 PM [express] GET /api/notifications 304 in 352ms :: {"notifications":[],"total":0}
+12:34:37 PM [express] GET /api/notifications/unread-count 304 in 300ms :: {"count":0}
+12:35:08 PM [express] GET /api/notifications/unread-count 304 in 207ms :: {"count":0}
+12:35:08 PM [express] GET /api/notifications 304 in 202ms :: {"notifications":[],"total":0}
+12:35:39 PM [express] GET /api/notifications/unread-count 304 in 361ms :: {"count":0}
+12:35:39 PM [express] GET /api/notifications 304 in 294ms :: {"notifications":[],"total":0}
+12:36:10 PM [express] GET /api/notifications/unread-count 304 in 295ms :: {"count":0}
+12:36:10 PM [express] GET /api/notifications 304 in 374ms :: {"notifications":[],"total":0}
+12:36:41 PM [express] GET /api/notifications/unread-count 304 in 289ms :: {"count":0}
+12:36:41 PM [express] GET /api/notifications 304 in 300ms :: {"notifications":[],"total":0}
+12:37:12 PM [express] GET /api/notifications/unread-count 304 in 670ms :: {"count":0}
+12:37:12 PM [express] GET /api/notifications 304 in 601ms :: {"notifications":[],"total":0}
+12:37:43 PM [express] GET /api/notifications/unread-count 304 in 196ms :: {"count":0}
+12:37:43 PM [express] GET /api/notifications 304 in 207ms :: {"notifications":[],"total":0}
+12:38:14 PM [express] GET /api/notifications 304 in 300ms :: {"notifications":[],"total":0}
+12:38:14 PM [express] GET /api/notifications/unread-count 304 in 206ms :: {"count":0}
+12:38:45 PM [express] GET /api/notifications/unread-count 304 in 275ms :: {"count":0}
+12:38:45 PM [express] GET /api/notifications 304 in 117ms :: {"notifications":[],"total":0}
+12:39:15 PM [express] GET /api/notifications/unread-count 304 in 198ms :: {"count":0}
+12:39:16 PM [express] GET /api/notifications 304 in 206ms :: {"notifications":[],"total":0}
+12:42:23 PM [express] GET /api/notifications/unread-count 304 in 173ms :: {"count":0}
+12:42:23 PM [express] GET /api/notifications 304 in 211ms :: {"notifications":[],"total":0}
+12:42:53 PM [express] GET /api/notifications/unread-count 304 in 113ms :: {"count":0}
+12:42:53 PM [express] GET /api/notifications 304 in 202ms :: {"notifications":[],"total":0}
+12:43:25 PM [express] GET /api/notifications/unread-count 304 in 699ms :: {"count":0}
+12:43:25 PM [express] GET /api/notifications 304 in 803ms :: {"notifications":[],"total":0}
+12:43:55 PM [express] GET /api/notifications/unread-count 304 in 115ms :: {"count":0}
+12:43:55 PM [express] GET /api/notifications 304 in 203ms :: {"notifications":[],"total":0}
+12:44:26 PM [express] GET /api/notifications/unread-count 304 in 206ms :: {"count":0}
+12:44:27 PM [express] GET /api/notifications 304 in 329ms :: {"notifications":[],"total":0}
+12:44:57 PM [express] GET /api/notifications/unread-count 304 in 105ms :: {"count":0}
+12:44:57 PM [express] GET /api/notifications 304 in 211ms :: {"notifications":[],"total":0}
+12:45:28 PM [express] GET /api/notifications/unread-count 304 in 124ms :: {"count":0}
+12:45:28 PM [express] GET /api/notifications 304 in 107ms :: {"notifications":[],"total":0}
+12:45:59 PM [express] GET /api/notifications/unread-count 304 in 203ms :: {"count":0}
+12:46:00 PM [express] GET /api/notifications 304 in 305ms :: {"notifications":[],"total":0}
+12:46:30 PM [express] GET /api/notifications/unread-count 304 in 135ms :: {"count":0}
+12:46:30 PM [express] GET /api/notifications 304 in 206ms :: {"notifications":[],"total":0}
+12:47:02 PM [express] GET /api/notifications/unread-count 304 in 438ms :: {"count":0}
+12:47:02 PM [express] GET /api/notifications 304 in 404ms :: {"notifications":[],"total":0}
+12:47:32 PM [express] GET /api/notifications/unread-count 304 in 205ms :: {"count":0}
+12:47:32 PM [express] GET /api/notifications 304 in 208ms :: {"notifications":[],"total":0}
+12:48:03 PM [express] GET /api/notifications/unread-count 304 in 144ms :: {"count":0}
+12:48:03 PM [express] GET /api/notifications 304 in 242ms :: {"notifications":[],"total":0}
+12:48:34 PM [express] GET /api/notifications/unread-count 304 in 206ms :: {"count":0}
+12:48:34 PM [express] GET /api/notifications 304 in 211ms :: {"notifications":[],"total":0}
+12:49:05 PM [express] GET /api/notifications/unread-count 304 in 207ms :: {"count":0}
+12:49:06 PM [express] GET /api/notifications 304 in 304ms :: {"notifications":[],"total":0}
+12:49:36 PM [express] GET /api/notifications/unread-count 304 in 209ms :: {"count":0}
+12:49:37 PM [express] GET /api/notifications 304 in 303ms :: {"notifications":[],"total":0}
+12:50:08 PM [express] GET /api/notifications 304 in 319ms :: {"notifications":[],"total":0}
+12:50:08 PM [express] GET /api/notifications/unread-count 304 in 308ms :: {"count":0}
+12:50:38 PM [express] GET /api/notifications/unread-count 304 in 203ms :: {"count":0}
+12:50:38 PM [express] GET /api/notifications 304 in 206ms :: {"notifications":[],"total":0}
+12:51:09 PM [express] GET /api/notifications/unread-count 304 in 202ms :: {"count":0}
+12:51:09 PM [express] GET /api/notifications 304 in 202ms :: {"notifications":[],"total":0}
+12:51:40 PM [express] GET /api/notifications/unread-count 304 in 206ms :: {"count":0}
+12:51:40 PM [express] GET /api/notifications 304 in 210ms :: {"notifications":[],"total":0}
+12:52:11 PM [express] GET /api/notifications/unread-count 304 in 169ms :: {"count":0}
+12:52:12 PM [express] GET /api/notifications 304 in 305ms :: {"notifications":[],"total":0}
+12:52:42 PM [express] GET /api/notifications/unread-count 304 in 167ms :: {"count":0}
+12:52:42 PM [express] GET /api/notifications 304 in 199ms :: {"notifications":[],"total":0}
+12:53:03 PM [express] POST /api/auth/logout 200 in 58ms :: {"message":"Logged out successfully"}
+12:53:03 PM [express] GET /api/auth/status 401 in 1ms :: {"error":"Not authenticated"}
+SECURITY: Cleanup completed - Rate limits: 0, Login attempts: 0, Suspicious IPs: 0
+1:28:15 PM [express] POST /api/auth/login 200 in 128ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24…
+1:28:15 PM [express] GET /api/users/me/permissions 304 in 134ms :: {"user":{"id":"cca94cb5-5de9-4780…
+1:28:15 PM [express] GET /api/notifications/unread-count 304 in 292ms :: {"count":0}
+1:28:15 PM [express] GET /api/notifications 304 in 415ms :: {"notifications":[],"total":0}
+1:28:15 PM [express] GET /api/auth/status 200 in 412ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24…
+1:28:15 PM [express] GET /api/auth/status 304 in 5ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24e5…
+1:28:15 PM [express] GET /api/organization/features 304 in 524ms :: {"reports":true,"gptCoach":true,…
+1:28:15 PM [express] GET /api/users/with-roles 200 in 357ms :: [{"id":"cca94cb5-5de9-4780-85b3-a24e5…
+1:28:15 PM [express] GET /api/user-groups 304 in 446ms :: []
+1:28:15 PM [express] GET /api/roles 304 in 504ms :: [{"id":"0ef4b6a7-f964-48e8-aedf-0fe1602254be","o…
+1:28:45 PM [express] GET /api/users/me/permissions 304 in 100ms :: {"user":{"id":"cca94cb5-5de9-4780…
+1:28:45 PM [express] GET /api/notifications/unread-count 304 in 9ms :: {"count":0}
+1:28:45 PM [express] GET /api/notifications 304 in 19ms :: {"notifications":[],"total":0}
+1:28:45 PM [express] GET /api/users/with-roles 304 in 13ms :: [{"id":"cca94cb5-5de9-4780-85b3-a24e5b…
+Error creating user: error: duplicate key value violates unique constraint "users_email_unique"
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.createUser (file:///opt/render/project/src/dist/index.js:2445:24)
+    at async file:///opt/render/project/src/dist/index.js:14813:20 {
+  length: 221,
+  severity: 'ERROR',
+  code: '23505',
+  detail: 'Key (email)=(Isabelle.smith@test.com) already exists.',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'users',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'users_email_unique',
+  file: 'nbtinsert.c',
+  line: '666',
+  routine: '_bt_check_unique'
+}
+1:28:51 PM [express] POST /api/users 400 in 287ms :: {"error":"Failed to create user"}
+1:29:16 PM [express] GET /api/notifications/unread-count 304 in 182ms :: {"count":0}
+1:29:16 PM [express] GET /api/notifications 304 in 279ms :: {"notifications":[],"total":0}
