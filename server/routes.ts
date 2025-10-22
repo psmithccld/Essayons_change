@@ -7213,13 +7213,98 @@ Please provide coaching guidance based on their question and current context.`;
 
   app.post("/api/users", requireAuthAndOrg, requirePermission('canModifyUsers'), async (req, res) => {
     try {
+      const organizationId = req.organizationId!;
+      const { roleId, ...userData } = req.body;
+      
+      // Validate required fields
       const validatedData = insertUserSchema.parse(req.body);
-      const user = await storage.createUser(validatedData);
+      
+      // Determine which role to use
+      let selectedRoleId: string;
+      
+      if (roleId) {
+        // Validate provided role exists and belongs to this organization
+        const [providedRole] = await db.select()
+          .from(roles)
+          .where(and(
+            eq(roles.id, roleId),
+            eq(roles.organizationId, organizationId),
+            eq(roles.isActive, true)
+          ))
+          .limit(1);
+        
+        if (!providedRole) {
+          return res.status(400).json({ error: "Selected role not found or does not belong to this organization" });
+        }
+        
+        selectedRoleId = roleId;
+      } else {
+        // Get default "User" role for this organization
+        const [defaultRole] = await db.select()
+          .from(roles)
+          .where(and(
+            eq(roles.name, 'User'),
+            eq(roles.organizationId, organizationId)
+          ))
+          .limit(1);
+
+        if (!defaultRole) {
+          return res.status(400).json({ 
+            error: "Default 'User' role not found. Please select a role or contact support." 
+          });
+        }
+        
+        selectedRoleId = defaultRole.id;
+      }
+      
+      // Create the user
+      const user = await storage.createUser({
+        ...validatedData,
+        roleId: selectedRoleId,
+        currentOrganizationId: organizationId,
+        isEmailVerified: true, // Users created by admins are auto-verified
+      });
+      
+      // Add user to organization membership
+      try {
+        await db.insert(organizationMemberships).values({
+          organizationId: organizationId,
+          userId: user.id,
+          orgRole: 'member',
+          isActive: true,
+        });
+        
+        console.log(`✓ User ${user.username} created and added to organization ${organizationId}`);
+      } catch (membershipError: any) {
+        // Log error but user is already created
+        console.error(`ERROR: Failed to add user ${user.username} to organization:`, membershipError);
+        
+        // Check if it's a duplicate membership error (user already belongs to org)
+        if (membershipError.code === '23505') {
+          console.warn(`User ${user.username} already has membership in organization ${organizationId}`);
+        } else {
+          // Return error but note that user was created
+          return res.status(500).json({ 
+            error: "User created but failed to add to organization. Please refresh and try again.",
+            userId: user.id 
+          });
+        }
+      }
       
       // User already has passwordHash removed by storage layer
       res.status(201).json(user);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating user:", error);
+      
+      // Handle specific database errors with helpful messages
+      if (error.code === '23505') {
+        if (error.constraint?.includes('username')) {
+          return res.status(409).json({ error: "Username already exists" });
+        } else if (error.constraint?.includes('email')) {
+          return res.status(409).json({ error: "Email already exists" });
+        }
+      }
+      
       res.status(400).json({ error: "Failed to create user" });
     }
   });
