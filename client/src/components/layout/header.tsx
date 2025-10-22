@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Plus, User, Shield, Briefcase, ChevronDown, Settings, Palette, Check, Trash2, UserPlus, AlertTriangle, BarChart3, RefreshCw, Loader2, LogOut, Lock, Eye, EyeOff } from "lucide-react";
+import { Bell, Plus, User, Shield, Briefcase, ChevronDown, Settings, Check, Trash2, UserPlus, AlertTriangle, BarChart3, RefreshCw, Loader2, LogOut, Lock, Eye, EyeOff } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -9,7 +9,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useForm } from "react-hook-form";
@@ -26,16 +25,6 @@ import { z } from "zod";
 import { formatDistanceToNow } from "date-fns";
 
 
-const userSettingsSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email").optional(),
-  role: z.string().optional(),
-  theme: z.enum(["light", "dark", "system"]).default("system"),
-  notifications: z.boolean().default(true),
-  emailNotifications: z.boolean().default(true),
-  autoSave: z.boolean().default(true),
-});
-
 const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
   newPassword: z.string().min(8, "Password must be at least 8 characters"),
@@ -45,7 +34,6 @@ const passwordChangeSchema = z.object({
   path: ["confirmPassword"],
 });
 
-type UserSettingsData = z.infer<typeof userSettingsSchema>;
 type PasswordChangeData = z.infer<typeof passwordChangeSchema>;
 
 export default function Header() {
@@ -184,20 +172,7 @@ export default function Header() {
   });
 
 
-  // User Settings Form
-  const settingsForm = useForm<UserSettingsData>({
-    resolver: zodResolver(userSettingsSchema),
-    defaultValues: {
-      name: user?.name || "",
-      email: user?.username || "",
-      role: "User",
-      theme: "system",
-      notifications: true,
-      emailNotifications: true,
-      autoSave: true,
-    },
-  });
-
+  // Password Change Form
   const passwordForm = useForm<PasswordChangeData>({
     resolver: zodResolver(passwordChangeSchema),
     defaultValues: {
@@ -233,15 +208,6 @@ export default function Header() {
       });
     },
   });
-
-  const onSettingsSubmit = (data: UserSettingsData) => {
-    console.log("Settings updated:", data);
-    toast({
-      title: "Settings Updated",
-      description: "Your preferences have been saved successfully!",
-    });
-    setIsSettingsOpen(false);
-  };
 
   const onPasswordSubmit = (data: PasswordChangeData) => {
     changePasswordMutation.mutate(data);
@@ -522,311 +488,144 @@ export default function Header() {
             </SheetTitle>
           </SheetHeader>
           <div className="mt-6">
-            <Form {...settingsForm}>
-              <form onSubmit={settingsForm.handleSubmit(onSettingsSubmit)} className="space-y-6">
-                {/* Profile Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
-                    <User className="w-4 h-4" />
-                    Profile
-                  </div>
+            {/* Security Section - Change Password */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
+                <Lock className="w-4 h-4" />
+                Change Password
+              </div>
+              
+              <Form {...passwordForm}>
+                <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
                   <FormField
-                    control={settingsForm.control}
-                    name="name"
+                    control={passwordForm.control}
+                    name="currentPassword"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input data-testid="input-settings-name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={settingsForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" data-testid="input-settings-email" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={settingsForm.control}
-                    name="role"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Role</FormLabel>
-                        <FormControl>
-                          <Input data-testid="input-settings-role" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Appearance Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
-                    <Palette className="w-4 h-4" />
-                    Appearance
-                  </div>
-                  <FormField
-                    control={settingsForm.control}
-                    name="theme"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Theme</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormLabel>Current Password</FormLabel>
+                        <div className="relative">
                           <FormControl>
-                            <SelectTrigger data-testid="select-settings-theme">
-                              <SelectValue placeholder="Select theme" />
-                            </SelectTrigger>
+                            <Input 
+                              type={showCurrentPassword ? "text" : "password"}
+                              data-testid="input-current-password"
+                              {...field}
+                            />
                           </FormControl>
-                          <SelectContent>
-                            <SelectItem value="light">Light</SelectItem>
-                            <SelectItem value="dark">Dark</SelectItem>
-                            <SelectItem value="system">System</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                            data-testid="button-toggle-current-password"
+                          >
+                            {showCurrentPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </div>
-
-                {/* Notifications Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
-                    <Bell className="w-4 h-4" />
-                    Notifications
-                  </div>
-                  <FormField
-                    control={settingsForm.control}
-                    name="notifications"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">
-                            Push Notifications
-                          </FormLabel>
-                          <div className="text-sm text-muted-foreground">
-                            Get notified about important updates
-                          </div>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="switch-settings-notifications"
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={settingsForm.control}
-                    name="emailNotifications"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">
-                            Email Notifications
-                          </FormLabel>
-                          <div className="text-sm text-muted-foreground">
-                            Receive updates via email
-                          </div>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="switch-settings-email-notifications"
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={settingsForm.control}
-                    name="autoSave"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">
-                            Auto Save
-                          </FormLabel>
-                          <div className="text-sm text-muted-foreground">
-                            Automatically save your work
-                          </div>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="switch-settings-auto-save"
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Security Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
-                    <Lock className="w-4 h-4" />
-                    Security
-                  </div>
                   
-                  <div className="bg-muted/30 rounded-lg p-4">
-                    <h4 className="text-sm font-medium mb-3">Change Password</h4>
-                    <Form {...passwordForm}>
-                      <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
-                        <FormField
-                          control={passwordForm.control}
-                          name="currentPassword"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Current Password</FormLabel>
-                              <div className="relative">
-                                <FormControl>
-                                  <Input 
-                                    type={showCurrentPassword ? "text" : "password"}
-                                    data-testid="input-current-password"
-                                    {...field}
-                                  />
-                                </FormControl>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                                  data-testid="button-toggle-current-password"
-                                >
-                                  {showCurrentPassword ? (
-                                    <EyeOff className="h-4 w-4" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={passwordForm.control}
-                          name="newPassword"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>New Password</FormLabel>
-                              <div className="relative">
-                                <FormControl>
-                                  <Input 
-                                    type={showNewPassword ? "text" : "password"}
-                                    data-testid="input-new-password"
-                                    {...field}
-                                  />
-                                </FormControl>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                  onClick={() => setShowNewPassword(!showNewPassword)}
-                                  data-testid="button-toggle-new-password"
-                                >
-                                  {showNewPassword ? (
-                                    <EyeOff className="h-4 w-4" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={passwordForm.control}
-                          name="confirmPassword"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Confirm New Password</FormLabel>
-                              <div className="relative">
-                                <FormControl>
-                                  <Input 
-                                    type={showConfirmPassword ? "text" : "password"}
-                                    data-testid="input-confirm-password"
-                                    {...field}
-                                  />
-                                </FormControl>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                  data-testid="button-toggle-confirm-password"
-                                >
-                                  {showConfirmPassword ? (
-                                    <EyeOff className="h-4 w-4" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <Button 
-                          type="submit" 
-                          variant="outline"
-                          disabled={changePasswordMutation.isPending}
-                          data-testid="button-change-password"
-                          className="w-full"
-                        >
-                          {changePasswordMutation.isPending ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Changing Password...
-                            </>
-                          ) : (
-                            "Change Password"
-                          )}
-                        </Button>
-                      </form>
-                    </Form>
+                  <FormField
+                    control={passwordForm.control}
+                    name="newPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>New Password</FormLabel>
+                        <div className="relative">
+                          <FormControl>
+                            <Input 
+                              type={showNewPassword ? "text" : "password"}
+                              data-testid="input-new-password"
+                              {...field}
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            data-testid="button-toggle-new-password"
+                          >
+                            {showNewPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={passwordForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm New Password</FormLabel>
+                        <div className="relative">
+                          <FormControl>
+                            <Input 
+                              type={showConfirmPassword ? "text" : "password"}
+                              data-testid="input-confirm-password"
+                              {...field}
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            data-testid="button-toggle-confirm-password"
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="flex gap-2 pt-4">
+                    <Button 
+                      type="submit" 
+                      disabled={changePasswordMutation.isPending}
+                      data-testid="button-change-password"
+                    >
+                      {changePasswordMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Changing Password...
+                        </>
+                      ) : (
+                        "Change Password"
+                      )}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setIsSettingsOpen(false)}
+                      data-testid="button-cancel"
+                    >
+                      Cancel
+                    </Button>
                   </div>
-                </div>
-
-                <div className="flex gap-2 pt-4">
-                  <Button type="submit" data-testid="button-save-settings">
-                    Save Changes
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsSettingsOpen(false)}
-                    data-testid="button-cancel-settings"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </Form>
+                </form>
+              </Form>
+            </div>
           </div>
         </SheetContent>
       </Sheet>
