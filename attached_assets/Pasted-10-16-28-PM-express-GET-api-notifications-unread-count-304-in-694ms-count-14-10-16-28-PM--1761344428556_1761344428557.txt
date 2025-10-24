@@ -1,0 +1,215 @@
+10:16:28 PM [express] GET /api/notifications/unread-count 304 in 694ms :: {"count":14}
+10:16:28 PM [express] GET /api/users/me/permissions 304 in 701ms :: {"user":{"id":"cca94cb5-5de9-4780…
+10:16:28 PM [express] GET /api/notifications 304 in 689ms :: {"notifications":[{"id":"8646b4f3-765d-4…
+10:16:28 PM [express] GET /api/auth/status 304 in 608ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24…
+10:16:28 PM [express] GET /api/organization/features 304 in 695ms :: {"reports":true,"gptCoach":true,…
+[auth-debug] method=GET path=/api/users
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/communication-templates/category/p2p_email
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/communication-templates/category/flyer
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+10:16:31 PM [express] GET /api/users 200 in 14ms :: [{"id":"a3523485-99aa-465f-904f-56504c5e4368","us…
+10:16:31 PM [express] GET /api/communication-templates/category/p2p_email 200 in 21ms :: []
+10:16:31 PM [express] GET /api/communication-templates/category/flyer 200 in 18ms :: []
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+10:16:59 PM [express] GET /api/notifications/unread-count 304 in 228ms :: {"count":14}
+10:16:59 PM [express] GET /api/notifications 304 in 303ms :: {"notifications":[{"id":"8646b4f3-765d-4…
+10:16:59 PM [express] GET /api/users/me/permissions 304 in 212ms :: {"user":{"id":"cca94cb5-5de9-4780…
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+10:17:29 PM [express] GET /api/notifications/unread-count 304 in 48ms :: {"count":14}
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+10:17:29 PM [express] GET /api/notifications 304 in 56ms :: {"notifications":[{"id":"8646b4f3-765d-43…
+10:17:29 PM [express] GET /api/users/me/permissions 304 in 112ms :: {"user":{"id":"cca94cb5-5de9-4780…
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+10:17:59 PM [express] GET /api/notifications/unread-count 304 in 34ms :: {"count":14}
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+10:17:59 PM [express] GET /api/notifications 304 in 47ms :: {"notifications":[{"id":"8646b4f3-765d-43…
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+10:17:59 PM [express] GET /api/users/me/permissions 304 in 33ms :: {"user":{"id":"cca94cb5-5de9-4780-…
+[auth-debug] method=POST path=/api/projects/undefined/communications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+Error creating communication: ZodError: [
+  {
+    "validation": "uuid",
+    "code": "invalid_string",
+    "message": "Invalid uuid",
+    "path": [
+      "projectId"
+    ]
+  }
+]
+    at get error [as error] (file:///opt/render/project/src/node_modules/zod/lib/index.mjs:587:31)
+    at ZodObject.parse (file:///opt/render/project/src/node_modules/zod/lib/index.mjs:663:22)
+    at file:///opt/render/project/src/dist/index.js:13971:55
+    at Layer.handle [as handle_request] (/opt/render/project/src/node_modules/express/lib/router/layer.js:95:5)
+    at next (/opt/render/project/src/node_modules/express/lib/router/route.js:149:13)
+    at requireOrgContext (file:///opt/render/project/src/dist/index.js:9904:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+  issues: [
+    {
+      validation: 'uuid',
+      code: 'invalid_string',
+      message: 'Invalid uuid',
+      path: [Array]
+    }
+  ],
+  addIssue: [Function (anonymous)],
+  addIssues: [Function (anonymous)],
+  errors: [
+    {
+      validation: 'uuid',
+      code: 'invalid_string',
+      message: 'Invalid uuid',
+      path: [Array]
+    }
+  ]
+}
+10:18:12 PM [express] POST /api/projects/undefined/communications 400 in 198ms :: {"error":"Failed to…
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+10:18:29 PM [express] GET /api/notifications/unread-count 304 in 113ms :: {"count":14}
+10:18:29 PM [express] GET /api/notifications 304 in 219ms :: {"notifications":[{"id":"8646b4f3-765d-4…
+[auth-debug] method=POST path=/api/projects/undefined/communications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+Error creating communication: ZodError: [
+  {
+    "validation": "uuid",
+    "code": "invalid_string",
+    "message": "Invalid uuid",
+    "path": [
+      "projectId"
+    ]
+  }
+]
+    at get error [as error] (file:///opt/render/project/src/node_modules/zod/lib/index.mjs:587:31)
+    at ZodObject.parse (file:///opt/render/project/src/node_modules/zod/lib/index.mjs:663:22)
+    at file:///opt/render/project/src/dist/index.js:13971:55
+    at Layer.handle [as handle_request] (/opt/render/project/src/node_modules/express/lib/router/layer.js:95:5)
+    at next (/opt/render/project/src/node_modules/express/lib/router/route.js:149:13)
+    at requireOrgContext (file:///opt/render/project/src/dist/index.js:9904:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+  issues: [
+    {
+      validation: 'uuid',
+      code: 'invalid_string',
+      message: 'Invalid uuid',
+      path: [Array]
+    }
+  ],
+  addIssue: [Function (anonymous)],
+  addIssues: [Function (anonymous)],
+  errors: [
+    {
+      validation: 'uuid',
+      code: 'invalid_string',
+      message: 'Invalid uuid',
+      path: [Array]
+    }
+  ]
+}
+10:18:37 PM [express] POST /api/projects/undefined/communications 400 in 12ms :: {"error":"Failed to …
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+10:19:00 PM [express] GET /api/notifications/unread-count 304 in 212ms :: {"count":14}
+10:19:00 PM [express] GET /api/notifications 304 in 305ms :: {"notifications":[{"id":"8646b4f3-765d-4…
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+10:19:16 PM [express] GET /api/users/me/permissions 304 in 94ms :: {"user":{"id":"cca94cb5-5de9-4780-…
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+10:19:31 PM [express] GET /api/notifications/unread-count 304 in 196ms :: {"count":14}
+10:19:31 PM [express] GET /api/notifications 304 in 264ms :: {"notifications":[{"id":"8646b4f3-765d-4…
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=xMcf8tPbyv0icx0e7v5JX0fa2CKx-cNW
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+10:20:02 PM [express] GET /api/notifications/unread-count 304 in 302ms :: {"count":14}
+10:20:02 PM [express] GET /api/notifications 304 in 306ms :: {"notifications":[{"id":"8646b4f3-765d-4…
