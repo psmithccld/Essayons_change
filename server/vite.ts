@@ -52,7 +52,7 @@ export async function setupVite(app: Express, server: Server) {
         "index.html",
       );
 
-      // always reload the index.html file from disk incase it changes
+      // always reload the index.html file from disk in case it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
@@ -112,10 +112,17 @@ export function serveStatic(app: Express) {
 
     // Ensure the document response is not cached anywhere and cannot be revalidated
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    // Helpful for some edge caches / CDNs that inspect Surrogate-Control
+    res.setHeader("Surrogate-Control", "no-store");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
     try { res.removeHeader("ETag"); } catch (e) {}
     try { res.removeHeader("Last-Modified"); } catch (e) {}
+
+    // Debug log so we can confirm the instance served the HTML shell
+    try {
+      console.info(`[serveStatic] sending index.html (no-store) for ${req.path}`);
+    } catch {}
 
     res.sendFile(indexPath, (err) => {
       if (err) next(err);
