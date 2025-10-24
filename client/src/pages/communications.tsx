@@ -4,6 +4,7 @@ import { FeatureGate } from "@/components/auth/FeatureGate";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -3520,6 +3521,19 @@ export default function Communications() {
   return (
     <FeatureGate feature="communications" redirectTo="/">
       <div className="space-y-6" data-testid="communications-page">
+      
+      {/* Warning Banner when no project is selected */}
+      {!currentProject?.id && (
+        <Alert variant="destructive" data-testid="alert-no-project">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>No Project Selected</AlertTitle>
+          <AlertDescription>
+            Please select a project from the sidebar to create meetings, emails, or other communications. 
+            All communication features are disabled until a project is selected.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
