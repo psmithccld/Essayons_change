@@ -208,6 +208,17 @@ app.use((req, _res, next) => {
   }
 });
 
+// NEW: Prevent caching of the HTML shell (index.html / root)
+// Inserted so clients always fetch the latest index.html and pick up new hashed bundles on deploy.
+app.use((req, res, next) => {
+  if (req.method === "GET" && (req.path === "/" || req.path.endsWith("/index.html"))) {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
+  next();
+});
+
 // ASYNC STARTUP WRAPPER
 (async () => {
   try {
