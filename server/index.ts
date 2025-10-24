@@ -211,8 +211,16 @@ app.use((req, _res, next) => {
 // STRONG: Prevent any caching of the HTML shell (index.html / root)
 // This sets no-store and removes ETag/Last-Modified so the browser will always request
 // and receive a fresh HTML body (avoids accepting 304 and reusing old HTML).
+// This applies to all document requests (Accept: text/html) for SPA routes.
 app.use((req, res, next) => {
-  if (req.method === "GET" && (req.path === "/" || req.path.endsWith("/index.html"))) {
+  // Check if this is a document request (HTML) by looking at Accept header
+  const acceptHeader = req.get("Accept") || "";
+  const isDocumentRequest = req.method === "GET" && acceptHeader.includes("text/html");
+  
+  // Skip API routes and asset requests
+  const isApiOrAsset = req.path.startsWith("/api/") || req.path.startsWith("/assets/");
+  
+  if (isDocumentRequest && !isApiOrAsset) {
     try {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
       res.setHeader("Pragma", "no-cache");

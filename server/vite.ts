@@ -59,6 +59,12 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx?v=${nanoid()}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
+      
+      // Set no-cache headers for HTML documents in development mode
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
@@ -76,10 +82,29 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Serve hashed assets under /assets with long-term caching
+  app.use("/assets", express.static(path.resolve(distPath, "assets"), {
+    maxAge: "1y", // Cache for 1 year
+    immutable: true, // Assets are immutable (content-addressed/hashed)
+  }));
+
+  // Serve other static files (favicon, etc.) with default settings
+  app.use(express.static(distPath, {
+    index: false, // Don't serve index.html from this middleware
+  }));
 
   // fall through to index.html if the file doesn't exist
+  // Set no-cache headers for the HTML shell to ensure users get the latest client bundles
   app.use("*", (_req, res) => {
+    // Set no-store headers for index.html
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    
+    // Remove ETag and Last-Modified headers to prevent 304 responses
+    res.removeHeader("ETag");
+    res.removeHeader("Last-Modified");
+    
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
