@@ -114,6 +114,28 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Populate req.user from session (if session stores user or userId).
+// This ensures route handlers that expect req.user will have it populated.
+// It runs after session/cookie parsing, and before request-logging and routes.
+app.use((req, _res, next) => {
+  try {
+    const s = (req as any).session;
+    if (!(req as any).user && s) {
+      // If the session has a full user object, attach it.
+      if (s.user) {
+        (req as any).user = s.user;
+      } else if (s.userId) {
+        // If the session stores only a userId, attach a minimal user object (handlers can lookup full user if needed).
+        (req as any).user = { id: s.userId };
+      }
+    }
+  } catch (err) {
+    console.error("[auth-populate] failed to populate req.user from session", err);
+  } finally {
+    next();
+  }
+});
+
 console.log("Startup: Session and middleware registered.");
 
 // STATIC EXPORTS
@@ -161,7 +183,7 @@ app.use((req, res, next) => {
 console.log("Startup: Request logging middleware registered.");
 
 // AUTH DEBUG MIDDLEWARE (temporary, for troubleshooting)
-// Inserted here so it runs after session middleware and request-logging but before routes
+// This will now see req.user if the session contained user/userId.
 app.use((req, _res, next) => {
   try {
     console.info("[auth-debug] method=%s path=%s", req.method, req.path);
