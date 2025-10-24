@@ -162,7 +162,11 @@ export function useDataSnapshot(snapshot: Partial<CoachContextSnapshot>) {
   
   useEffect(() => {
     if (snapshot && Object.keys(snapshot).length > 0) {
+      // Stringify for deep comparison to prevent infinite loops
+      const snapshotKey = JSON.stringify(snapshot);
       updateSnapshot(snapshot);
     }
-  }, [updateSnapshot, snapshot]);
+    // Only depend on stringified snapshot to prevent object reference changes from triggering updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateSnapshot, JSON.stringify(snapshot)]);
 }
