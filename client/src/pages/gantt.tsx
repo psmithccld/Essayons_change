@@ -65,8 +65,7 @@ export default function Gantt() {
   const createMilestoneMutation = useMutation({
     mutationFn: async (milestoneData: MilestoneFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/milestones`, milestoneData);
-      return response.json();
+      return apiRequest("POST", `/api/projects/${currentProject.id}/milestones`, milestoneData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'milestones'] });
@@ -89,8 +88,7 @@ export default function Gantt() {
 
   const updateMilestoneMutation = useMutation({
     mutationFn: async ({ milestoneId, data }: { milestoneId: string; data: Partial<MilestoneFormData> }) => {
-      const response = await apiRequest("PUT", `/api/milestones/${milestoneId}`, data);
-      return response.json();
+      return apiRequest("PUT", `/api/milestones/${milestoneId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'milestones'] });
@@ -112,8 +110,7 @@ export default function Gantt() {
 
   const deleteMilestoneMutation = useMutation({
     mutationFn: async (milestoneId: string) => {
-      const response = await apiRequest("DELETE", `/api/milestones/${milestoneId}`);
-      return response.json();
+      return apiRequest("DELETE", `/api/milestones/${milestoneId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'milestones'] });
