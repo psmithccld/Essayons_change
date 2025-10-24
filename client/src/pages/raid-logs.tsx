@@ -250,8 +250,7 @@ export default function RaidLogs() {
   const createRaidLogMutation = useMutation({
     mutationFn: async (logData: RaidLogFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/raid-logs`, logData);
-      return response.json();
+      return await apiRequest("POST", `/api/projects/${currentProject.id}/raid-logs`, logData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'raid-logs'] });
@@ -274,8 +273,7 @@ export default function RaidLogs() {
 
   const updateRaidLogMutation = useMutation({
     mutationFn: async ({ logId, data }: { logId: string; data: Partial<RaidLog> }) => {
-      const response = await apiRequest("PUT", `/api/raid-logs/${logId}`, data);
-      return response.json();
+      return await apiRequest("PUT", `/api/raid-logs/${logId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'raid-logs'] });
@@ -297,8 +295,7 @@ export default function RaidLogs() {
 
   const deleteRaidLogMutation = useMutation({
     mutationFn: async (logId: string) => {
-      const response = await apiRequest("DELETE", `/api/raid-logs/${logId}`, {});
-      return response.json();
+      return await apiRequest("DELETE", `/api/raid-logs/${logId}`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'raid-logs'] });
