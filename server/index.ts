@@ -208,25 +208,22 @@ app.use((req, _res, next) => {
   }
 });
 
-// STRONG: Prevent any caching of the HTML shell for ANY document request (including SPA routes)
+// STRONG: Prevent any caching of the HTML shell (index.html / root)
+// This sets no-store and removes ETag/Last-Modified so the browser will always request
+// and receive a fresh HTML body (avoids accepting 304 and reusing old HTML).
 app.use((req, res, next) => {
-  try {
-    const isGet = req.method === "GET";
-    const accept = (req.headers.accept || "").toString();
-    const secFetchDest = (req.headers["sec-fetch-dest"] || "").toString();
-    const isDocumentAccept = accept.includes("text/html") || secFetchDest === "document";
-    // Only affect HTML document requests (root and SPA routes)
-    if (isGet && isDocumentAccept) {
-      // Prevent any caching of the HTML shell so clients always get the freshest HTML body.
+  if (req.method === "GET" && (req.path === "/" || req.path.endsWith("/index.html"))) {
+    try {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
-      // Try to remove ETag/Last-Modified to avoid 304 responses for the document
-      try { res.removeHeader("ETag"); } catch (e) {}
-      try { res.removeHeader("Last-Modified"); } catch (e) {}
+      // Remove ETag/Last-Modified so origin won't reply 304 for the document
+      // (some frameworks/setups set these later; removal here is best-effort)
+      try { res.removeHeader("ETag"); } catch {}
+      try { res.removeHeader("Last-Modified"); } catch {}
+    } catch (err) {
+      console.error("[no-cache-index] failed to set no-store headers", err);
     }
-  } catch (err) {
-    console.error("[no-cache-index] failed to set no-store headers", err);
   }
   next();
 });
