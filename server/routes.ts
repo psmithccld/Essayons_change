@@ -6932,70 +6932,103 @@ Please provide coaching guidance based on their question and current context.`;
   });
 
 
-  // Process Maps
-  app.get("/api/projects/:projectId/process-maps", async (req, res) => {
-    try {
-      const processMaps = await storage.getProcessMapsByProject(req.params.projectId);
-      res.json(processMaps);
-    } catch (error) {
-      console.error("Error fetching process maps:", error);
-      res.status(500).json({ error: "Failed to fetch process maps" });
-    }
-  });
-
-  app.get("/api/process-maps/:id", async (req, res) => {
-    try {
-      const processMap = await storage.getProcessMap(req.params.id);
-      if (!processMap) {
-        return res.status(404).json({ error: "Process map not found" });
-      }
-      res.json(processMap);
-    } catch (error) {
-      console.error("Error fetching process map:", error);
-      res.status(500).json({ error: "Failed to fetch process map" });
-    }
-  });
-
   app.post("/api/projects/:projectId/process-maps", async (req, res) => {
-    try {
-      const validatedData = insertProcessMapSchema.parse({
-        ...req.body,
-        projectId: req.params.projectId,
-        createdById: "550e8400-e29b-41d4-a716-446655440000", // For demo, using default user ID
-      });
-      const processMap = await storage.createProcessMap(validatedData);
-      res.status(201).json(processMap);
-    } catch (error) {
-      console.error("Error creating process map:", error);
-      res.status(400).json({ error: "Failed to create process map" });
-    }
-  });
+  try {
+    const user = (req as any).user;
+    const organizationId = (req as any).organizationId;
 
-  app.put("/api/process-maps/:id", async (req, res) => {
-    try {
-      const processMap = await storage.updateProcessMap(req.params.id, req.body);
-      if (!processMap) {
-        return res.status(404).json({ error: "Process map not found" });
-      }
-      res.json(processMap);
-    } catch (error) {
-      console.error("Error updating process map:", error);
-      res.status(400).json({ error: "Failed to update process map" });
+    // Auth: require authenticated user
+    if (!user || !user.id) {
+      console.warn("[createProcessMap] unauthenticated request");
+      return res.status(401).json({ error: "Authentication required" });
     }
-  });
 
-  app.delete("/api/process-maps/:id", async (req, res) => {
-    try {
-      const success = await storage.deleteProcessMap(req.params.id);
-      if (!success) {
-        return res.status(404).json({ error: "Process map not found" });
-      }
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting process map:", error);
-      res.status(500).json({ error: "Failed to delete process map" });
+    const { projectId } = req.params;
+    if (!projectId) {
+      return res.status(400).json({ error: "Missing projectId in URL" });
     }
-  });
+
+    // Basic validation of required fields (name at minimum) via zod schema later,
+    // but do a quick shape check here to provide clear messages:
+    if (!req.body || typeof req.body.name !== "string" || req.body.name.trim().length === 0) {
+      return res.status(400).json({ error: "Missing required field: name" });
+    }
+
+    // Parse/normalize canvasData safely. Accept object or JSON string.
+    let canvasData: any = { objects: [], background: "#ffffff" };
+    if (req.body.canvasData !== undefined && req.body.canvasData !== null) {
+      try {
+        canvasData = typeof req.body.canvasData === "string" ? JSON.parse(req.body.canvasData) : req.body.canvasData;
+        if (typeof canvasData !== "object" || canvasData === null) {
+          canvasData = { objects: [], background: "#ffffff" };
+        }
+      } catch (err) {
+        console.warn("[createProcessMap] invalid canvasData JSON:", err);
+        return res.status(400).json({ error: "Invalid canvasData JSON" });
+      }
+    }
+
+    // Best-effort tenant/project check (BOLA protection)
+    let project: any | undefined = undefined;
+    try {
+      if (typeof storage.getProjectById === "function") {
+        project = await storage.getProjectById(projectId);
+      } else if (typeof storage.getProject === "function") {
+        project = await storage.getProject(projectId);
+      }
+    } catch (err) {
+      console.error("[createProcessMap] error loading project for validation:", err);
+      return res.status(500).json({ error: "Error validating project" });
+    }
+
+    if (project) {
+      if (organizationId && (project as any).organizationId && (project as any).organizationId !== organizationId) {
+        console.warn("[createProcessMap] project org mismatch", { projectId, projectOrg: (project as any).organizationId, reqOrg: organizationId });
+        return res.status(403).json({ error: "Project not accessible in current organization" });
+      }
+    }
+
+    // Build the insert payload server-side - do NOT trust client-provided createdById
+    const insertPayload = {
+      projectId,
+      name: req.body.name,
+      description: req.body.description ?? null,
+      canvasData,
+      elements: req.body.elements ?? [],
+      connections: req.body.connections ?? [],
+      createdById: user.id,
+    };
+
+    // Debug logs (temporary — remove after verification)
+    console.info("[createProcessMap] incoming user:", { id: user.id, email: user.email });
+    console.debug("[createProcessMap] request body preview:", {
+      name: req.body.name,
+      createdByIdProvided: !!req.body.createdById,
+      canvasDataType: typeof req.body.canvasData,
+    });
+    console.info("[createProcessMap] insertPayload preview:", { projectId: insertPayload.projectId, createdById: insertPayload.createdById, name: insertPayload.name });
+
+    // Validate using shared schema for safety
+    try {
+      insertProcessMapSchema.parse(insertPayload);
+    } catch (schemaErr: any) {
+      console.warn("[createProcessMap] payload validation failed:", schemaErr);
+      return res.status(400).json({ error: "Invalid process map payload", details: schemaErr.errors ?? schemaErr.message });
+    }
+
+    // Persist
+    const processMap = await storage.createProcessMap(insertPayload);
+    return res.status(201).json(processMap);
+  } catch (error: any) {
+    // Map DB foreign key violation to a friendly message
+    if (error?.code === "23503") {
+      console.error("[createProcessMap] FK violation:", error);
+      return res.status(400).json({ error: "Referenced resource not found or invalid foreign key", detail: error?.detail });
+    }
+    console.error("[createProcessMap] unexpected error:", error);
+    return res.status(500).json({ error: "Failed to create process map" });
+  }
+});
 
   // Enhanced Role Management Routes
   app.post("/api/roles", requireAuthAndOrg, requirePermission('canModifyRoles'), async (req, res) => {
