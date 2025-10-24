@@ -59,12 +59,12 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx?v=${nanoid()}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
-      
+
       // Set no-cache headers for HTML documents in development mode
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
-      
+
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
@@ -74,13 +74,13 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  // Candidate directories to look for the built client index.html
+  // Candidate directories to look for the built client index.html (including client root)
   const candidates = [
-    path.resolve(import.meta.dirname, "public"),                     // current expectation
+    path.resolve(import.meta.dirname, "public"),                     // existing expectation
     path.resolve(import.meta.dirname, "..", "client", "dist"),      // common Vite output
     path.resolve(import.meta.dirname, "..", "client", "build"),     // CRA-like output
     path.resolve(import.meta.dirname, "..", "dist"),                // alternate top-level dist
-    path.resolve(import.meta.dirname, "..", "client", "public"),    // sometimes used
+    path.resolve(import.meta.dirname, "..", "client"),              // client root (contains client/index.html)
   ];
 
   // Pick the first candidate that contains index.html
@@ -97,11 +97,10 @@ export function serveStatic(app: Express) {
   }
 
   if (!distPath) {
-    // Helpful error message so deploy logs show where we looked
     const tried = candidates.map((p) => `  - ${p}`).join("\n");
     throw new Error(
       `Could not find index.html in any expected build directories. Looked at:\n${tried}\n` +
-      `Make sure you run the client build in CI and that index.html is present in one of these locations.`
+      `Make sure you run the client build in CI or place index.html in one of the expected paths.`
     );
   }
 
