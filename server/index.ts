@@ -208,13 +208,22 @@ app.use((req, _res, next) => {
   }
 });
 
-// NEW: Prevent caching of the HTML shell (index.html / root)
-// Inserted so clients always fetch the latest index.html and pick up new hashed bundles on deploy.
+// STRONG: Prevent any caching of the HTML shell (index.html / root)
+// This sets no-store and removes ETag/Last-Modified so the browser will always request
+// and receive a fresh HTML body (avoids accepting 304 and reusing old HTML).
 app.use((req, res, next) => {
   if (req.method === "GET" && (req.path === "/" || req.path.endsWith("/index.html"))) {
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
+    try {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      // Remove ETag/Last-Modified so origin won't reply 304 for the document
+      // (some frameworks/setups set these later; removal here is best-effort)
+      try { res.removeHeader("ETag"); } catch {}
+      try { res.removeHeader("Last-Modified"); } catch {}
+    } catch (err) {
+      console.error("[no-cache-index] failed to set no-store headers", err);
+    }
   }
   next();
 });
