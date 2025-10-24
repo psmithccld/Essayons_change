@@ -214,11 +214,16 @@ function EmailsExecutionModule() {
 
   // Create email mutation - handles both P2P and group emails
   const createEmailMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', `/api/projects/${currentProject?.id}/communications`, {
-      ...data,
-      type: emailType,
-      status: 'draft'
-    }),
+    mutationFn: (data: any) => {
+      if (!currentProject?.id) {
+        throw new Error("No project selected. Please select a project before creating an email.");
+      }
+      return apiRequest('POST', `/api/projects/${currentProject.id}/communications`, {
+        ...data,
+        type: emailType,
+        status: 'draft'
+      });
+    },
     onSuccess: async (newEmail) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
       
@@ -1534,19 +1539,28 @@ function MeetingsExecutionModule() {
 
   // Create meeting mutation
   const createMeetingMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', `/api/projects/${currentProject?.id}/communications`, {
-      ...data,
-      type: 'meeting',
-      status: 'draft'
-    }),
+    mutationFn: (data: any) => {
+      if (!currentProject?.id) {
+        throw new Error("No project selected. Please select a project before creating a meeting.");
+      }
+      return apiRequest('POST', `/api/projects/${currentProject.id}/communications`, {
+        ...data,
+        type: 'meeting',
+        status: 'draft'
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
       toast({ title: "Meeting created successfully" });
       setShowCreateModal(false);
       resetMeetingForm();
     },
-    onError: () => {
-      toast({ title: "Failed to create meeting", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to create meeting", 
+        description: error?.message || "Please try again.",
+        variant: "destructive" 
+      });
     }
   });
 
@@ -1649,6 +1663,16 @@ function MeetingsExecutionModule() {
   };
 
   const handleCreateMeeting = () => {
+    // Check if project is selected first
+    if (!currentProject?.id) {
+      toast({ 
+        title: "No project selected", 
+        description: "Please select a project before creating a meeting.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
     if (!meetingWhat.title || !meetingWhat.purpose || !meetingWhen.date || !meetingWhen.time) {
       toast({ title: "Please fill in all required meeting details", variant: "destructive" });
       return;
@@ -1935,11 +1959,12 @@ function MeetingsExecutionModule() {
                     </Button>
                     <Button 
                       onClick={handleCreateMeeting}
+                      disabled={!currentProject?.id || createMeetingMutation.isPending}
                       className="bg-red-600 hover:bg-red-700 text-white"
                       data-testid="create-meeting-submit"
                     >
                       <Save className="h-4 w-4 mr-2" />
-                      Schedule Meeting
+                      {createMeetingMutation.isPending ? 'Creating...' : 'Schedule Meeting'}
                     </Button>
                   </div>
                 </div>
