@@ -77,6 +77,18 @@ app.head("/", (_req, res) => res.status(200).end());
 
 console.log("Startup: Health endpoints registered.");
 
+// VERSION ENDPOINT
+// Returns a commit/build identifier (if provided via env in CI) or a timestamp fallback.
+// This is useful for clients to detect a new deploy and prompt for reload.
+app.get("/api/version", (_req: Request, res: Response) => {
+  const commit = process.env.GIT_COMMIT_SHA || process.env.BUILD_ID || process.env.COMMIT_SHA;
+  if (commit) {
+    res.json({ commit });
+  } else {
+    res.json({ commit: `ts:${new Date().toISOString()}` });
+  }
+});
+
 // SESSION CONFIGURATION
 neonConfig.webSocketConstructor = ws;
 const pgPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
