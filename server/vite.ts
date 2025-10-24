@@ -52,7 +52,7 @@ export async function setupVite(app: Express, server: Server) {
         "index.html",
       );
 
-      // always reload the index.html file from disk incase it changes
+      // always reload the index.html file from disk in case it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
@@ -74,6 +74,7 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
+  // Production build output path - adjust if your build writes elsewhere
   const distPath = path.resolve(import.meta.dirname, "public");
 
   if (!fs.existsSync(distPath)) {
@@ -82,29 +83,55 @@ export function serveStatic(app: Express) {
     );
   }
 
-  // Serve hashed assets under /assets with long-term caching
-  app.use("/assets", express.static(path.resolve(distPath, "assets"), {
-    maxAge: "1y", // Cache for 1 year
-    immutable: true, // Assets are immutable (content-addressed/hashed)
-  }));
+  // Serve hashed static assets (assets/) with long-term caching
+  app.use(
+    "/assets",
+    express.static(path.join(distPath, "assets"), {
+      maxAge: "1y",
+      immutable: true,
+      setHeaders: (res) => {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      },
+    })
+  );
 
-  // Serve other static files (favicon, etc.) with default settings
-  app.use(express.static(distPath, {
-    index: false, // Don't serve index.html from this middleware
-  }));
+  // Serve images and other static folders with reasonable caching
+  app.use(
+    "/images",
+    express.static(path.join(distPath, "images"), {
+      maxAge: "1d",
+      setHeaders: (res) => {
+        res.setHeader("Cache-Control", "public, max-age=86400");
+      },
+    })
+  );
 
-  // fall through to index.html if the file doesn't exist
-  // Set no-cache headers for the HTML shell to ensure users get the latest client bundles
-  app.use("*", (_req, res) => {
-    // Set no-store headers for index.html
+  // Fallback: serve index.html for all other GET requests that accept HTML
+  app.get("*", (req, res, next) => {
+    const accept = (req.headers.accept || "").toString();
+    if (req.method !== "GET" || !accept.includes("text/html")) {
+      return next();
+    }
+
+    const indexPath = path.join(distPath, "index.html");
+    if (!fs.existsSync(indexPath)) return res.status(404).send("index.html not found");
+
+    // Ensure the document response is not cached anywhere and cannot be revalidated
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    // Helpful for some edge caches / CDNs that inspect Surrogate-Control
+    res.setHeader("Surrogate-Control", "no-store");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
-    
-    // Remove ETag and Last-Modified headers to prevent 304 responses
-    res.removeHeader("ETag");
-    res.removeHeader("Last-Modified");
-    
-    res.sendFile(path.resolve(distPath, "index.html"));
+    try { res.removeHeader("ETag"); } catch (e) {}
+    try { res.removeHeader("Last-Modified"); } catch (e) {}
+
+    // Debug log so we can confirm the instance served the HTML shell
+    try {
+      console.info(`[serveStatic] sending index.html (no-store) for ${req.path}`);
+    } catch {}
+
+    res.sendFile(indexPath, (err) => {
+      if (err) next(err);
+    });
   });
 }
