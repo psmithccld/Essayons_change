@@ -208,6 +208,29 @@ app.use((req, _res, next) => {
   }
 });
 
+// STRONG: Prevent any caching of the HTML shell for ANY document request (including SPA routes)
+app.use((req, res, next) => {
+  try {
+    const isGet = req.method === "GET";
+    const accept = (req.headers.accept || "").toString();
+    const secFetchDest = (req.headers["sec-fetch-dest"] || "").toString();
+    const isDocumentAccept = accept.includes("text/html") || secFetchDest === "document";
+    // Only affect HTML document requests (root and SPA routes)
+    if (isGet && isDocumentAccept) {
+      // Prevent any caching of the HTML shell so clients always get the freshest HTML body.
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      // Try to remove ETag/Last-Modified to avoid 304 responses for the document
+      try { res.removeHeader("ETag"); } catch (e) {}
+      try { res.removeHeader("Last-Modified"); } catch (e) {}
+    }
+  } catch (err) {
+    console.error("[no-cache-index] failed to set no-store headers", err);
+  }
+  next();
+});
+
 // ASYNC STARTUP WRAPPER
 (async () => {
   try {
