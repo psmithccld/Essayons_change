@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
@@ -152,16 +153,32 @@ export function serveStatic(app: Express) {
     res.setHeader("Surrogate-Control", "no-store");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
+
+    // Add a debug header to help tie responses to an instance
+    try {
+      const instance = process.env.HOSTNAME || os.hostname();
+      res.setHeader("X-Served-By", instance);
+    } catch (e) {}
+
+    // Remove headers if present (best-effort), then stream the file so Express won't add ETag/Last-Modified later
     try { res.removeHeader("ETag"); } catch (e) {}
     try { res.removeHeader("Last-Modified"); } catch (e) {}
 
     // Debug log so we can confirm the instance served the HTML shell and which path was used
     try {
-      console.info(`[serveStatic] sending index.html (no-store) from ${distPath} for ${req.path}`);
+      console.warn(`${new Date().toISOString()} [serveStatic] sending index.html (no-store) from ${distPath} for ${req.path}`);
     } catch {}
 
-    res.sendFile(indexPath, (err) => {
-      if (err) next(err);
+    // Stream the file to avoid Express adding ETag/Last-Modified after headers set
+    const stream = fs.createReadStream(indexPath);
+    stream.on("error", (err) => {
+      next(err);
     });
+
+    // Ensure Content-Type is set
+    res.setHeader("Content-Type", "text/html; charset=UTF-8");
+
+    // Pipe and finish response
+    stream.pipe(res);
   });
 }
