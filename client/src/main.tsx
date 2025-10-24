@@ -9,10 +9,8 @@ if (import.meta.env.PROD) {
     startVersionCheck({
       intervalMs: 30_000,
       onUpdate: (v) => {
-        // Replace this confirm with an in-app banner if you prefer
-        if (confirm("A new version of the app is available. Reload now to update?")) {
-          window.location.reload();
-        }
+        // No-op: don't prompt the user with a browser confirm.
+        // You can instead set app state to show a non-blocking banner/toast here.
       },
     });
   } catch (err) {
