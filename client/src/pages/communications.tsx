@@ -384,6 +384,16 @@ function EmailsExecutionModule() {
   };
 
   const handleSaveP2PEmail = () => {
+    // Check if project is selected first
+    if (!currentProject?.id) {
+      toast({ 
+        title: "No project selected", 
+        description: "Please select a project before creating an email.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
     if (!emailContent.title || !emailContent.content) {
       toast({ title: "Please fill in subject and content", variant: "destructive" });
       return;
@@ -953,11 +963,11 @@ function EmailsExecutionModule() {
                   </Button>
                   <Button
                     onClick={handleSaveP2PEmail}
-                    disabled={!emailContent.title || !emailContent.content || !recipientEmail}
+                    disabled={!currentProject?.id || !emailContent.title || !emailContent.content || !recipientEmail || createEmailMutation.isPending}
                     data-testid="button-save-p2p-email"
                   >
                     <Save className="w-4 h-4 mr-2" />
-                    Save Personal Email
+                    {createEmailMutation.isPending ? 'Saving...' : 'Save Personal Email'}
                   </Button>
                 </div>
               </CardContent>
