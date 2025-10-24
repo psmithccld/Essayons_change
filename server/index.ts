@@ -160,6 +160,32 @@ app.use((req, res, next) => {
 
 console.log("Startup: Request logging middleware registered.");
 
+// AUTH DEBUG MIDDLEWARE (temporary, for troubleshooting)
+// Inserted here so it runs after session middleware and request-logging but before routes
+app.use((req, _res, next) => {
+  try {
+    console.info("[auth-debug] method=%s path=%s", req.method, req.path);
+    console.info("[auth-debug] cookie header present=%s", !!req.headers.cookie);
+    // express-session provides req.sessionID and req.session
+    console.info("[auth-debug] sessionID=%s", (req as any).sessionID || "<none>");
+    console.info(
+      "[auth-debug] sessionKeys=%s",
+      (req as any).session ? Object.keys((req as any).session).slice(0, 20).join(",") : "<no-session>"
+    );
+    const u = (req as any).user;
+    if (u) {
+      // Print only minimal user info to avoid leaking sensitive fields
+      console.info("[auth-debug] req.user present:", { id: u.id, email: u.email });
+    } else {
+      console.info("[auth-debug] req.user absent");
+    }
+  } catch (err) {
+    console.error("[auth-debug] logging failed", err);
+  } finally {
+    next();
+  }
+});
+
 // ASYNC STARTUP WRAPPER
 (async () => {
   try {
