@@ -337,8 +337,7 @@ export function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItem
         status: "pending",
       };
       
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, cleanData);
-      return response.json();
+      return apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, cleanData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
@@ -349,12 +348,11 @@ export function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItem
   const createMilestoneMutation = useMutation({
     mutationFn: async (data: MilestoneFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/milestones`, {
+      return apiRequest("POST", `/api/projects/${currentProject.id}/milestones`, {
         ...data,
         phase,
         status: "pending",
       });
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'milestones'] });
@@ -374,8 +372,7 @@ export function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItem
         status: "open",
       };
       
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/raid-logs`, cleanData);
-      return response.json();
+      return apiRequest("POST", `/api/projects/${currentProject.id}/raid-logs`, cleanData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'raid-logs'] });
@@ -386,12 +383,11 @@ export function CreateItemForm({ itemType, phase, users, onSuccess }: CreateItem
   const createCommunicationMutation = useMutation({
     mutationFn: async (data: CommunicationFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/communications`, {
+      return apiRequest("POST", `/api/projects/${currentProject.id}/communications`, {
         ...data,
         phase,
         status: "scheduled",
       });
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'communications'] });
@@ -899,8 +895,7 @@ export default function ChangeProcessFlow() {
   const updateProjectMutation = useMutation({
     mutationFn: async (phase: string) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("PUT", `/api/projects/${currentProject.id}`, { currentPhase: phase });
-      return response.json();
+      return apiRequest("PUT", `/api/projects/${currentProject.id}`, { currentPhase: phase });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects'] });

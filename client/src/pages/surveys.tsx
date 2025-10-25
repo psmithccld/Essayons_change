@@ -160,8 +160,7 @@ export default function Surveys() {
   const createSurveyMutation = useMutation({
     mutationFn: async (surveyData: SurveyFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/surveys`, surveyData);
-      return response.json();
+      return apiRequest("POST", `/api/projects/${currentProject.id}/surveys`, surveyData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'surveys'] });
@@ -196,8 +195,7 @@ export default function Surveys() {
         endDate: data.endDate,
       };
       
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/surveys`, surveyData);
-      return response.json();
+      return apiRequest("POST", `/api/projects/${currentProject.id}/surveys`, surveyData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'surveys'] });
@@ -260,8 +258,7 @@ export default function Surveys() {
   // Survey status mutation
   const updateSurveyStatusMutation = useMutation({
     mutationFn: async ({ surveyId, status }: { surveyId: string; status: string }) => {
-      const response = await apiRequest("PATCH", `/api/surveys/${surveyId}/status`, { status });
-      return response.json();
+      return apiRequest("PATCH", `/api/surveys/${surveyId}/status`, { status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'surveys'] });
@@ -282,8 +279,7 @@ export default function Surveys() {
   // Send reminders mutation
   const sendRemindersMutation = useMutation({
     mutationFn: async (surveyId: string) => {
-      const response = await apiRequest("POST", `/api/surveys/${surveyId}/reminders`);
-      return response.json();
+      return apiRequest("POST", `/api/surveys/${surveyId}/reminders`);
     },
     onSuccess: (data) => {
       toast({
@@ -303,8 +299,7 @@ export default function Surveys() {
   // Delete survey mutation
   const deleteSurveyMutation = useMutation({
     mutationFn: async (surveyId: string) => {
-      const response = await apiRequest("DELETE", `/api/surveys/${surveyId}`);
-      return response.json();
+      return apiRequest("DELETE", `/api/surveys/${surveyId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'surveys'] });

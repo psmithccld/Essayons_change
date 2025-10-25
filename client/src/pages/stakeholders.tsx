@@ -166,8 +166,7 @@ export default function Stakeholders() {
   const createStakeholderMutation = useMutation({
     mutationFn: async (stakeholderData: StakeholderFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/stakeholders`, stakeholderData);
-      return response.json();
+      return apiRequest("POST", `/api/projects/${currentProject.id}/stakeholders`, stakeholderData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'stakeholders'] });
@@ -196,11 +195,10 @@ export default function Stakeholders() {
   const importStakeholdersMutation = useMutation({
     mutationFn: async ({ sourceProjectId, stakeholderIds }: { sourceProjectId: string; stakeholderIds: string[] }) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/stakeholders/import`, {
+      return apiRequest("POST", `/api/projects/${currentProject.id}/stakeholders/import`, {
         sourceProjectId,
         stakeholderIds,
       });
-      return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'stakeholders'] });

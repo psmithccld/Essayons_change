@@ -87,8 +87,7 @@ export default function SurveyTake() {
         }, {} as Record<string, string>)
       };
       
-      const response = await apiRequest("POST", `/api/surveys/${surveyId}/responses`, responseData);
-      return response.json();
+      return apiRequest("POST", `/api/surveys/${surveyId}/responses`, responseData);
     },
     onSuccess: () => {
       setIsSubmitted(true);
