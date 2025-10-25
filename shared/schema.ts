@@ -74,12 +74,6 @@ export const permissionsSchema = z.object({
   canEditGanttCharts: z.boolean().default(false),
   canDeleteGanttCharts: z.boolean().default(false),
   
-  // Checklist Templates Management - granular CRUD operations
-  canSeeChecklistTemplates: z.boolean().default(false),
-  canModifyChecklistTemplates: z.boolean().default(false),
-  canEditChecklistTemplates: z.boolean().default(false),
-  canDeleteChecklistTemplates: z.boolean().default(false),
-  
   // Reports and Analytics - granular access
   canSeeReports: z.boolean().default(false),
   canModifyReports: z.boolean().default(false),
@@ -810,19 +804,6 @@ export const milestones = pgTable("milestones", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const checklistTemplates = pgTable("checklist_templates", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  description: text("description"),
-  category: text("category").notNull(), // development, marketing, operations, general
-  templateItems: jsonb("template_items").notNull(), // Array of {text: string, required: boolean}
-  isActive: boolean("is_active").notNull().default(true),
-  createdById: uuid("created_by_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-
 export const processMaps = pgTable("process_maps", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
@@ -896,7 +877,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   surveys: many(surveys),
   surveyResponses: many(surveyResponses),
   gptInteractions: many(gptInteractions),
-  createdChecklistTemplates: many(checklistTemplates),
   createdProcessMaps: many(processMaps),
   initiativeAssignments: many(userInitiativeAssignments, { relationName: "userAssignments" }),
   assignedInitiatives: many(userInitiativeAssignments, { relationName: "assignedBy" }),
@@ -1080,14 +1060,6 @@ export const milestonesRelations = relations(milestones, ({ one }) => ({
     references: [projects.id],
   }),
 }));
-
-export const checklistTemplatesRelations = relations(checklistTemplates, ({ one }) => ({
-  createdBy: one(users, {
-    fields: [checklistTemplates.createdById],
-    references: [users.id],
-  }),
-}));
-
 
 export const processMapsRelations = relations(processMaps, ({ one }) => ({
   project: one(projects, {
@@ -1358,13 +1330,6 @@ export const insertMilestoneSchema = createInsertSchema(milestones).omit({
   updatedAt: true,
 });
 
-export const insertChecklistTemplateSchema = createInsertSchema(checklistTemplates).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-
 export const insertProcessMapSchema = createInsertSchema(processMaps).omit({
   id: true,
   createdAt: true,
@@ -1503,12 +1468,6 @@ export const DEFAULT_PERMISSIONS = {
     canEditGanttCharts: true,
     canDeleteGanttCharts: true,
     
-    // Checklist Templates Management - Full Access
-    canSeeChecklistTemplates: true,
-    canModifyChecklistTemplates: true,
-    canEditChecklistTemplates: true,
-    canDeleteChecklistTemplates: true,
-    
     // Reports and Analytics - Full Access
     canSeeReports: true,
     canModifyReports: true,
@@ -1608,12 +1567,6 @@ export const DEFAULT_PERMISSIONS = {
     canEditGanttCharts: true,
     canDeleteGanttCharts: true,
     
-    // Checklist Templates Management - Full Management
-    canSeeChecklistTemplates: true,
-    canModifyChecklistTemplates: true,
-    canEditChecklistTemplates: true,
-    canDeleteChecklistTemplates: true,
-    
     // Reports and Analytics - View Only
     canSeeReports: true,
     canModifyReports: false,
@@ -1712,12 +1665,6 @@ export const DEFAULT_PERMISSIONS = {
     canModifyGanttCharts: false,
     canEditGanttCharts: false,
     canDeleteGanttCharts: false,
-    
-    // Checklist Templates Management - Limited Access
-    canSeeChecklistTemplates: true,
-    canModifyChecklistTemplates: false,
-    canEditChecklistTemplates: false,
-    canDeleteChecklistTemplates: false,
     
     // Reports and Analytics - No Access
     canSeeReports: false,
@@ -1823,10 +1770,6 @@ export type InsertGptInteraction = z.infer<typeof insertGptInteractionSchema>;
 
 export type Milestone = typeof milestones.$inferSelect;
 export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
-
-export type ChecklistTemplate = typeof checklistTemplates.$inferSelect;
-export type InsertChecklistTemplate = z.infer<typeof insertChecklistTemplateSchema>;
-
 
 export type ProcessMap = typeof processMaps.$inferSelect;
 export type InsertProcessMap = z.infer<typeof insertProcessMapSchema>;

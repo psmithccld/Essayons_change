@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { 
-  users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, checklistTemplates, processMaps, roles, userInitiativeAssignments,
+  users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
   organizations, organizationMemberships, organizationSettings, customerTiers, subscriptions, invitations,
   superAdminUsers, superAdminSessions, superAdminMfaSetup, supportTickets, supportConversations, systemSettings,
@@ -9,7 +9,7 @@ import {
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type CommunicationVersion, type InsertCommunicationVersion, type Survey, type InsertSurvey,
   type SurveyResponse, type InsertSurveyResponse, type GptInteraction, type InsertGptInteraction,
-  type Milestone, type InsertMilestone, type ChecklistTemplate, type InsertChecklistTemplate,
+  type Milestone, type InsertMilestone,
   type ProcessMap, type InsertProcessMap, type CommunicationStrategy, type InsertCommunicationStrategy,
   type CommunicationTemplate, type InsertCommunicationTemplate,
   type Role, type InsertRole, type UserInitiativeAssignment, type InsertUserInitiativeAssignment,
@@ -196,16 +196,6 @@ export interface IStorage {
   createMilestone(milestone: InsertMilestone, organizationId: string): Promise<Milestone>;
   updateMilestone(id: string, organizationId: string, milestone: Partial<InsertMilestone>): Promise<Milestone | undefined>;
   deleteMilestone(id: string, organizationId: string): Promise<boolean>;
-
-  // Checklist Templates
-  getChecklistTemplates(): Promise<ChecklistTemplate[]>;
-  getChecklistTemplatesByCategory(category: string): Promise<ChecklistTemplate[]>;
-  getActiveChecklistTemplates(): Promise<ChecklistTemplate[]>;
-  getChecklistTemplate(id: string): Promise<ChecklistTemplate | undefined>;
-  createChecklistTemplate(template: InsertChecklistTemplate): Promise<ChecklistTemplate>;
-  updateChecklistTemplate(id: string, template: Partial<InsertChecklistTemplate>): Promise<ChecklistTemplate | undefined>;
-  deleteChecklistTemplate(id: string): Promise<boolean>;
-
 
   // Process Maps
   getProcessMapsByProject(projectId: string): Promise<ProcessMap[]>;
@@ -3626,48 +3616,6 @@ export class DatabaseStorage implements IStorage {
       .set({ usageCount: sql`${communicationTemplates.usageCount} + 1` })
       .where(eq(communicationTemplates.id, id));
   }
-
-  // Checklist Templates
-  async getChecklistTemplates(): Promise<ChecklistTemplate[]> {
-    return await db.select().from(checklistTemplates).orderBy(desc(checklistTemplates.createdAt));
-  }
-
-  async getChecklistTemplatesByCategory(category: string): Promise<ChecklistTemplate[]> {
-    return await db.select().from(checklistTemplates)
-      .where(eq(checklistTemplates.category, category))
-      .orderBy(desc(checklistTemplates.createdAt));
-  }
-
-  async getActiveChecklistTemplates(): Promise<ChecklistTemplate[]> {
-    return await db.select().from(checklistTemplates)
-      .where(eq(checklistTemplates.isActive, true))
-      .orderBy(desc(checklistTemplates.createdAt));
-  }
-
-  async getChecklistTemplate(id: string): Promise<ChecklistTemplate | undefined> {
-    const [template] = await db.select().from(checklistTemplates).where(eq(checklistTemplates.id, id));
-    return template || undefined;
-  }
-
-  async createChecklistTemplate(template: InsertChecklistTemplate): Promise<ChecklistTemplate> {
-    const [created] = await db.insert(checklistTemplates).values(template).returning();
-    return created;
-  }
-
-  async updateChecklistTemplate(id: string, template: Partial<InsertChecklistTemplate>): Promise<ChecklistTemplate | undefined> {
-    const [updated] = await db.update(checklistTemplates)
-      .set({ ...template, updatedAt: new Date() })
-      .where(eq(checklistTemplates.id, id))
-      .returning();
-    return updated || undefined;
-  }
-
-  async deleteChecklistTemplate(id: string): Promise<boolean> {
-    const result = await db.delete(checklistTemplates).where(eq(checklistTemplates.id, id));
-    return result.rowCount ? result.rowCount > 0 : false;
-  }
-
-  // Mind Maps
 
   // Process Maps
   async getProcessMapsByProject(projectId: string): Promise<ProcessMap[]> {

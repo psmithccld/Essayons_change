@@ -48,7 +48,6 @@ type NavigationItem = {
 const allNavigationItems: NavigationItem[] = [
   { id: "overview", icon: ChartLine, label: "Overview", path: "/" },
   { id: "tasks", icon: ListTodo, label: "Tasks & To Do", path: "/tasks" },
-  { id: "checklist-templates", icon: ListChecks, label: "Checklist Templates", path: "/checklist-templates" },
   { id: "gantt", icon: ChartGantt, label: "Initiative Timeline", path: "/gantt" },
   { id: "raid-logs", icon: AlertTriangle, label: "RAID Logs", path: "/raid-logs" },
   { id: "reports", icon: ChartBar, label: "Reports", path: "/reports", permissions: ["canSeeReports"], featureFlag: "reports" },

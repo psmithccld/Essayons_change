@@ -21,7 +21,6 @@ import { useToast } from "@/hooks/use-toast";
 const NotFound = lazy(() => import("@/pages/not-found"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const Tasks = lazy(() => import("@/pages/tasks"));
-const ChecklistTemplates = lazy(() => import("@/pages/checklist-templates"));
 const GanttChart = lazy(() => import("@/pages/gantt"));
 const RaidLogs = lazy(() => import("@/pages/raid-logs"));
 const Communications = lazy(() => import("@/pages/communications"));
@@ -86,7 +85,6 @@ function AuthenticatedApp() {
             <Route path="/" component={Dashboard} />
             <Route path="/projects" component={Projects} />
             <Route path="/tasks" component={Tasks} />
-            <Route path="/checklist-templates" component={ChecklistTemplates} />
             <Route path="/gantt" component={GanttChart} />
             <Route path="/raid-logs" component={RaidLogs} />
             <Route path="/communications" component={Communications} />
