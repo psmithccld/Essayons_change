@@ -26,7 +26,7 @@ const taskFormSchema = z.object({
   status: z.enum(["pending", "in_progress", "completed", "blocked"]),
   priority: z.enum(["low", "medium", "high", "critical"]),
   assigneeId: z.string().optional(),
-  assigneeEmail: z.string().email().optional(),
+  assigneeEmail: z.string().optional(),
   assignmentType: z.enum(["user", "external"]).default("user"),
   startDate: z.string().optional(),
   dueDate: z.string().optional(),
@@ -35,7 +35,19 @@ const taskFormSchema = z.object({
     text: z.string(),
     completed: z.boolean()
   })).optional().default([]),
-});
+}).refine(
+  (data) => {
+    // If assignment type is external, require a valid email
+    if (data.assignmentType === "external") {
+      return data.assigneeEmail && data.assigneeEmail.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.assigneeEmail);
+    }
+    return true;
+  },
+  {
+    message: "Email is required for external assignments",
+    path: ["assigneeEmail"],
+  }
+);
 
 type TaskFormData = z.infer<typeof taskFormSchema>;
 
@@ -191,11 +203,11 @@ export default function Tasks() {
       if (!currentProject?.id) throw new Error("No project selected");
       return apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, taskData);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
+    onSuccess: async () => {
+      form.reset();
+      await queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
       setIsTaskDialogOpen(false);
       setEditingTask(null);
-      form.reset();
       toast({
         title: "Success",
         description: "Task created successfully",
@@ -214,8 +226,8 @@ export default function Tasks() {
     mutationFn: async ({ taskId, data }: { taskId: string; data: Partial<Task> }) => {
       return apiRequest("PUT", `/api/tasks/${taskId}`, data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
       setIsTaskDialogOpen(false);
       setEditingTask(null);
       toast({
