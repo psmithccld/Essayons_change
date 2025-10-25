@@ -304,6 +304,7 @@ export interface IStorage {
 
   // A. User Reports
   getUserLoginActivityReport(params: {
+    organizationId: string;
     authorizedProjectIds?: string[];
     roleIds?: string[];
     dateFrom?: Date;
@@ -324,6 +325,7 @@ export interface IStorage {
   }>>;
 
   getRoleAssignmentReport(params: {
+    organizationId: string;
     authorizedProjectIds?: string[];
     includeHistory?: boolean;
     sortBy?: 'roleName' | 'userCount' | 'assignedAt';
@@ -343,6 +345,7 @@ export interface IStorage {
   }>>;
 
   getInitiativesParticipationReport(params: {
+    organizationId: string;
     authorizedProjectIds?: string[];
     userId?: string;
     includeProjectDetails?: boolean;
