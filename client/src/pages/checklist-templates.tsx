@@ -78,8 +78,7 @@ export default function ChecklistTemplates() {
 
   const createTemplateMutation = useMutation({
     mutationFn: async (templateData: TemplateFormData) => {
-      const response = await apiRequest("POST", "/api/checklist-templates", templateData);
-      return response.json();
+      return apiRequest("POST", "/api/checklist-templates", templateData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/checklist-templates'] });
@@ -101,8 +100,7 @@ export default function ChecklistTemplates() {
 
   const updateTemplateMutation = useMutation({
     mutationFn: async ({ templateId, data }: { templateId: string; data: Partial<TemplateFormData> }) => {
-      const response = await apiRequest("PUT", `/api/checklist-templates/${templateId}`, data);
-      return response.json();
+      return apiRequest("PUT", `/api/checklist-templates/${templateId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/checklist-templates'] });
@@ -124,8 +122,7 @@ export default function ChecklistTemplates() {
 
   const deleteTemplateMutation = useMutation({
     mutationFn: async (templateId: string) => {
-      const response = await apiRequest("DELETE", `/api/checklist-templates/${templateId}`);
-      return response.json();
+      return apiRequest("DELETE", `/api/checklist-templates/${templateId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/checklist-templates'] });
