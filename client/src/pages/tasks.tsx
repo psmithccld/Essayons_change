@@ -149,12 +149,10 @@ function getStatusVariant(status: string): "default" | "secondary" | "destructiv
 }
 
 export default function Tasks() {
-  // Removed isNewTaskOpen state - using quick create only  
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
-  const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
@@ -191,12 +189,11 @@ export default function Tasks() {
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: TaskFormData) => {
       if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, taskData);
-      return response.json();
+      return apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, taskData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
-      // Quick create dialog handled separately
+      setIsTaskDialogOpen(false);
       setEditingTask(null);
       form.reset();
       toast({
@@ -215,12 +212,11 @@ export default function Tasks() {
 
   const updateTaskMutation = useMutation({
     mutationFn: async ({ taskId, data }: { taskId: string; data: Partial<Task> }) => {
-      const response = await apiRequest("PUT", `/api/tasks/${taskId}`, data);
-      return response.json();
+      return apiRequest("PUT", `/api/tasks/${taskId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
-      setIsEditDialogOpen(false);
+      setIsTaskDialogOpen(false);
       setEditingTask(null);
       toast({
         title: "Success", 
@@ -238,8 +234,7 @@ export default function Tasks() {
 
   const deleteTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
-      const response = await apiRequest("DELETE", `/api/tasks/${taskId}`, {});
-      return response.json();
+      return apiRequest("DELETE", `/api/tasks/${taskId}`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
@@ -283,7 +278,24 @@ export default function Tasks() {
       dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "",
       checklist: checklistData,
     });
-    setIsEditDialogOpen(true);
+    setIsTaskDialogOpen(true);
+  };
+
+  const handleCreateTask = () => {
+    setEditingTask(null);
+    form.reset({
+      name: "",
+      description: "",
+      status: "pending",
+      priority: "medium",
+      assigneeId: "unassigned",
+      assigneeEmail: "",
+      assignmentType: "user",
+      startDate: "",
+      dueDate: "",
+      checklist: [],
+    });
+    setIsTaskDialogOpen(true);
   };
 
   const onSubmit = (data: TaskFormData) => {
@@ -389,38 +401,6 @@ export default function Tasks() {
     updateTaskMutation.mutate({ taskId, data: { status } });
   };
 
-  // Quick task creation form
-  const quickTaskForm = useForm<{name: string}>({
-    resolver: zodResolver(z.object({ name: z.string().min(1, "Task name required") })),
-    defaultValues: { name: "" }
-  });
-
-  const quickCreateMutation = useMutation({
-    mutationFn: async (data: {name: string}) => {
-      if (!currentProject?.id) throw new Error("No project selected");
-      const response = await apiRequest("POST", `/api/projects/${currentProject.id}/tasks`, {
-        name: data.name,
-        status: "pending",
-        priority: "medium",
-        assignmentType: "user"
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject?.id, 'tasks'] });
-      setIsQuickCreateOpen(false);
-      quickTaskForm.reset();
-      toast({ title: "Success", description: "Task created successfully" });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to create task", variant: "destructive" });
-    },
-  });
-
-  const onQuickSubmit = (data: {name: string}) => {
-    quickCreateMutation.mutate(data);
-  };
-
   // Enhanced filtering and sorting
   const filteredAndSortedTasks = useMemo(() => {
     let filtered = tasks.filter(task => {
@@ -517,53 +497,23 @@ export default function Tasks() {
           <p className="text-sm text-muted-foreground">Manage project tasks and track progress</p>
         </div>
         <div className="flex gap-2">
-          {/* Quick Create Dialog */}
-          <Dialog open={isQuickCreateOpen} onOpenChange={setIsQuickCreateOpen}>
-            <DialogTrigger asChild>
-              <Button disabled={!currentProject} variant="outline" data-testid="button-quick-task">
-                <Zap className="w-4 h-4 mr-2" />
-                Quick Task
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Quick Task Creation</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={quickTaskForm.handleSubmit(onQuickSubmit)} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="quickTaskName">Task Name</Label>
-                  <Input
-                    id="quickTaskName"
-                    {...quickTaskForm.register("name")}
-                    placeholder="Enter task name..."
-                    data-testid="input-quick-task-name"
-                  />
-                  {quickTaskForm.formState.errors.name && (
-                    <p className="text-sm text-red-500">{quickTaskForm.formState.errors.name.message}</p>
-                  )}
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => setIsQuickCreateOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={quickCreateMutation.isPending} data-testid="button-quick-create">
-                    {quickCreateMutation.isPending ? "Creating..." : "Create Task"}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button 
+            disabled={!currentProject} 
+            onClick={handleCreateTask} 
+            data-testid="button-create-task"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create Task
+          </Button>
           
-          {/* Edit Task Dialog */}
-          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          {/* Create/Edit Task Dialog */}
+          <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Edit Task: {editingTask?.name}</DialogTitle>
+                <DialogTitle>{editingTask ? `Edit Task: ${editingTask.name}` : 'Create New Task'}</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit((data) => {
-                  if (editingTask) {
-                    updateTaskMutation.mutate({ taskId: editingTask.id, data });
-                  }
-                })} className="space-y-4">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
                     name="name"
@@ -642,21 +592,204 @@ export default function Tasks() {
                     />
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="startDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Start Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} data-testid="input-task-start-date" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="dueDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Due Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} data-testid="input-task-due-date" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="assignmentType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assignment Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-assignment-type">
+                              <SelectValue placeholder="Select assignment type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="user">Team Member</SelectItem>
+                            <SelectItem value="external">External Email</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {form.watch("assignmentType") === "user" ? (
+                    <FormField
+                      control={form.control}
+                      name="assigneeId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Assign To</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || "unassigned"}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-assignee">
+                                <SelectValue placeholder="Select team member" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="unassigned">Unassigned</SelectItem>
+                              {users.map((user) => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.name} ({user.email})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="assigneeEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>External Email</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="email" 
+                              placeholder="email@example.com" 
+                              {...field} 
+                              data-testid="input-assignee-email" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  <div className="space-y-2">
+                    <Label>Checklist</Label>
+                    <div className="space-y-2">
+                      {form.watch("checklist")?.map((item, index) => (
+                        <div key={item.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            checked={item.completed}
+                            onCheckedChange={(checked) => {
+                              const checklist = form.getValues("checklist");
+                              checklist[index].completed = checked as boolean;
+                              form.setValue("checklist", [...checklist]);
+                            }}
+                            data-testid={`checkbox-item-${item.id}`}
+                          />
+                          <span className={`flex-1 text-sm ${item.completed ? 'line-through text-muted-foreground' : ''}`}>
+                            {item.text}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeChecklistItem(item.id)}
+                            data-testid={`button-remove-${item.id}`}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex space-x-2">
+                        <Input
+                          placeholder="Add checklist item..."
+                          value={newChecklistItem}
+                          onChange={(e) => setNewChecklistItem(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addChecklistItem();
+                            }
+                          }}
+                          data-testid="input-checklist-item"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={addChecklistItem}
+                          data-testid="button-add-checklist-item"
+                        >
+                          Add
+                        </Button>
+                        {templates.length > 0 && (
+                          <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button type="button" variant="outline" size="sm">
+                                <FileText className="w-4 h-4 mr-1" />
+                                Templates
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Apply Checklist Template</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-2">
+                                {templates.map((template) => (
+                                  <Button
+                                    key={template.id}
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full justify-start"
+                                    onClick={() => applyTemplate(template)}
+                                  >
+                                    {template.name}
+                                  </Button>
+                                ))}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex justify-end space-x-2">
                     <Button 
                       type="button" 
                       variant="outline" 
-                      onClick={() => setIsEditDialogOpen(false)}
-                      data-testid="button-cancel-edit"
+                      onClick={() => setIsTaskDialogOpen(false)}
+                      data-testid="button-cancel-task"
                     >
                       Cancel
                     </Button>
                     <Button 
                       type="submit" 
-                      disabled={updateTaskMutation.isPending}
-                      data-testid="button-save-edit"
+                      disabled={editingTask ? updateTaskMutation.isPending : createTaskMutation.isPending}
+                      data-testid={editingTask ? "button-save-edit" : "button-save-create"}
                     >
-                      {updateTaskMutation.isPending ? "Updating..." : "Update Task"}
+                      {editingTask 
+                        ? (updateTaskMutation.isPending ? "Updating..." : "Update Task")
+                        : (createTaskMutation.isPending ? "Creating..." : "Create Task")
+                      }
                     </Button>
                   </div>
                 </form>
@@ -764,7 +897,7 @@ export default function Tasks() {
                             data-testid={`button-complete-${task.id}`}
                           >
                             <CheckCircle className="w-3 h-3 mr-1" />
-                            Complete
+                            Mark Complete
                           </Button>
                         )}
                         {task.status !== 'blocked' && task.status !== 'completed' && (
