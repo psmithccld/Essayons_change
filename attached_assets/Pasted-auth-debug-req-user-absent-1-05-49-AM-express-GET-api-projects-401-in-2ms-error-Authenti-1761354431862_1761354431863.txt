@@ -1,0 +1,162 @@
+auth-debug] req.user absent
+1:05:49 AM [express] GET /api/projects 401 in 2ms :: {"error":"Authentication required. Please log i…
+[auth-debug] method=GET path=/api/auth/status
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=JIzazOPeeubMnxdzcOOz2lNxeqBLf-l0
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+1:05:49 AM [express] GET /api/auth/status 401 in 2ms :: {"error":"Not authenticated"}
+[auth-debug] method=GET path=/assets/image_1758488024387-DL5lyzk2.png
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=ZW1OTpNt_hMIbG9_9U4wySOIGKCV-g_b
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+[auth-debug] method=POST path=/api/auth/login
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=Z5XNdEignSJQEWMY_RBHMN1HhIdXAw4U
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+1:05:56 AM [express] POST /api/auth/login 200 in 75ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24e…
+[auth-debug] method=GET path=/api/auth/status
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+1:05:56 AM [express] GET /api/auth/status 200 in 8ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24e5…
+[auth-debug] method=GET path=/assets/rocket-DYkHyVsv.js
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/assets/save-BBvOFyZW.js
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/assets/HelpDeskButton-7JnrDa6T.js
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/assets/link-BFhqa6hH.js
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/organization/features
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/assets/PersistentAICoach-8Y0AQy_R.js
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/assets/progress-m_wg5ljK.js
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/auth/status
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/assets/dashboard-BttCHYhD.js
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/assets/lightbulb-DJ8EEvGX.js
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/assets/send-Ct9iT0yr.js
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/my/dashboard-metrics
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/my/initiatives
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+1:05:57 AM [express] GET /api/organization/features 200 in 977ms :: {"reports":true,"gptCoach":true,…
+[auth-debug] method=GET path=/assets/message-circle-BQP-aiCf.js
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/images/essayons-logo-cropped.png
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+1:05:57 AM [express] GET /api/auth/status 304 in 1096ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a2…
+1:05:57 AM [express] GET /api/notifications 200 in 1304ms :: {"notifications":[{"id":"2d5b6659-f0a2-…
+1:05:57 AM [express] GET /api/notifications/unread-count 200 in 402ms :: {"count":18}
+1:05:57 AM [express] GET /api/users/me/permissions 200 in 1304ms :: {"user":{"id":"cca94cb5-5de9-478…
+1:05:57 AM [express] GET /api/my/initiatives 200 in 1204ms :: [{"project":{"id":"cb57ee2c-3b91-4a4d-…
+1:05:57 AM [express] GET /api/my/dashboard-metrics 200 in 1347ms :: {"activeInitiatives":1,"pendingS…
+[auth-debug] method=GET path=/assets/gantt-CMhsc6x5.js
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/assets/checklist-templates-CzWWs2C9.js
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/checklist-templates
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+1:06:01 AM [express] GET /api/checklist-templates 200 in 7ms :: []
+[auth-debug] method=POST path=/api/checklist-templates
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+1:06:12 AM [express] POST /api/checklist-templates 403 in 114ms :: {"error":"Access denied. Required…
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+1:06:27 AM [express] GET /api/notifications/unread-count 304 in 62ms :: {"count":18}
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jxcsVK8u8-QRoEYfcGWqOIOejOcYlHEn
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+1:06:27 AM [express] GET /api/notifications 304 in 205ms :: {"notifications":[{"id":"2d5b6659-f0a2-4…
+1:06:27 AM [express] GET /api/users/me/permissions 304 in 60ms :: {"user":{"id":"cca94cb5-5de9-4780-…
