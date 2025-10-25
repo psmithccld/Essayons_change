@@ -29,6 +29,7 @@ Preferred communication style: Simple, everyday language.
 - **Session Management**: Cookie-based sessions with PostgreSQL store.
 - **User Management**: Basic user system with roles and permissions, including a separate Super Admin system.
 - **Multi-tenant Isolation**: Comprehensive enforcement ensuring users can only access data within their organization via `currentOrganizationId` and `organizationId` parameters across all relevant queries and API endpoints.
+- **Comprehensive Reports Security**: All user reports (Login Activity, Role Assignment, Initiatives Participation) enforce organization filtering via organizationMemberships joins and organizationId conditions to prevent cross-tenant data leakage. Role Assignment report supports legacy global roles (organizationId = null) for backward compatibility.
 - **Idle Timeout**: Automatic logout after 20 minutes of inactivity on the client side.
 - **Organization-Scoped Security Roles**: Roles are now tied to specific organizations, preventing privilege escalation and enhancing compartmentalization.
 
