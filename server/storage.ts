@@ -3977,6 +3977,7 @@ export class DatabaseStorage implements IStorage {
 
   // A. User Reports
   async getUserLoginActivityReport(params: {
+    organizationId: string;
     authorizedProjectIds?: string[];
     roleIds?: string[];
     dateFrom?: Date;
@@ -3985,8 +3986,9 @@ export class DatabaseStorage implements IStorage {
     sortBy?: 'lastLogin' | 'loginFrequency' | 'name';
     sortOrder?: 'asc' | 'desc';
   }) {
-    const { roleIds, dateFrom, dateTo, includeInactive = false, sortBy = 'name', sortOrder = 'asc' } = params;
+    const { organizationId, roleIds, dateFrom, dateTo, includeInactive = false, sortBy = 'name', sortOrder = 'asc' } = params;
     
+    // SECURITY: Filter users by organization using organizationMemberships
     let query = db
       .select({
         userId: users.id,
@@ -3998,9 +4000,13 @@ export class DatabaseStorage implements IStorage {
         createdAt: users.createdAt,
       })
       .from(users)
+      .innerJoin(organizationMemberships, eq(users.id, organizationMemberships.userId))
       .leftJoin(roles, eq(users.roleId, roles.id));
     
-    const conditions = [];
+    const conditions = [
+      eq(organizationMemberships.organizationId, organizationId) // SECURITY: Organization isolation
+    ];
+    
     if (!includeInactive) {
       conditions.push(eq(users.isActive, true));
     }
@@ -4014,9 +4020,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(sql`${users.lastLoginAt} <= ${dateTo}`);
     }
     
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
+    query = query.where(and(...conditions));
     
     // Apply sorting
     if (sortBy === 'lastLogin') {
