@@ -29,7 +29,7 @@ import {
   type Activity, type SystemHealth, type Alert
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql, count, isNull, inArray, ne } from "drizzle-orm";
+import { eq, desc, and, or, sql, count, isNull, inArray, ne } from "drizzle-orm";
 
 const SALT_ROUNDS = 12;
 
@@ -4056,6 +4056,7 @@ export class DatabaseStorage implements IStorage {
     const { organizationId, sortBy = 'roleName', sortOrder = 'asc' } = params;
     
     // SECURITY: Get roles with user counts and user details, filtered by organization
+    // Show roles that belong to this organization OR legacy global roles (organizationId = null)
     const rolesWithUsers = await db
       .select({
         roleId: roles.id,
@@ -4069,7 +4070,10 @@ export class DatabaseStorage implements IStorage {
       })
       .from(roles)
       .leftJoin(users, and(eq(roles.id, users.roleId), eq(users.isActive, true)))
-      .where(eq(roles.organizationId, organizationId)); // SECURITY: Organization isolation
+      .where(or(
+        eq(roles.organizationId, organizationId), // Organization-specific roles
+        isNull(roles.organizationId) // Legacy global roles for backward compatibility
+      )); // SECURITY: Organization isolation with legacy support
     
     // Group by role
     const roleMap = new Map();

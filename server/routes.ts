@@ -7850,6 +7850,7 @@ Please provide coaching guidance based on their question and current context.`;
       
       // Override with authorized projects for security
       params.authorizedProjectIds = authorizedProjectIds;
+      params.organizationId = req.organizationId!; // SECURITY: Organization isolation
       
       // Convert date strings to Date objects
       if (params.dateFrom) params.dateFrom = new Date(params.dateFrom);
@@ -7870,6 +7871,7 @@ Please provide coaching guidance based on their question and current context.`;
       // SECURITY: Get user's authorized projects for filtering
       const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
+      params.organizationId = req.organizationId!; // SECURITY: Organization isolation
       
       const report = await storage.getRoleAssignmentReport(params);
       res.json(report);
@@ -7886,6 +7888,7 @@ Please provide coaching guidance based on their question and current context.`;
       // SECURITY: Get user's authorized projects for filtering
       const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(req.userId!, req.organizationId!);
       params.authorizedProjectIds = authorizedProjectIds;
+      params.organizationId = req.organizationId!; // SECURITY: Organization isolation
       
       const report = await storage.getInitiativesParticipationReport(params);
       res.json(report);
