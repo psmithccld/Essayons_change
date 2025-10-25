@@ -14,6 +14,11 @@ Preferred communication style: Simple, everyday language.
 - **React with TypeScript**: Modern React application using TypeScript for type safety
 - **Vite**: Fast build tool and development server for optimal development experience
 - **React Query (TanStack Query)**: Server state management for data fetching, caching, and synchronization
+  - **Critical Pattern Fix (October 2025)**: Fixed systematic double JSON parsing bug across 13 mutations in 4 files
+  - **Root Cause**: `apiRequest` in `client/src/lib/queryClient.ts` already returns parsed JSON; calling `.json()` on the result caused mutations to fail with false error messages despite successful API responses (201 Created)
+  - **Fixed Files**: fishbone.tsx (5 mutations), stakeholders.tsx (2 mutations), survey-take.tsx (1 mutation), surveys.tsx (5 mutations)
+  - **Correct Pattern**: Always `return apiRequest(...)` directly in mutation functions; never call `.json()` on the result
+  - **Impact**: Eliminated false error toasts across task creation, stakeholder management, surveys, and fishbone diagram features
 - **Wouter**: Lightweight client-side routing library
 - **Shadcn/ui**: Component library built on Radix UI primitives with Tailwind CSS styling
 - **React Hook Form**: Form management with Zod schema validation
