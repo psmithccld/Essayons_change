@@ -4047,14 +4047,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRoleAssignmentReport(params: {
+    organizationId: string;
     authorizedProjectIds?: string[];
     includeHistory?: boolean;
     sortBy?: 'roleName' | 'userCount' | 'assignedAt';
     sortOrder?: 'asc' | 'desc';
   }) {
-    const { sortBy = 'roleName', sortOrder = 'asc' } = params;
+    const { organizationId, sortBy = 'roleName', sortOrder = 'asc' } = params;
     
-    // Get roles with user counts and user details
+    // SECURITY: Get roles with user counts and user details, filtered by organization
     const rolesWithUsers = await db
       .select({
         roleId: roles.id,
@@ -4067,7 +4068,8 @@ export class DatabaseStorage implements IStorage {
         createdAt: users.createdAt,
       })
       .from(roles)
-      .leftJoin(users, and(eq(roles.id, users.roleId), eq(users.isActive, true)));
+      .leftJoin(users, and(eq(roles.id, users.roleId), eq(users.isActive, true)))
+      .where(eq(roles.organizationId, organizationId)); // SECURITY: Organization isolation
     
     // Group by role
     const roleMap = new Map();
@@ -4112,14 +4114,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInitiativesParticipationReport(params: {
+    organizationId: string;
     authorizedProjectIds?: string[];
     userId?: string;
     includeProjectDetails?: boolean;
     sortBy?: 'userLoad' | 'userName' | 'projectCount';
     sortOrder?: 'asc' | 'desc';
   }) {
-    const { authorizedProjectIds, userId, sortBy = 'userName', sortOrder = 'asc' } = params;
+    const { organizationId, authorizedProjectIds, userId, sortBy = 'userName', sortOrder = 'asc' } = params;
     
+    // SECURITY: Filter users by organization using organizationMemberships
     let query = db
       .select({
         userId: users.id,
@@ -4135,21 +4139,25 @@ export class DatabaseStorage implements IStorage {
         projectPriority: projects.priority,
       })
       .from(users)
+      .innerJoin(organizationMemberships, eq(users.id, organizationMemberships.userId))
       .leftJoin(roles, eq(users.roleId, roles.id))
       .leftJoin(userInitiativeAssignments, eq(users.id, userInitiativeAssignments.userId))
-      .leftJoin(projects, eq(userInitiativeAssignments.projectId, projects.id))
-      .where(eq(users.isActive, true));
+      .leftJoin(projects, eq(userInitiativeAssignments.projectId, projects.id));
+    
+    const conditions = [
+      eq(users.isActive, true),
+      eq(organizationMemberships.organizationId, organizationId) // SECURITY: Organization isolation
+    ];
     
     if (userId) {
-      query = query.where(and(eq(users.isActive, true), eq(users.id, userId)));
+      conditions.push(eq(users.id, userId));
     }
     
     if (authorizedProjectIds && authorizedProjectIds.length > 0) {
-      query = query.where(and(
-        eq(users.isActive, true),
-        inArray(projects.id, authorizedProjectIds)
-      ));
+      conditions.push(inArray(projects.id, authorizedProjectIds));
     }
+    
+    query = query.where(and(...conditions));
     
     const results = await query;
     
