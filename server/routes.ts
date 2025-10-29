@@ -601,6 +601,34 @@ function requireFeature(featureName: 'readinessSurveys' | 'gptCoach' | 'communic
   };
 }
 
+// --- INSERT NEW MIDDLEWARE HERE (immediately after the requireFeature function) ---
+function requireEitherFeatureOrPermission(
+  featureName: 'readinessSurveys' | 'gptCoach' | 'communications' | 'changeArtifacts' | 'reports',
+  permissionName: string
+) {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = req.organizationId;
+      if (!organizationId) {
+        return res.status(401).json({ error: "Organization context required" });
+      }
+
+      const enabledFeatures = await resolveOrganizationFeatures(organizationId);
+
+      // If the org has the feature enabled, allow access immediately (org-wide access)
+      if (enabledFeatures[featureName]) {
+        return next();
+      }
+
+      // Otherwise fall back to the existing permission check middleware
+      return requirePermission(permissionName)(req, res, next);
+    } catch (error) {
+      console.error(`Error checking feature ${featureName} or permission ${permissionName}:`, error);
+      return res.status(500).json({ error: "Failed to verify access" });
+    }
+  };
+}
+
 // SECURITY: Authentication middleware - uses secure session-based authentication
 const requireAuth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -6572,7 +6600,13 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/gpt/stakeholder-tips", requireAuthAndOrg, requireEitherFeatureOrPermission('gptCoach', 'canSeeStakeholders'), async (req: AuthenticatedRequest, res) => {
+app.post(
+  "/api/gpt/stakeholder-tips",
+  requireAuthAndOrg,
+  // Allow request if org has gptCoach feature enabled OR
+  // the user has the canSeeStakeholders permission.
+  requireEitherFeatureOrPermission('gptCoach', 'canSeeStakeholders'),
+  async (req: AuthenticatedRequest, res) => {
     try {
       // Input validation
       const parseResult = gptStakeholderTipsSchema.safeParse(req.body);
@@ -6592,6 +6626,26 @@ Return the refined content in JSON format:
       if (!authorizedProjectIds.includes(projectId)) {
         return res.status(403).json({ error: 'Access denied to requested project' });
       }
+      
+      const tips = await openaiService.getStakeholderEngagementTips(stakeholders);
+
+      // Save interaction
+      await storage.createGptInteraction({
+        projectId,
+        userId: req.user!.id,
+        type: "stakeholder_tips",
+        prompt: "Get stakeholder engagement tips",
+        response: JSON.stringify(tips),
+        metadata: { stakeholderCount: stakeholders.length }
+      });
+
+      res.json(tips);
+    } catch (error) {
+      console.error("Error generating stakeholder tips:", error);
+      res.status(500).json({ error: "Failed to generate stakeholder tips" });
+    }
+  }
+);
       
       const tips = await openaiService.getStakeholderEngagementTips(stakeholders);
 
