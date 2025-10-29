@@ -737,6 +737,34 @@ const requirePermission = (permission: keyof Permissions) => {
   };
 };
 
+// Middleware factory: allow request if organization feature is enabled OR enforce permission
+function requireEitherFeatureOrPermission(
+  featureName: keyof ReturnType<typeof resolveOrganizationFeatures>,
+  permissionName: string
+) {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = req.organizationId;
+      if (!organizationId) {
+        return res.status(401).json({ error: "Organization context required" });
+      }
+
+      const enabledFeatures = await resolveOrganizationFeatures(organizationId);
+
+      // If the org has the feature enabled, allow access immediately
+      if (enabledFeatures[featureName]) {
+        return next();
+      }
+
+      // Otherwise fall back to the normal permission check
+      return requirePermission(permissionName)(req, res, next);
+    } catch (error) {
+      console.error(`Error checking feature ${featureName} or permission ${permissionName}:`, error);
+      return res.status(500).json({ error: "Failed to verify access" });
+    }
+  };
+}
+
 // Combined middleware for auth + organization context + permission
 const requireAuthAndPermission = (permission: keyof Permissions) => {
   return [requireAuth, requireOrgContext, requirePermission(permission)];
@@ -6544,7 +6572,7 @@ Return the refined content in JSON format:
     }
   });
 
-  app.post("/api/gpt/stakeholder-tips", requireAuthAndOrg, requireFeature('gptCoach'), requirePermission('canSeeStakeholders'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/gpt/stakeholder-tips", requireAuthAndOrg, requireEitherFeatureOrPermission('gptCoach', 'canSeeStakeholders'), async (req: AuthenticatedRequest, res) => {
     try {
       // Input validation
       const parseResult = gptStakeholderTipsSchema.safeParse(req.body);
