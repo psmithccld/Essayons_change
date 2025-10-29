@@ -740,7 +740,7 @@ const requirePermission = (permission: keyof Permissions) => {
 // Middleware factory: allow request if organization feature is enabled OR enforce permission
 function requireEitherFeatureOrPermission(
   featureName: keyof ReturnType<typeof resolveOrganizationFeatures>,
-  permissionName: string
+  permissionName: keyof Permissions
 ) {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
