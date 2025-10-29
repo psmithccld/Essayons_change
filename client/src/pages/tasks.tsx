@@ -707,12 +707,13 @@ export default function Tasks() {
                         <FormItem>
                           <FormLabel>External Email</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="email" 
-                              placeholder="email@example.com" 
+                            {/* Spread RHF field to keep expected event handling, but normalize sentinel display */}
+                            <Input
+                              {...field}
+                              type="email"
+                              placeholder="email@example.com"
                               value={field.value === "unassigned" ? "" : (field.value || "")}
-                              onChange={(e) => field.onChange(e.target.value)}
-                              data-testid="input-assignee-email" 
+                              data-testid="input-assignee-email"
                             />
                           </FormControl>
                           <FormMessage />
