@@ -44,6 +44,26 @@ interface AuthenticatedSuperAdminRequest extends SessionRequest {
 }
 
 interface AuthenticatedRequest extends SessionRequest {
+  userId?: string;
+  user?: {
+    id: string;
+    username: string;
+    name: string;
+    roleId: string;
+    isActive: boolean;
+  };
+  // Organization context for multi-tenant security
+  organizationId?: string;
+  organization?: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+  };
+  organizationMembership?: {
+    role: string;
+    isActive: boolean;
+  };
   superAdminUser?: {
     id: string;
     username: string;
@@ -504,28 +524,7 @@ const checkEnvironmentSafety = (operation: 'email' | 'bulk_email'): { safe: bool
 };
 
 // SECURITY: Session-based authentication interfaces
-interface AuthenticatedRequest extends SessionRequest {
-  userId?: string;
-  user?: {
-    id: string;
-    username: string;
-    name: string;
-    roleId: string;
-    isActive: boolean;
-  };
-  // Organization context for multi-tenant security
-  organizationId?: string;
-  organization?: {
-    id: string;
-    name: string;
-    slug: string;
-    status: string;
-  };
-  organizationMembership?: {
-    role: string;
-    isActive: boolean;
-  };
-}
+// (AuthenticatedRequest is defined earlier in the file)
 
 // SECURITY: Helper function to resolve organization features from Customer Tier subscription
 // This is the single source of truth for feature resolution
@@ -765,33 +764,7 @@ const requirePermission = (permission: keyof Permissions) => {
   };
 };
 
-// Middleware factory: allow request if organization feature is enabled OR enforce permission
-function requireEitherFeatureOrPermission(
-  featureName: keyof ReturnType<typeof resolveOrganizationFeatures>,
-  permissionName: keyof Permissions
-) {
-  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    try {
-      const organizationId = req.organizationId;
-      if (!organizationId) {
-        return res.status(401).json({ error: "Organization context required" });
-      }
-
-      const enabledFeatures = await resolveOrganizationFeatures(organizationId);
-
-      // If the org has the feature enabled, allow access immediately
-      if (enabledFeatures[featureName]) {
-        return next();
-      }
-
-      // Otherwise fall back to the normal permission check
-      return requirePermission(permissionName)(req, res, next);
-    } catch (error) {
-      console.error(`Error checking feature ${featureName} or permission ${permissionName}:`, error);
-      return res.status(500).json({ error: "Failed to verify access" });
-    }
-  };
-}
+// (requireEitherFeatureOrPermission is defined earlier in the file)
 
 // Combined middleware for auth + organization context + permission
 const requireAuthAndPermission = (permission: keyof Permissions) => {
@@ -1270,7 +1243,7 @@ async function seedNewOrganization(organization: any, storage: any): Promise<{ a
       }
       
       // Generate a secure random password for the admin user
-      generatedPassword = crypto.randomBytes(16).toString('base64').slice(0, 16);
+      generatedPassword = randomBytes(16).toString('base64').slice(0, 16);
       
       adminUser = await storage.createUser({
         username: adminUsername,
@@ -2814,10 +2787,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 day trial
         }).returning();
         
-        // Sync plan features to organization enabledFeatures
+        // Sync tier features to organization enabledFeatures
         await db.update(organizations)
           .set({
-            enabledFeatures: plan.features,
+            enabledFeatures: tier.features,
             updatedAt: new Date()
           })
           .where(eq(organizations.id, orgId));
@@ -6646,25 +6619,6 @@ app.post(
     }
   }
 );
-      
-      const tips = await openaiService.getStakeholderEngagementTips(stakeholders);
-
-      // Save interaction
-      await storage.createGptInteraction({
-        projectId,
-        userId: req.user!.id,
-        type: "stakeholder_tips",
-        prompt: "Get stakeholder engagement tips",
-        response: JSON.stringify(tips),
-        metadata: { stakeholderCount: stakeholders.length }
-      });
-
-      res.json(tips);
-    } catch (error) {
-      console.error("Error generating stakeholder tips:", error);
-      res.status(500).json({ error: "Failed to generate stakeholder tips" });
-    }
-  });
 
   // Context-Aware AI Coach Chat Endpoint
   app.post("/api/coach/chat", requireAuthAndOrg, requireFeature('gptCoach'), async (req: AuthenticatedRequest, res) => {
