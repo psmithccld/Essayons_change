@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Calendar, User as UserIcon, AlertCircle, CheckCircle, Clock, Pause, X, ListChecks, FileText, Building, Code, Megaphone, Settings, Edit, Trash2, Copy, Zap, Play, XCircle } from "lucide-react";
@@ -195,8 +195,28 @@ export default function Tasks() {
       priority: "medium",
       assignmentType: "user",
       assigneeId: "unassigned",
+      assigneeEmail: "",
     },
   });
+
+  // Watch assignmentType and clear the external email when appropriate.
+  // UseEffect avoids clearing repeatedly from Select internals and centralizes logic.
+  const assignmentTypeValue = form.watch("assignmentType");
+  useEffect(() => {
+    const currentEmail = form.getValues("assigneeEmail");
+    if (assignmentTypeValue === "external") {
+      // Only clear when it's the sentinel or empty to avoid overwriting user input
+      if (!currentEmail || currentEmail === "unassigned") {
+        form.setValue("assigneeEmail", "", { shouldValidate: false });
+      }
+    } else {
+      // switching to user: clear external email (don't disturb if already empty)
+      if (currentEmail) {
+        form.setValue("assigneeEmail", "", { shouldValidate: false });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignmentTypeValue]);
 
   const createTaskMutation = useMutation({
     mutationFn: async (taskData: TaskFormData) => {
@@ -644,20 +664,7 @@ export default function Tasks() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Assignment Type</FormLabel>
-                        <Select
-                          onValueChange={(val) => {
-                            field.onChange(val);
-                            if (val === "external") {
-                              // ensure assigneeId remains sentinel and assigneeEmail is cleared so the input is editable
-                              form.setValue("assigneeId", "unassigned");
-                              form.setValue("assigneeEmail", "");
-                            } else {
-                              // switching to user: clear any external email value
-                              form.setValue("assigneeEmail", "");
-                            }
-                          }}
-                          value={field.value}
-                        >
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-assignment-type">
                               <SelectValue placeholder="Select assignment type" />
@@ -700,19 +707,23 @@ export default function Tasks() {
                       )}
                     />
                   ) : (
-                    <FormField
-                      control={form.control}
+                    // Use Controller for the assigneeEmail field to ensure proper mapping
+                    <Controller
                       name="assigneeEmail"
+                      control={form.control}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>External Email</FormLabel>
                           <FormControl>
-                            {/* Spread RHF field to keep expected event handling, but normalize sentinel display */}
                             <Input
-                              {...field}
                               type="email"
                               placeholder="email@example.com"
-                              value={field.value === "unassigned" ? "" : (field.value || "")}
+                              // Show empty string instead of sentinel
+                              value={field.value === "unassigned" ? "" : (field.value ?? "")}
+                              onChange={(e) => {
+                                // Forward native event as value to RHF
+                                field.onChange(e.target.value);
+                              }}
                               data-testid="input-assignee-email"
                             />
                           </FormControl>
