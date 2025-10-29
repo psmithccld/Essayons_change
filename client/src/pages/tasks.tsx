@@ -329,7 +329,7 @@ export default function Tasks() {
     } else if (data.assignmentType === "external" && data.assigneeEmail) {
       // Normalize assigneeEmail: trim and ignore "unassigned" sentinel
       const trimmedEmail = data.assigneeEmail.trim();
-      if (trimmedEmail && trimmedEmail !== "unassigned") {
+      if (trimmedEmail && trimmedEmail.toLowerCase() !== "unassigned") {
         assigneeEmail = trimmedEmail;
       }
     }
@@ -644,17 +644,18 @@ export default function Tasks() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Assignment Type</FormLabel>
-                        <Select 
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            // Clear opposite field when switching assignment type
-                            if (value === "external") {
+                        <Select
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            if (val === "external") {
+                              // ensure assigneeId remains sentinel and assigneeEmail is cleared so the input is editable
                               form.setValue("assigneeId", "unassigned");
                               form.setValue("assigneeEmail", "");
                             } else {
+                              // switching to user: clear any external email value
                               form.setValue("assigneeEmail", "");
                             }
-                          }} 
+                          }}
                           value={field.value}
                         >
                           <FormControl>
@@ -709,8 +710,8 @@ export default function Tasks() {
                             <Input 
                               type="email" 
                               placeholder="email@example.com" 
-                              value={field.value === "unassigned" ? "" : field.value || ""}
-                              onChange={field.onChange}
+                              value={field.value === "unassigned" ? "" : (field.value || "")}
+                              onChange={(e) => field.onChange(e.target.value)}
                               data-testid="input-assignee-email" 
                             />
                           </FormControl>
