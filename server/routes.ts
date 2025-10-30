@@ -1402,7 +1402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SECURITY: User registration endpoint
   app.post("/api/auth/register", async (req: SessionRequest, res: Response) => {
     try {
-      const { registrationRequestSchema } = await import("../shared/schema.js");
+      const { registrationRequestSchema } = await import("@shared/schema");
       
       // Validate request body
       const validationResult = registrationRequestSchema.safeParse(req.body);
@@ -1462,7 +1462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Email verification endpoint
   app.post("/api/auth/verify-email", async (req: SessionRequest, res: Response) => {
     try {
-      const { emailVerificationResponseSchema } = await import("../shared/schema.js");
+      const { emailVerificationResponseSchema } = await import("@shared/schema");
       
       // Validate request body
       const validationResult = emailVerificationResponseSchema.safeParse(req.body);
@@ -5424,7 +5424,13 @@ Return the refined content in JSON format:
         response_format: { type: "json_object" },
       });
 
-      const refinedContent = JSON.parse(response.choices[0].message.content || "{}");
+      // SECURITY FIX: Validate OpenAI response structure
+      if (!response?.choices?.[0]?.message?.content) {
+        console.error("Invalid OpenAI response structure for flyer refinement");
+        return res.status(500).json({ error: "AI service returned invalid response" });
+      }
+
+      const refinedContent = JSON.parse(response.choices[0].message.content);
       res.json(refinedContent);
     } catch (error) {
       console.error("Error refining flyer content:", error);
@@ -5497,7 +5503,13 @@ Return the refined content in JSON format:
         response_format: { type: "json_object" },
       });
 
-      const refinedContent = JSON.parse(response.choices[0].message.content || "{}");
+      // SECURITY FIX: Validate OpenAI response structure
+      if (!response?.choices?.[0]?.message?.content) {
+        console.error("Invalid OpenAI response structure for group email refinement");
+        return res.status(500).json({ error: "AI service returned invalid response" });
+      }
+
+      const refinedContent = JSON.parse(response.choices[0].message.content);
       res.json(refinedContent);
     } catch (error) {
       console.error("Error refining group email content:", error);
@@ -5587,7 +5599,13 @@ Return the content in JSON format:
         response_format: { type: "json_object" },
       });
 
-      const content = JSON.parse(response.choices[0].message.content || "{}");
+      // SECURITY FIX: Validate OpenAI response structure
+      if (!response?.choices?.[0]?.message?.content) {
+        console.error("Invalid OpenAI response structure for P2P email generation");
+        return res.status(500).json({ error: "AI service returned invalid response" });
+      }
+
+      const content = JSON.parse(response.choices[0].message.content);
       res.json(content);
     } catch (error) {
       console.error("Error generating P2P email content:", error);
@@ -5652,7 +5670,13 @@ Return the refined content in JSON format:
         response_format: { type: "json_object" },
       });
 
-      const refinedContent = JSON.parse(response.choices[0].message.content || "{}");
+      // SECURITY FIX: Validate OpenAI response structure
+      if (!response?.choices?.[0]?.message?.content) {
+        console.error("Invalid OpenAI response structure for P2P email refinement");
+        return res.status(500).json({ error: "AI service returned invalid response" });
+      }
+
+      const refinedContent = JSON.parse(response.choices[0].message.content);
       res.json(refinedContent);
     } catch (error) {
       console.error("Error refining P2P email content:", error);
@@ -6754,7 +6778,9 @@ Please provide coaching guidance based on their question and current context.`;
         max_tokens: 800,
       });
 
-      const coachingResponse = response.choices[0].message.content || "I'm sorry, I couldn't generate a response at this time.";
+      // SECURITY FIX: Validate OpenAI response structure with graceful fallback
+      const coachingResponse = response?.choices?.[0]?.message?.content 
+        || "I'm sorry, I couldn't generate a response at this time. The AI service returned an invalid response.";
 
       // Save coaching interaction
       if (contextPayload?.currentProjectId) {

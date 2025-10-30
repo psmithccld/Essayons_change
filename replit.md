@@ -45,6 +45,34 @@ Preferred communication style: Simple, everyday language.
 - **Type Safety**: End-to-end TypeScript.
 - **Tooling**: Vite HMR, ESBuild for production builds, Path Aliases.
 
+### Security Configuration
+
+#### Impersonation Token System
+The application includes a secure impersonation system for Super Admin capabilities:
+
+- **IMPERSONATION_SECRET**: Required environment variable containing a 256-bit (32-byte) base64url-encoded secret key
+  - **Production**: Must be set explicitly - server will fail to start without it
+  - **Development**: Can bypass the requirement by setting `ALLOW_DEV_IMPERSONATION_SECRET=true`
+  - **Generation**: Use one of these methods to generate a base64url-safe key:
+    - **Shell**: `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`
+    - **Node.js**: `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`
+  - **Format**: Must use base64url encoding (characters: A-Z, a-z, 0-9, `-`, `_` only - no `+`, `/`, or `=`)
+  - **Security**: Never commit this secret to version control. Use Replit Secrets or environment-specific secret management.
+
+#### Rate Limiting
+- **Implementation**: In-memory Maps with automatic cleanup and size limits
+- **Single Instance**: Current implementation works for single-server deployments
+- **Production Scaling**: For multi-instance/Kubernetes deployments, migrate to Redis or external rate-limiting service
+- **Configuration**: Rate limits and store size caps are hardcoded; consider moving to environment variables for production flexibility
+
+### System Requirements
+
+#### Node.js Version
+- **Minimum Version**: Node.js 16.20+ / 18.12+ / 20+
+- **Reason**: The application uses `base64url` encoding for cryptographic operations (HMAC token verification)
+- **Verification**: Run `node --version` to check your current version
+- **Note**: Older Node.js versions don't support `base64url` as a Buffer encoding parameter
+
 ## External Dependencies
 
 ### Database and Infrastructure
