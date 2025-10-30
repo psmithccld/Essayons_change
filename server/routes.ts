@@ -80,6 +80,7 @@ interface AuthenticatedRequest extends SessionRequest {
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
+import { createRateLimitStore, type RateLimitStore } from "./rateLimit.js";
 import { type SystemSettings } from "@shared/schema";
 import { 
   insertProjectSchema, insertTaskSchema, insertStakeholderSchema, insertRaidLogSchema,
@@ -152,6 +153,27 @@ if (process.env.IMPERSONATION_SECRET) {
     'Either set IMPERSONATION_SECRET environment variable, or set ALLOW_DEV_IMPERSONATION_SECRET=true for development.\n' +
     'Generate a secure key: openssl rand -hex 32'
   );
+}
+
+// COMPATIBILITY CHECK: Ensure Node.js version supports base64url encoding
+const nodeVersion = process.version.match(/^v(\d+)\.(\d+)/);
+if (nodeVersion) {
+  const major = parseInt(nodeVersion[1]);
+  const minor = parseInt(nodeVersion[2]);
+  const isCompatible = 
+    (major === 16 && minor >= 20) ||
+    (major === 18 && minor >= 12) ||
+    (major >= 20);
+  
+  if (!isCompatible) {
+    throw new Error(
+      `🚨 COMPATIBILITY ERROR: Node.js ${process.version} does not support base64url encoding.\n` +
+      `Required: Node.js >= 16.20.0, >= 18.12.0, or >= 20.0.0\n` +
+      `Current: ${process.version}\n` +
+      `Please upgrade Node.js to use impersonation token features.`
+    );
+  }
+  console.log(`✅ Node.js ${process.version} - base64url encoding support confirmed`);
 }
 
 interface ImpersonationTokenPayload {
@@ -340,25 +362,33 @@ interface LoginAttemptEntry {
   successiveFailures: number;
 }
 
-const rateLimitStore = new Map<string, RateLimitEntry>();
-const loginAttemptStore = new Map<string, LoginAttemptEntry>();
-const suspiciousIpStore = new Map<string, { reportCount: number; lastReport: number }>();
+const rateLimitStore: RateLimitStore<RateLimitEntry> = createRateLimitStore<RateLimitEntry>('rate-limit');
+const loginAttemptStore: RateLimitStore<LoginAttemptEntry> = createRateLimitStore<LoginAttemptEntry>('login-attempts');
+const suspiciousIpStore: RateLimitStore<{ reportCount: number; lastReport: number }> = createRateLimitStore<{ reportCount: number; lastReport: number }>('suspicious-ips');
 
 // SECURITY: Enhanced rate limiting with progressive delays and memory protection
-const checkRateLimit = (userId: string, limit: number = 10, windowMs: number = 60000): boolean => {
+const checkRateLimit = async (userId: string, limit: number = 10, windowMs: number = 60000): Promise<boolean> => {
   const now = Date.now();
-  const userLimit = rateLimitStore.get(userId);
+  const userLimit = await rateLimitStore.get(userId);
   
   if (!userLimit || now > userLimit.resetTime) {
     // SECURITY FIX: Implement maximum entry limit to prevent memory DoS
-    if (rateLimitStore.size > 50000) { // Cap at 50k entries
+    const storeSize = await rateLimitStore.size();
+    if (storeSize > 50000) { // Cap at 50k entries
       // Remove oldest entries if we hit the limit
-      const entries = Array.from(rateLimitStore.entries());
+      const allKeys = await rateLimitStore.keys();
+      const entries: Array<[string, RateLimitEntry]> = [];
+      for (const key of allKeys) {
+        const entry = await rateLimitStore.get(key);
+        if (entry) entries.push([key, entry]);
+      }
       entries.sort((a, b) => a[1].lastAttempt - b[1].lastAttempt);
-      entries.slice(0, 5000).forEach(([key]) => rateLimitStore.delete(key)); // Remove oldest 5000
+      for (const [key] of entries.slice(0, 5000)) {
+        await rateLimitStore.delete(key);
+      }
     }
     
-    rateLimitStore.set(userId, { count: 1, resetTime: now + windowMs, lastAttempt: now });
+    await rateLimitStore.set(userId, { count: 1, resetTime: now + windowMs, lastAttempt: now });
     return true;
   }
   
@@ -368,22 +398,23 @@ const checkRateLimit = (userId: string, limit: number = 10, windowMs: number = 6
   
   userLimit.count++;
   userLimit.lastAttempt = now;
+  await rateLimitStore.set(userId, userLimit);
   return true;
 };
 
 // SECURITY: Advanced brute-force protection for Super Admin login
-const checkLoginRateLimit = (username: string, clientIp: string): { allowed: boolean; reason?: string; retryAfter?: number } => {
+const checkLoginRateLimit = async (username: string, clientIp: string): Promise<{ allowed: boolean; reason?: string; retryAfter?: number }> => {
   const now = Date.now();
   const normalizedUsername = username.toLowerCase().trim(); // Normalize for consistent keying
   const userKey = `user:${normalizedUsername}`;
   
   // SECURITY FIX: Clear expired lockouts to prevent memory retention
-  const userAttempts = loginAttemptStore.get(userKey);
+  const userAttempts = await loginAttemptStore.get(userKey);
   if (userAttempts?.lockoutUntil && now >= userAttempts.lockoutUntil) {
     userAttempts.lockoutUntil = undefined;
     // Reset successive failures after lockout expires (prevents overly punitive lockouts)
     userAttempts.successiveFailures = 0;
-    loginAttemptStore.set(userKey, userAttempts);
+    await loginAttemptStore.set(userKey, userAttempts);
   }
   
   // Check if user account is currently locked out
@@ -400,11 +431,11 @@ const checkLoginRateLimit = (username: string, clientIp: string): { allowed: boo
   // SECURITY FIX: Time-based decay of successive failures (24 hour cooldown)
   if (userAttempts && (now - userAttempts.lastFailedAttempt) > 86400000) { // 24 hours
     userAttempts.successiveFailures = 0;
-    loginAttemptStore.set(userKey, userAttempts);
+    await loginAttemptStore.set(userKey, userAttempts);
   }
   
   // Check IP-based rate limiting (more permissive)
-  if (!checkRateLimit(`ip-login:${clientIp}`, 15, 900000)) { // 15 attempts per 15 minutes per IP
+  if (!(await checkRateLimit(`ip-login:${clientIp}`, 15, 900000))) { // 15 attempts per 15 minutes per IP
     return { 
       allowed: false, 
       // SECURITY FIX: Generic message to prevent fingerprinting
@@ -414,7 +445,7 @@ const checkLoginRateLimit = (username: string, clientIp: string): { allowed: boo
   }
   
   // Check username-based rate limiting (more restrictive)
-  if (!checkRateLimit(`user-login:${normalizedUsername}`, 5, 900000)) { // 5 attempts per 15 minutes per username
+  if (!(await checkRateLimit(`user-login:${normalizedUsername}`, 5, 900000))) { // 5 attempts per 15 minutes per username
     return { 
       allowed: false, 
       // SECURITY FIX: Generic message to prevent user enumeration
@@ -427,12 +458,12 @@ const checkLoginRateLimit = (username: string, clientIp: string): { allowed: boo
 };
 
 // SECURITY: Record failed login attempt with progressive lockout
-const recordFailedLogin = (username: string, clientIp: string): void => {
+const recordFailedLogin = async (username: string, clientIp: string): Promise<void> => {
   const now = Date.now();
   const normalizedUsername = username.toLowerCase().trim(); // Consistent normalization
   const userKey = `user:${normalizedUsername}`;
   
-  let userAttempts = loginAttemptStore.get(userKey);
+  let userAttempts = await loginAttemptStore.get(userKey);
   if (!userAttempts) {
     userAttempts = {
       failedAttempts: 0,
@@ -458,17 +489,25 @@ const recordFailedLogin = (username: string, clientIp: string): void => {
   }
   
   // SECURITY FIX: Implement maximum entry limit to prevent memory DoS
-  if (loginAttemptStore.size > 10000) { // Cap at 10k entries
+  const storeSize = await loginAttemptStore.size();
+  if (storeSize > 10000) { // Cap at 10k entries
     // Remove oldest entries if we hit the limit
-    const entries = Array.from(loginAttemptStore.entries());
+    const allKeys = await loginAttemptStore.keys();
+    const entries: Array<[string, LoginAttemptEntry]> = [];
+    for (const key of allKeys) {
+      const entry = await loginAttemptStore.get(key);
+      if (entry) entries.push([key, entry]);
+    }
     entries.sort((a, b) => a[1].lastFailedAttempt - b[1].lastFailedAttempt);
-    entries.slice(0, 1000).forEach(([key]) => loginAttemptStore.delete(key)); // Remove oldest 1000
+    for (const [key] of entries.slice(0, 1000)) {
+      await loginAttemptStore.delete(key);
+    }
   }
   
-  loginAttemptStore.set(userKey, userAttempts);
+  await loginAttemptStore.set(userKey, userAttempts);
   
   // Track suspicious IP activity
-  let ipData = suspiciousIpStore.get(clientIp);
+  let ipData = await suspiciousIpStore.get(clientIp);
   if (!ipData) {
     ipData = { reportCount: 0, lastReport: now };
   }
@@ -476,75 +515,97 @@ const recordFailedLogin = (username: string, clientIp: string): void => {
   ipData.lastReport = now;
   
   // SECURITY FIX: Cap suspicious IP store size
-  if (suspiciousIpStore.size > 5000) {
-    const ipEntries = Array.from(suspiciousIpStore.entries());
+  const ipStoreSize = await suspiciousIpStore.size();
+  if (ipStoreSize > 5000) {
+    const allIpKeys = await suspiciousIpStore.keys();
+    const ipEntries: Array<[string, { reportCount: number; lastReport: number }]> = [];
+    for (const key of allIpKeys) {
+      const entry = await suspiciousIpStore.get(key);
+      if (entry) ipEntries.push([key, entry]);
+    }
     ipEntries.sort((a, b) => a[1].lastReport - b[1].lastReport);
-    ipEntries.slice(0, 500).forEach(([key]) => suspiciousIpStore.delete(key)); // Remove oldest 500
+    for (const [key] of ipEntries.slice(0, 500)) {
+      await suspiciousIpStore.delete(key);
+    }
   }
   
-  suspiciousIpStore.set(clientIp, ipData);
+  await suspiciousIpStore.set(clientIp, ipData);
   
   // SECURITY FIX: Log with normalized username to prevent log injection
   console.warn(`SECURITY: Failed Super Admin login attempt for user '${normalizedUsername}' from IP ${clientIp}. Total failures: ${userAttempts.failedAttempts}, Successive: ${userAttempts.successiveFailures}`);
 };
 
 // SECURITY: Record successful login (clears failed attempts)
-const recordSuccessfulLogin = (username: string, clientIp: string): void => {
+const recordSuccessfulLogin = async (username: string, clientIp: string): Promise<void> => {
   const normalizedUsername = username.toLowerCase().trim(); // Consistent normalization
   const userKey = `user:${normalizedUsername}`;
-  const userAttempts = loginAttemptStore.get(userKey);
+  const userAttempts = await loginAttemptStore.get(userKey);
   
   if (userAttempts) {
     // Keep total failed attempts for auditing, but reset successive failures
     userAttempts.successiveFailures = 0;
     userAttempts.lockoutUntil = undefined;
-    loginAttemptStore.set(userKey, userAttempts);
+    await loginAttemptStore.set(userKey, userAttempts);
   }
   
   console.log(`SECURITY: Successful Super Admin login for user '${normalizedUsername}' from IP ${clientIp}`);
 };
 
 // SECURITY: Cleanup old rate limit entries to prevent memory leaks
-const cleanupRateLimitStores = (): void => {
+const cleanupRateLimitStores = async (): Promise<void> => {
   const now = Date.now();
   const maxAge = 24 * 60 * 60 * 1000; // 24 hours
   
   // Cleanup rate limit store
-  Array.from(rateLimitStore.entries()).forEach(([key, entry]) => {
-    if (now > entry.resetTime || (now - entry.lastAttempt) > maxAge) {
-      rateLimitStore.delete(key);
+  const rateLimitKeys = await rateLimitStore.keys();
+  for (const key of rateLimitKeys) {
+    const entry = await rateLimitStore.get(key);
+    if (entry && (now > entry.resetTime || (now - entry.lastAttempt) > maxAge)) {
+      await rateLimitStore.delete(key);
     }
-  });
+  }
   
   // SECURITY FIX: Cleanup login attempt store including expired lockouts
-  Array.from(loginAttemptStore.entries()).forEach(([key, entry]) => {
-    const isExpiredLockout = entry.lockoutUntil && now >= entry.lockoutUntil;
-    const isOldEntry = (now - entry.lastFailedAttempt) > maxAge;
-    
-    if (isExpiredLockout || isOldEntry) {
-      loginAttemptStore.delete(key);
+  const loginAttemptKeys = await loginAttemptStore.keys();
+  for (const key of loginAttemptKeys) {
+    const entry = await loginAttemptStore.get(key);
+    if (entry) {
+      const isExpiredLockout = entry.lockoutUntil && now >= entry.lockoutUntil;
+      const isOldEntry = (now - entry.lastFailedAttempt) > maxAge;
+      
+      if (isExpiredLockout || isOldEntry) {
+        await loginAttemptStore.delete(key);
+      }
     }
-  });
+  }
   
   // Cleanup suspicious IP store
-  Array.from(suspiciousIpStore.entries()).forEach(([key, entry]) => {
-    if ((now - entry.lastReport) > maxAge) {
-      suspiciousIpStore.delete(key);
+  const suspiciousIpKeys = await suspiciousIpStore.keys();
+  for (const key of suspiciousIpKeys) {
+    const entry = await suspiciousIpStore.get(key);
+    if (entry && (now - entry.lastReport) > maxAge) {
+      await suspiciousIpStore.delete(key);
     }
-  });
+  }
   
   // SECURITY: Log cleanup stats for monitoring
-  console.log(`SECURITY: Cleanup completed - Rate limits: ${rateLimitStore.size}, Login attempts: ${loginAttemptStore.size}, Suspicious IPs: ${suspiciousIpStore.size}`);
+  const rateLimitSize = await rateLimitStore.size();
+  const loginAttemptSize = await loginAttemptStore.size();
+  const suspiciousIpSize = await suspiciousIpStore.size();
+  console.log(`SECURITY: Cleanup completed - Rate limits: ${rateLimitSize}, Login attempts: ${loginAttemptSize}, Suspicious IPs: ${suspiciousIpSize}`);
 };
 
 // SECURITY: Run cleanup every hour and add monitoring
-setInterval(() => {
-  cleanupRateLimitStores();
+setInterval(async () => {
+  await cleanupRateLimitStores();
   
   // Monitor memory usage and alert if stores grow too large
-  const totalEntries = rateLimitStore.size + loginAttemptStore.size + suspiciousIpStore.size;
+  const rateLimitSize = await rateLimitStore.size();
+  const loginAttemptSize = await loginAttemptStore.size();
+  const suspiciousIpSize = await suspiciousIpStore.size();
+  const totalEntries = rateLimitSize + loginAttemptSize + suspiciousIpSize;
   if (totalEntries > 75000) {
-    console.warn(`SECURITY ALERT: High memory usage in rate limiting stores. Total entries: ${totalEntries} (Rate: ${rateLimitStore.size}, Login: ${loginAttemptStore.size}, IP: ${suspiciousIpStore.size})`);
+    console.warn(`SECURITY ALERT: High memory usage in rate limiting stores. Total entries: ${totalEntries} (Rate: ${rateLimitSize}, Login: ${loginAttemptSize}, IP: ${suspiciousIpSize})`);
   }
 }, 3600000); // 1 hour
 
@@ -1304,7 +1365,7 @@ async function seedNewOrganization(organization: any, storage: any): Promise<{ a
         isEmailVerified: false
       });
       console.log(`✅ Created Admin user: ${adminUser.username} (${adminUser.id})`);
-      console.log(`🔑 Admin password: ${generatedPassword} (store this securely - it cannot be retrieved later)`);
+      console.log('🔑 Generated admin password (store securely - cannot be retrieved later)');
     } else {
       console.log(`ℹ️  Admin user already exists: ${adminUser.username} (${adminUser.id})`);
     }
@@ -1780,7 +1841,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // SECURITY: Enhanced brute-force protection with progressive lockout
       const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
       
-      const rateLimitResult = checkLoginRateLimit(username, clientIp);
+      const rateLimitResult = await checkLoginRateLimit(username, clientIp);
       if (!rateLimitResult.allowed) {
         // Record this as a rate-limited attempt for monitoring
         console.warn(`SECURITY: Super admin login rate limit exceeded for username: ${username}, IP: ${clientIp} - ${rateLimitResult.reason}`);
@@ -1799,7 +1860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.verifySuperAdminPassword(username, password);
       if (!user) {
         // SECURITY: Record failed login attempt with progressive lockout
-        recordFailedLogin(username, clientIp);
+        await recordFailedLogin(username, clientIp);
         return res.status(401).json({ error: "Invalid username or password" });
       }
 
@@ -1808,7 +1869,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // SECURITY: Record successful login (clears failed attempts)
-      recordSuccessfulLogin(username, clientIp);
+      await recordSuccessfulLogin(username, clientIp);
       
       // Create super admin session
       const session = await storage.createSuperAdminSession(user.id);
@@ -1854,7 +1915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
       
       // SECURITY: Rate limiting for MFA verification (5 attempts per 15 minutes per IP)
-      if (!checkRateLimit(`mfa-verify-ip:${clientIp}`, 5, 900000)) {
+      if (!(await checkRateLimit(`mfa-verify-ip:${clientIp}`, 5, 900000))) {
         return res.status(429).json({ 
           error: "Too many MFA verification attempts. Please wait before trying again.",
           retryAfter: 900
@@ -1875,7 +1936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { sessionId, totpCode, backupCode } = validationResult.data;
 
       // SECURITY: Per-session rate limiting (3 attempts per session to prevent brute force)
-      if (!checkRateLimit(`mfa-verify-session:${sessionId}`, 3, 900000)) {
+      if (!(await checkRateLimit(`mfa-verify-session:${sessionId}`, 3, 900000))) {
         return res.status(429).json({ 
           error: "Too many verification attempts for this session. Please wait before trying again.",
           retryAfter: 900
@@ -4223,7 +4284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userAgent: req.get('User-Agent'),
       });
       
-      console.log(`🔒 SECURITY: Secure impersonation bound to session for org ${organizationId} in ${mode} mode via validated token`);
+      console.log(`🔒 SECURITY: Secure impersonation bound to session for org ${organizationId}`);
       
       res.json({ 
         success: true,
@@ -4300,7 +4361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userAgent: req.get('User-Agent'),
       });
       
-      console.log(`🔒 SECURITY: Impersonation token generated for org ${organizationId} in ${mode} mode`);
+      console.log(`🔒 SECURITY: Impersonation token generated for org ${organizationId}`);
       
       res.json({ 
         success: true,
@@ -5536,7 +5597,7 @@ Return the refined content in JSON format:
       } = validatedInput;
 
       // SECURITY: Rate limiting check for P2P content generation
-      if (!checkRateLimit(req.userId!, 20, 300000)) { // 20 generations per 5 minutes
+      if (!(await checkRateLimit(req.userId!, 20, 300000))) { // 20 generations per 5 minutes
         return res.status(429).json({ 
           error: "Rate limit exceeded. Please wait before generating more content." 
         });
@@ -5621,7 +5682,7 @@ Return the content in JSON format:
       const { currentContent, refinementRequest, recipientName, relationship, tone, urgency } = validatedInput;
 
       // SECURITY: Rate limiting check
-      if (!checkRateLimit(req.userId!, 20, 300000)) { // 20 refinements per 5 minutes
+      if (!(await checkRateLimit(req.userId!, 20, 300000))) { // 20 refinements per 5 minutes
         return res.status(429).json({ 
           error: "Rate limit exceeded. Please wait before refining more content." 
         });
@@ -5716,7 +5777,7 @@ Return the refined content in JSON format:
       const { format } = validatedInput;
       
       // SECURITY: Rate limiting for exports
-      if (!checkRateLimit(req.userId!, 20, 300000)) { // 20 exports per 5 minutes
+      if (!(await checkRateLimit(req.userId!, 20, 300000))) { // 20 exports per 5 minutes
         return res.status(429).json({ 
           error: "Export rate limit exceeded. Please wait before requesting more exports." 
         });
@@ -6497,7 +6558,7 @@ Return the refined content in JSON format:
       const { projectId, projectName, description, stakeholders } = validatedInput;
       
       // Rate limiting for AI endpoints
-      if (!checkRateLimit(req.userId!, 5, 300000)) { // 5 requests per 5 minutes
+      if (!(await checkRateLimit(req.userId!, 5, 300000))) { // 5 requests per 5 minutes
         return res.status(429).json({ error: "AI coaching rate limit exceeded. Please wait before requesting more AI assistance." });
       }
       
@@ -6541,7 +6602,7 @@ Return the refined content in JSON format:
       const { projectId, surveyResponses, stakeholderData } = validatedInput;
       
       // Rate limiting for AI endpoints
-      if (!checkRateLimit(req.userId!, 5, 300000)) { // 5 requests per 5 minutes
+      if (!(await checkRateLimit(req.userId!, 5, 300000))) { // 5 requests per 5 minutes
         return res.status(429).json({ error: "AI coaching rate limit exceeded. Please wait before requesting more AI assistance." });
       }
       
@@ -6584,7 +6645,7 @@ Return the refined content in JSON format:
       const { projectId, risks } = validatedInput;
       
       // Rate limiting for AI endpoints
-      if (!checkRateLimit(req.userId!, 5, 300000)) { // 5 requests per 5 minutes
+      if (!(await checkRateLimit(req.userId!, 5, 300000))) { // 5 requests per 5 minutes
         return res.status(429).json({ error: "AI coaching rate limit exceeded. Please wait before requesting more AI assistance." });
       }
       
@@ -6630,7 +6691,7 @@ app.post(
       const { projectId, stakeholders } = validatedInput;
       
       // Rate limiting for AI endpoints
-      if (!checkRateLimit(req.userId!, 5, 300000)) { // 5 requests per 5 minutes
+      if (!(await checkRateLimit(req.userId!, 5, 300000))) { // 5 requests per 5 minutes
         return res.status(429).json({ error: "AI coaching rate limit exceeded. Please wait before requesting more AI assistance." });
       }
       
@@ -6672,7 +6733,7 @@ app.post(
       const { message, contextPayload } = chatRequestSchema.parse(req.body);
       
       // Rate limiting for AI coaching
-      if (!checkRateLimit(req.userId!, 10, 300000)) { // 10 requests per 5 minutes
+      if (!(await checkRateLimit(req.userId!, 10, 300000))) { // 10 requests per 5 minutes
         return res.status(429).json({ error: "AI coaching rate limit exceeded. Please wait before requesting more coaching assistance." });
       }
       
@@ -7339,12 +7400,6 @@ Please provide coaching guidance based on their question and current context.`;
       // Handle password reset separately from other user data
       const { resetPassword, password, confirmPassword, ...otherData } = req.body;
       
-      // Log request but redact sensitive fields
-      console.log("PUT /api/users/:id - Request body:", JSON.stringify(otherData, null, 2));
-      
-      console.log("PUT /api/users/:id - Other data (sanitized):", JSON.stringify(otherData, null, 2));
-      console.log("PUT /api/users/:id - Reset password:", resetPassword);
-      
       // Create a schema for updating users (partial, excluding password fields)
       const updateUserSchema = z.object({
         name: z.string().min(1, "Name is required").optional(),
@@ -7358,7 +7413,6 @@ Please provide coaching guidance based on their question and current context.`;
       let validatedData;
       try {
         validatedData = updateUserSchema.parse(otherData);
-        console.log("PUT /api/users/:id - Validated data:", JSON.stringify(validatedData, null, 2));
       } catch (validationError) {
         console.error("PUT /api/users/:id - Validation error:", validationError);
         return res.status(400).json({ error: "Invalid user data", details: validationError });
@@ -7366,22 +7420,17 @@ Please provide coaching guidance based on their question and current context.`;
       
       // If password reset is requested, handle it separately
       if (resetPassword) {
-        console.log("PUT /api/users/:id - Processing password reset");
-        
         // Require both password fields when reset is requested
         if (!password || !confirmPassword) {
-          console.error("PUT /api/users/:id - Missing password fields");
           return res.status(400).json({ error: "Both password and confirm password are required when resetting password" });
         }
         
         // Validate password requirements
         if (password.length < 8) {
-          console.error("PUT /api/users/:id - Password too short");
           return res.status(400).json({ error: "Password must be at least 8 characters long" });
         }
         
         if (password !== confirmPassword) {
-          console.error("PUT /api/users/:id - Passwords don't match");
           return res.status(400).json({ error: "Passwords do not match" });
         }
         
@@ -7392,20 +7441,12 @@ Please provide coaching guidance based on their question and current context.`;
         
         // Include passwordHash in the update
         validatedData.passwordHash = passwordHash;
-        console.log("PUT /api/users/:id - Password hash added to validated data");
       }
-      
-      // Log update data but redact passwordHash for security
-      const { passwordHash, ...safeUpdateData } = validatedData;
-      console.log("PUT /api/users/:id - Calling storage.updateUser with:", JSON.stringify({ ...safeUpdateData, passwordHash: passwordHash ? '[REDACTED]' : undefined }, null, 2));
       
       const user = await storage.updateUser(req.params.id, validatedData);
       if (!user) {
-        console.error("PUT /api/users/:id - User not found:", req.params.id);
         return res.status(404).json({ error: "User not found" });
       }
-      
-      console.log("PUT /api/users/:id - User updated successfully");
       
       // User already has passwordHash removed by storage layer
       res.json(user);
@@ -7717,7 +7758,7 @@ Please provide coaching guidance based on their question and current context.`;
       const validatedInput = generateMeetingAgendaSchema.parse(req.body);
       
       // SECURITY: Rate limiting check for meeting agenda generation
-      if (!checkRateLimit(req.userId!, 10, 300000)) { // 10 agenda generations per 5 minutes
+      if (!(await checkRateLimit(req.userId!, 10, 300000))) { // 10 agenda generations per 5 minutes
         return res.status(429).json({ 
           error: "Rate limit exceeded. Please wait before generating more agendas." 
         });
@@ -7754,7 +7795,7 @@ Please provide coaching guidance based on their question and current context.`;
       const { recipients, meetingData, dryRun } = validatedInput;
 
       // SECURITY: Rate limiting check for meeting invites
-      if (!checkRateLimit(req.userId!, 5, 300000)) { // 5 meeting invite distributions per 5 minutes
+      if (!(await checkRateLimit(req.userId!, 5, 300000))) { // 5 meeting invite distributions per 5 minutes
         return res.status(429).json({ 
           error: "Rate limit exceeded. Please wait before sending more meeting invites." 
         });
@@ -7876,7 +7917,7 @@ Please provide coaching guidance based on their question and current context.`;
       const validatedInput = refineMeetingContentSchema.parse(req.body);
       
       // SECURITY: Rate limiting check for meeting content refinement
-      if (!checkRateLimit(req.userId!, 15, 300000)) { // 15 refinements per 5 minutes
+      if (!(await checkRateLimit(req.userId!, 15, 300000))) { // 15 refinements per 5 minutes
         return res.status(429).json({ 
           error: "Rate limit exceeded. Please wait before refining more meeting content." 
         });
