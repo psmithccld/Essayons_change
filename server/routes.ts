@@ -127,23 +127,31 @@ const toggleSupportModeSchema = z.object({
 });
 
 // CRITICAL SECURITY: Cryptographic token system for secure impersonation binding
-const IMPERSONATION_SECRET_RAW = process.env.IMPERSONATION_SECRET || 
-  (process.env.NODE_ENV === 'development' ? 
-    'dev-fallback-32-char-hmac-secret-key-not-for-production-use-only' : 
-    null);
+// Determine the impersonation secret based on environment and configuration
+let IMPERSONATION_SECRET: string;
 
-if (!IMPERSONATION_SECRET_RAW) {
-  console.error('🚨 SECURITY ERROR: IMPERSONATION_SECRET environment variable is required for secure token validation');
-  console.error('Generate a secure key: openssl rand -hex 32');
-  console.error('Set it in production environment: IMPERSONATION_SECRET=your_generated_key');
-  process.exit(1);
-}
-
-// Type assertion: after the null check above, we know this is never null
-const IMPERSONATION_SECRET: string = IMPERSONATION_SECRET_RAW;
-
-if (process.env.NODE_ENV === 'development' && !process.env.IMPERSONATION_SECRET) {
-  console.warn('⚠️  DEVELOPMENT: Using fallback IMPERSONATION_SECRET. Set IMPERSONATION_SECRET env var for production!');
+if (process.env.IMPERSONATION_SECRET) {
+  // Use the explicit environment variable if provided
+  IMPERSONATION_SECRET = process.env.IMPERSONATION_SECRET;
+} else if (process.env.NODE_ENV === 'production') {
+  // SECURITY: In production, fail-fast with descriptive error if secret is missing
+  throw new Error(
+    '🚨 SECURITY ERROR: IMPERSONATION_SECRET environment variable is required in production.\n' +
+    'Generate a secure key: openssl rand -hex 32\n' +
+    'Set it in your production environment: IMPERSONATION_SECRET=your_generated_key'
+  );
+} else if (process.env.ALLOW_DEV_IMPERSONATION_SECRET === 'true') {
+  // SECURITY: Only allow dev fallback when explicitly enabled
+  IMPERSONATION_SECRET = 'dev-fallback-32-char-hmac-secret-key-not-for-production-use-only';
+  console.warn('⚠️  DEVELOPMENT: Using fallback IMPERSONATION_SECRET because ALLOW_DEV_IMPERSONATION_SECRET=true');
+  console.warn('⚠️  This is NOT secure for production. Set IMPERSONATION_SECRET env var for production!');
+} else {
+  // SECURITY: In development without explicit flag, fail to prevent accidental insecure usage
+  throw new Error(
+    '🚨 SECURITY ERROR: IMPERSONATION_SECRET not set and ALLOW_DEV_IMPERSONATION_SECRET is not enabled.\n' +
+    'Either set IMPERSONATION_SECRET environment variable, or set ALLOW_DEV_IMPERSONATION_SECRET=true for development.\n' +
+    'Generate a secure key: openssl rand -hex 32'
+  );
 }
 
 interface ImpersonationTokenPayload {
@@ -187,14 +195,54 @@ function validateImpersonationToken(token: string): ImpersonationTokenPayload | 
     const signatureBuffer = Buffer.from(signature, 'base64url');
     const expectedBuffer = Buffer.from(expectedSignature, 'base64url');
     
+    // SECURITY FIX: Check buffer lengths match before calling timingSafeEqual
+    // timingSafeEqual throws an exception if buffer lengths differ
+    if (signatureBuffer.length !== expectedBuffer.length) {
+      console.warn('🚨 SECURITY: Invalid impersonation token signature (length mismatch)');
+      return null;
+    }
+    
     if (!timingSafeEqual(signatureBuffer, expectedBuffer)) {
       console.warn('🚨 SECURITY: Invalid impersonation token signature');
       return null;
     }
     
-    // Parse and validate payload
+    // Parse and validate payload with robust error handling
     const payloadJson = Buffer.from(payloadBase64, 'base64url').toString('utf8');
-    const payload: ImpersonationTokenPayload = JSON.parse(payloadJson);
+    let payload: any;
+    
+    try {
+      payload = JSON.parse(payloadJson);
+    } catch (parseError) {
+      console.warn('🚨 SECURITY: Failed to parse impersonation token payload JSON:', parseError);
+      return null;
+    }
+    
+    // SECURITY FIX: Explicit type checks for required fields
+    if (!payload || typeof payload !== 'object') {
+      console.warn('🚨 SECURITY: Invalid impersonation token payload structure');
+      return null;
+    }
+    
+    if (typeof payload.sessionId !== 'string' || !payload.sessionId) {
+      console.warn('🚨 SECURITY: Missing or invalid sessionId in impersonation token');
+      return null;
+    }
+    
+    if (typeof payload.organizationId !== 'string' || !payload.organizationId) {
+      console.warn('🚨 SECURITY: Missing or invalid organizationId in impersonation token');
+      return null;
+    }
+    
+    if (typeof payload.mode !== 'string' || (payload.mode !== 'read' && payload.mode !== 'write')) {
+      console.warn('🚨 SECURITY: Missing or invalid mode in impersonation token');
+      return null;
+    }
+    
+    if (typeof payload.exp !== 'number' || typeof payload.iat !== 'number') {
+      console.warn('🚨 SECURITY: Missing or invalid timestamps in impersonation token');
+      return null;
+    }
     
     // Check expiration
     const now = Math.floor(Date.now() / 1000);
@@ -203,7 +251,7 @@ function validateImpersonationToken(token: string): ImpersonationTokenPayload | 
       return null;
     }
     
-    return payload;
+    return payload as ImpersonationTokenPayload;
   } catch (error) {
     console.warn('🚨 SECURITY: Malformed impersonation token:', error);
     return null;
@@ -1660,38 +1708,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // SECURITY: Check authentication status endpoint
-  app.get("/api/auth/status", async (req: SessionRequest, res) => {
-    try {
-      if (req.session?.userId) {
-        // Verify user still exists and is active
-        const user = await storage.getUser(req.session.userId);
-        if (user && user.isActive) {
-          const role = await storage.getRole(user.roleId);
-          return res.json({
-            authenticated: true,
-            user: {
-              id: user.id,
-              username: user.username,
-              name: user.name,
-              roleId: user.roleId,
-              isActive: user.isActive
-            },
-            role,
-            permissions: role?.permissions
-          });
-        } else {
-          // User no longer exists or is inactive, clear session
-          req.session.destroy(() => {});
-        }
-      }
-      
-      res.json({ authenticated: false });
-    } catch (error) {
-      console.error("Error checking auth status:", error);
-      res.status(500).json({ error: "Authentication status check failed" });
-    }
-  });
-
   // ===============================================
   // SUPER ADMIN AUTHENTICATION ROUTES - Platform Management
   // ===============================================
