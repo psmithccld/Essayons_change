@@ -221,7 +221,7 @@ export default function Stakeholders() {
 
   const getStakeholderTipsMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/gpt/stakeholder-tips", {
+      return apiRequest("POST", "/api/gpt/stakeholder-tips", {
         projectId: currentProject?.id,
         stakeholders: stakeholders.map(s => ({
           name: s.name,
@@ -231,7 +231,6 @@ export default function Stakeholders() {
           engagementLevel: s.engagementLevel,
         }))
       });
-      return response.json();
     },
     onSuccess: (data) => {
       setGptTips(data);
