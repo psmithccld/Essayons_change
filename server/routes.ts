@@ -90,7 +90,7 @@ import {
   insertUserGroupSchema, insertUserGroupMembershipSchema, insertUserPermissionSchema, insertNotificationSchema, insertChangeArtifactSchema,
   insertOrganizationSettingsSchema,
   coachContextPayloadSchema,
-  type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload,
+  type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload, type Survey,
   // Add missing schema imports
   users, projects, organizations, organizationMemberships, customerTiers, subscriptions, roles, superAdminUsers
 } from "@shared/schema";
@@ -6700,7 +6700,7 @@ app.post(
               
             case "surveys":
               const surveys = await storage.getSurveys(organizationId);
-              const projectSurveys = surveys.filter((s: any) => s.projectId === contextPayload.currentProjectId);
+              const projectSurveys = surveys.filter((s: Survey) => s.projectId === contextPayload.currentProjectId);
               pageContext = `\n\n**SURVEY INSIGHTS:**
 - Total Surveys: ${projectSurveys.length}
 - Currently viewing: Surveys page`;
