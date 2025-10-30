@@ -101,6 +101,11 @@ import * as openaiService from "./openai";
 import { sendTaskAssignmentNotification } from "./services/emailService";
 import { z } from "zod";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { 
+  generateImpersonationToken as generateTokenUtil, 
+  validateImpersonationToken as validateTokenUtil,
+  type ImpersonationTokenPayload as ImpersonationPayload 
+} from './impersonationUtils.js';
 
 // Input validation schemas
 const distributionRequestSchema = z.object({
@@ -176,108 +181,20 @@ if (nodeVersion) {
   console.log(`✅ Node.js ${process.version} - base64url encoding support confirmed`);
 }
 
-interface ImpersonationTokenPayload {
-  sessionId: string;
-  organizationId: string;
-  mode: 'read' | 'write';
-  exp: number; // expiration timestamp
-  iat: number; // issued at timestamp
+// Wrapper functions that use the shared utility module with logging
+function generateImpersonationToken(payload: Omit<ImpersonationPayload, 'exp' | 'iat'>): string {
+  return generateTokenUtil(IMPERSONATION_SECRET, payload);
 }
 
-// Generate a cryptographically signed impersonation token
-function generateImpersonationToken(payload: Omit<ImpersonationTokenPayload, 'exp' | 'iat'>): string {
-  const now = Math.floor(Date.now() / 1000);
-  const fullPayload: ImpersonationTokenPayload = {
-    ...payload,
-    iat: now,
-    exp: now + (5 * 60) // 5 minutes expiration
-  };
+function validateImpersonationToken(token: string): ImpersonationPayload | null {
+  const result = validateTokenUtil(IMPERSONATION_SECRET, token);
   
-  const payloadJson = JSON.stringify(fullPayload);
-  const payloadBase64 = Buffer.from(payloadJson).toString('base64url');
-  
-  const signature = createHmac('sha256', IMPERSONATION_SECRET)
-    .update(payloadBase64)
-    .digest('base64url');
-  
-  return `${payloadBase64}.${signature}`;
-}
-
-// Validate and parse an impersonation token
-function validateImpersonationToken(token: string): ImpersonationTokenPayload | null {
-  try {
-    const [payloadBase64, signature] = token.split('.');
-    if (!payloadBase64 || !signature) return null;
-    
-    // Verify signature using timing-safe comparison
-    const expectedSignature = createHmac('sha256', IMPERSONATION_SECRET)
-      .update(payloadBase64)
-      .digest('base64url');
-    
-    const signatureBuffer = Buffer.from(signature, 'base64url');
-    const expectedBuffer = Buffer.from(expectedSignature, 'base64url');
-    
-    // SECURITY FIX: Check buffer lengths match before calling timingSafeEqual
-    // timingSafeEqual throws an exception if buffer lengths differ
-    if (signatureBuffer.length !== expectedBuffer.length) {
-      console.warn('🚨 SECURITY: Invalid impersonation token signature (length mismatch)');
-      return null;
-    }
-    
-    if (!timingSafeEqual(signatureBuffer, expectedBuffer)) {
-      console.warn('🚨 SECURITY: Invalid impersonation token signature');
-      return null;
-    }
-    
-    // Parse and validate payload with robust error handling
-    const payloadJson = Buffer.from(payloadBase64, 'base64url').toString('utf8');
-    let payload: any;
-    
-    try {
-      payload = JSON.parse(payloadJson);
-    } catch (parseError) {
-      console.warn('🚨 SECURITY: Failed to parse impersonation token payload JSON:', parseError);
-      return null;
-    }
-    
-    // SECURITY FIX: Explicit type checks for required fields
-    if (!payload || typeof payload !== 'object') {
-      console.warn('🚨 SECURITY: Invalid impersonation token payload structure');
-      return null;
-    }
-    
-    if (typeof payload.sessionId !== 'string' || !payload.sessionId) {
-      console.warn('🚨 SECURITY: Missing or invalid sessionId in impersonation token');
-      return null;
-    }
-    
-    if (typeof payload.organizationId !== 'string' || !payload.organizationId) {
-      console.warn('🚨 SECURITY: Missing or invalid organizationId in impersonation token');
-      return null;
-    }
-    
-    if (typeof payload.mode !== 'string' || (payload.mode !== 'read' && payload.mode !== 'write')) {
-      console.warn('🚨 SECURITY: Missing or invalid mode in impersonation token');
-      return null;
-    }
-    
-    if (typeof payload.exp !== 'number' || typeof payload.iat !== 'number') {
-      console.warn('🚨 SECURITY: Missing or invalid timestamps in impersonation token');
-      return null;
-    }
-    
-    // Check expiration
-    const now = Math.floor(Date.now() / 1000);
-    if (payload.exp < now) {
-      console.warn('🚨 SECURITY: Expired impersonation token');
-      return null;
-    }
-    
-    return payload as ImpersonationTokenPayload;
-  } catch (error) {
-    console.warn('🚨 SECURITY: Malformed impersonation token:', error);
-    return null;
+  // Add logging for security events (utility module doesn't log to avoid exposing secrets)
+  if (!result) {
+    console.warn('🚨 SECURITY: Invalid impersonation token');
   }
+  
+  return result;
 }
 
 // GPT Content Generation schema
