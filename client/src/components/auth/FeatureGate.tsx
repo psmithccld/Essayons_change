@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { Redirect } from "wouter";
 import { useFeatures, type OrganizationFeatures } from "@/hooks/use-features";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,6 +29,7 @@ export function FeatureGate({
 }: FeatureGateProps) {
   const { features: orgFeatures, hasFeature, isLoading, error } = useFeatures();
   const { toast } = useToast();
+  const hasShownToast = useRef(false);
 
   // Show loading state while checking features
   if (isLoading) {
@@ -83,16 +84,23 @@ export function FeatureGate({
     hasAccess = true;
   }
 
-  if (!hasAccess) {
-    // Show toast notification about feature restriction
-    const featureName = feature || features[0] || 'this feature';
-    const displayName = String(featureName);
-    toast({
-      title: "Feature Not Available",
-      description: `The ${displayName} feature is not enabled for your organization.`,
-      variant: "destructive",
-    });
+  // Calculate display name for feature restriction messages
+  const featureName = feature || features[0] || 'this feature';
+  const displayName = String(featureName);
 
+  // Show toast notification about feature restriction (only once)
+  useEffect(() => {
+    if (!hasAccess && !hasShownToast.current) {
+      toast({
+        title: "Feature Not Available",
+        description: `The ${displayName} feature is not enabled for your organization.`,
+        variant: "destructive",
+      });
+      hasShownToast.current = true;
+    }
+  }, [hasAccess, displayName, toast]);
+
+  if (!hasAccess) {
     // Redirect if specified
     if (redirectTo) {
       return <Redirect to={redirectTo} />;

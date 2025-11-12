@@ -8345,9 +8345,10 @@ Please provide coaching guidance based on their question and current context.`;
     try {
       const { projectId } = req.params;
       const userId = req.userId!;
+      const organizationId = req.organizationId!;
       
       // SECURITY: Check if user has access to this project
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId, organizationId);
       if (!authorizedProjectIds.includes(projectId)) {
         return res.status(403).json({ error: 'Access denied to this project' });
       }
@@ -8391,9 +8392,10 @@ Please provide coaching guidance based on their question and current context.`;
     try {
       const { projectId } = req.params;
       const userId = req.userId!;
+      const organizationId = req.organizationId!;
       
       // SECURITY: Check if user has access to this project
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId, organizationId);
       if (!authorizedProjectIds.includes(projectId)) {
         return res.status(403).json({ error: 'Access denied to this project' });
       }
@@ -8410,9 +8412,10 @@ Please provide coaching guidance based on their question and current context.`;
   app.post('/api/change-artifacts/search', requireAuthAndOrg, requireFeature('changeArtifacts'), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.userId!;
+      const organizationId = req.organizationId!;
       
       // SECURITY: Get user's authorized projects for filtering
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId, organizationId);
       
       const searchParams = {
         ...req.body,
@@ -8457,6 +8460,7 @@ Please provide coaching guidance based on their question and current context.`;
     try {
       const { id } = req.params;
       const userId = req.userId!;
+      const organizationId = req.organizationId!;
       
       // Check if artifact exists and user has access
       const existingArtifact = await storage.getChangeArtifact(id);
@@ -8464,7 +8468,7 @@ Please provide coaching guidance based on their question and current context.`;
         return res.status(404).json({ error: 'Change artifact not found' });
       }
 
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId, organizationId);
       if (!authorizedProjectIds.includes(existingArtifact.projectId)) {
         return res.status(403).json({ error: 'Access denied' });
       }
@@ -8494,6 +8498,7 @@ Please provide coaching guidance based on their question and current context.`;
     try {
       const { id } = req.params;
       const userId = req.userId!;
+      const organizationId = req.organizationId!;
       
       // Check if artifact exists and user has access
       const existingArtifact = await storage.getChangeArtifact(id);
@@ -8501,7 +8506,7 @@ Please provide coaching guidance based on their question and current context.`;
         return res.status(404).json({ error: 'Change artifact not found' });
       }
 
-      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId);
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId, organizationId);
       if (!authorizedProjectIds.includes(existingArtifact.projectId)) {
         return res.status(403).json({ error: 'Access denied' });
       }

@@ -73,8 +73,27 @@ export function ObjectUploader({
       })
       .on("complete", (result) => {
         onComplete?.(result);
+        // Close modal after successful upload
+        setShowModal(false);
+        // Clean up completed files for next upload (do not cancel them)
+        uppy.getFiles().forEach(file => {
+          uppy.removeFile(file.id);
+        });
       })
   );
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    // Only cancel in-progress uploads, not completed ones
+    const state = uppy.getState();
+    if (state.totalProgress > 0 && state.totalProgress < 100) {
+      uppy.cancelAll();
+    }
+    // Clean up any remaining files
+    uppy.getFiles().forEach(file => {
+      uppy.removeFile(file.id);
+    });
+  };
 
   return (
     <div>
@@ -85,8 +104,10 @@ export function ObjectUploader({
       <DashboardModal
         uppy={uppy}
         open={showModal}
-        onRequestClose={() => setShowModal(false)}
+        onRequestClose={handleCloseModal}
         proudlyDisplayPoweredByUppy={false}
+        closeModalOnClickOutside={true}
+        closeAfterFinish={false}
       />
     </div>
   );
