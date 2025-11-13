@@ -25,6 +25,17 @@ Preferred communication style: Simple, everyday language.
 - **Customer Tiers**: A system defining feature availability and resource limits based on active subscriptions, replacing previous organization defaults.
 - **Organization Seeding**: Automated setup for new organizations including default roles, an admin user, and an initial initiative.
 
+### Object Storage
+- **Dual Provider System**: Supports both Google Cloud Storage (development) and Cloudflare R2 (production) via provider abstraction.
+- **Auto-Detection**: Automatically selects the appropriate provider based on environment variables.
+- **Provider-Specific Behavior**:
+  - **GCS (Development)**: Streams files through the server with full ACL support for fine-grained access control.
+  - **R2 (Production)**: Uses signed URL redirects (HTTP 302) for direct downloads from Cloudflare, eliminating streaming overhead.
+- **ACL Graceful Degradation**: ACL features only work with GCS provider; R2 relies on application-level authorization.
+- **Environment Variables**:
+  - **Development (GCS)**: Uses Replit's built-in object storage with `PUBLIC_OBJECT_SEARCH_PATHS` and `PRIVATE_OBJECT_DIR`.
+  - **Production (R2)**: Requires `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `PRIVATE_OBJECT_DIR`, and `PUBLIC_OBJECT_SEARCH_PATHS`.
+
 ### Authentication and Authorization
 - **Session Management**: Cookie-based sessions with PostgreSQL store.
 - **User Management**: Basic user system with roles and permissions, including a separate Super Admin system.
