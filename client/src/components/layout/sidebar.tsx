@@ -276,6 +276,17 @@ export default function Sidebar() {
     return true;
   }, [hasPermissionForItem, hasFeature]);
 
+  // Filter items to only those with access (for drag-and-drop and shortcuts)
+  // This ensures SortableContext only includes items that will actually render
+  const accessibleDraggableItems = useMemo(() => {
+    // During loading, show all items (they'll render as skeletons)
+    if (permissionsLoading || featuresLoading) {
+      return orderedDraggableItems;
+    }
+    // After loading, only include items user has access to
+    return orderedDraggableItems.filter(item => hasAccessToItem(item));
+  }, [orderedDraggableItems, hasAccessToItem, permissionsLoading, featuresLoading]);
+
   // Keyboard shortcuts for navigation
   useEffect(() => {
     const handleKeydown = (e: KeyboardEvent) => {
@@ -289,7 +300,8 @@ export default function Sidebar() {
         const keyNum = parseInt(e.key);
         if (keyNum >= 1 && keyNum <= 9) {
           e.preventDefault();
-          const items = [allNavigationItems[0], ...orderedDraggableItems]; // Include overview
+          // Only include accessible items in shortcuts
+          const items = [allNavigationItems[0], ...accessibleDraggableItems]; // Include overview
           const targetItem = items[keyNum - 1];
           if (targetItem && hasAccessToItem(targetItem)) {
             navigate(targetItem.path);
@@ -304,7 +316,7 @@ export default function Sidebar() {
 
     window.addEventListener('keydown', handleKeydown);
     return () => window.removeEventListener('keydown', handleKeydown);
-  }, [navigate, orderedDraggableItems, hasAccessToItem, toast]);
+  }, [navigate, accessibleDraggableItems, hasAccessToItem, toast]);
 
   // Handle drag end event
   const handleDragEnd = (event: DragEndEvent) => {
@@ -314,10 +326,10 @@ export default function Sidebar() {
       return;
     }
 
-    const oldIndex = orderedDraggableItems.findIndex(item => item.id === active.id);
-    const newIndex = orderedDraggableItems.findIndex(item => item.id === over.id);
+    const oldIndex = accessibleDraggableItems.findIndex(item => item.id === active.id);
+    const newIndex = accessibleDraggableItems.findIndex(item => item.id === over.id);
 
-    const newItems = arrayMove(orderedDraggableItems, oldIndex, newIndex);
+    const newItems = arrayMove(accessibleDraggableItems, oldIndex, newIndex);
     const newOrder = newItems.map(item => item.id);
     
     setDragOrder(newOrder);
@@ -446,17 +458,17 @@ export default function Sidebar() {
               onDragEnd={handleDragEnd}
             >
               <SortableContext 
-                items={orderedDraggableItems.map(item => item.id)}
+                items={accessibleDraggableItems.map(item => item.id)}
                 strategy={verticalListSortingStrategy}
               >
                 <div className="space-y-1 mt-1">
-                  {orderedDraggableItems.map((item) => (
+                  {accessibleDraggableItems.map((item) => (
                     <SortableNavItem
                       key={item.id}
                       item={item}
                       isActive={location === item.path}
                       isCollapsed={isCollapsed}
-                      hasAccess={hasAccessToItem(item)}
+                      hasAccess={hasAccessToItem(item) || permissionsLoading || featuresLoading}
                       permissionsLoading={permissionsLoading}
                     />
                   ))}
