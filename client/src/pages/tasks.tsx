@@ -909,7 +909,9 @@ export default function Tasks() {
                         )}
                         <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                           {task.assigneeId && task.assigneeId !== 'unassigned' && (
-                            <span data-testid={`text-assignee-${task.id}`}>Assigned to: {task.assigneeId}</span>
+                            <span data-testid={`text-assignee-${task.id}`}>
+                              Assigned to: {users.find(u => u.id === task.assigneeId)?.name || task.assigneeId}
+                            </span>
                           )}
                           {task.dueDate && (
                             <span data-testid={`text-due-date-${task.id}`}>Due: {new Date(task.dueDate).toLocaleDateString()}</span>

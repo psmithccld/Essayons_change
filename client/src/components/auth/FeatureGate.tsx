@@ -31,6 +31,44 @@ export function FeatureGate({
   const { toast } = useToast();
   const hasShownToast = useRef(false);
 
+  // Check feature access (calculate early, before any returns)
+  let hasAccess = false;
+
+  if (!isLoading && !error) {
+    if (customCheck) {
+      hasAccess = customCheck();
+    } else if (feature) {
+      hasAccess = hasFeature(feature);
+    } else if (features.length > 0) {
+      if (requireAll) {
+        hasAccess = features.every(f => hasFeature(f as keyof OrganizationFeatures));
+      } else {
+        hasAccess = features.some(f => hasFeature(f as keyof OrganizationFeatures));
+      }
+    } else {
+      // No features specified, allow access
+      hasAccess = true;
+    }
+  }
+
+  // Calculate display name for feature restriction messages
+  const featureName = feature || features[0] || 'this feature';
+  const displayName = String(featureName);
+
+  // IMPORTANT: Call all hooks BEFORE any conditional returns (Rules of Hooks)
+  // Show toast notification about feature restriction (only once)
+  useEffect(() => {
+    // Only show toast if not loading, no error, and access is denied
+    if (!isLoading && !error && !hasAccess && !hasShownToast.current) {
+      toast({
+        title: "Feature Not Available",
+        description: `The ${displayName} feature is not enabled for your organization.`,
+        variant: "destructive",
+      });
+      hasShownToast.current = true;
+    }
+  }, [isLoading, error, hasAccess, displayName, toast]);
+
   // Show loading state while checking features
   if (isLoading) {
     return (
@@ -65,40 +103,6 @@ export function FeatureGate({
       </div>
     );
   }
-
-  // Check feature access
-  let hasAccess = false;
-
-  if (customCheck) {
-    hasAccess = customCheck();
-  } else if (feature) {
-    hasAccess = hasFeature(feature);
-  } else if (features.length > 0) {
-    if (requireAll) {
-      hasAccess = features.every(f => hasFeature(f as keyof OrganizationFeatures));
-    } else {
-      hasAccess = features.some(f => hasFeature(f as keyof OrganizationFeatures));
-    }
-  } else {
-    // No features specified, allow access
-    hasAccess = true;
-  }
-
-  // Calculate display name for feature restriction messages
-  const featureName = feature || features[0] || 'this feature';
-  const displayName = String(featureName);
-
-  // Show toast notification about feature restriction (only once)
-  useEffect(() => {
-    if (!hasAccess && !hasShownToast.current) {
-      toast({
-        title: "Feature Not Available",
-        description: `The ${displayName} feature is not enabled for your organization.`,
-        variant: "destructive",
-      });
-      hasShownToast.current = true;
-    }
-  }, [hasAccess, displayName, toast]);
 
   if (!hasAccess) {
     // Redirect if specified
