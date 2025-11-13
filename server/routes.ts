@@ -79,6 +79,7 @@ interface AuthenticatedRequest extends SessionRequest {
 }
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { getStorageProvider } from "./storage-providers/factory";
 import { ObjectPermission } from "./objectAcl";
 import { createRateLimitStore, type RateLimitStore } from "./rateLimit.js";
 import { type SystemSettings } from "@shared/schema";
@@ -8318,7 +8319,33 @@ Please provide coaching guidance based on their question and current context.`;
     try {
       const userId = req.userId!;
       const objectStorageService = new ObjectStorageService();
+      const provider = getStorageProvider();
       
+      // Use provider-aware flow if ACL not supported (e.g., R2)
+      if (!provider.supportsAcl) {
+        const location = objectStorageService.getObjectLocation(req.path);
+        
+        // Check if object exists (returns 404 for missing objects)
+        const exists = await provider.objectExists({
+          bucketName: location.bucketName,
+          objectName: location.objectName,
+        });
+        
+        if (!exists) {
+          return res.sendStatus(404);
+        }
+        
+        // Redirect to signed download URL (avoids streaming issues)
+        const downloadUrl = await provider.getSignedDownloadUrl({
+          bucketName: location.bucketName,
+          objectName: location.objectName,
+          ttlSec: 3600, // 1 hour
+        });
+        
+        return res.redirect(302, downloadUrl);
+      }
+      
+      // Use GCS-based flow with ACL (for development/GCS provider)
       const objectFile = await objectStorageService.getObjectEntityFile(req.path);
       const canAccess = await objectStorageService.canAccessObjectEntity({
         objectFile,

@@ -27,6 +27,9 @@ function createR2Client() {
 }
 
 export class R2Provider implements StorageProvider {
+  readonly name = "Cloudflare R2";
+  readonly supportsAcl = false; // ACL not supported in R2 (yet)
+  
   private client: S3Client;
 
   constructor() {
@@ -122,13 +125,19 @@ export class R2Provider implements StorageProvider {
   }): Promise<void> {
     const { CopyObjectCommand } = await import("@aws-sdk/client-s3");
     
+    // Get current metadata first to preserve other fields
+    const currentMetadata = await this.getCustomMetadata(params);
+    
+    // Merge new metadata with existing
+    const mergedMetadata = { ...currentMetadata, ...params.metadata };
+    
     // R2 doesn't support updating metadata directly
     // We need to copy the object to itself with new metadata
     const command = new CopyObjectCommand({
       Bucket: params.bucketName,
       CopySource: `${params.bucketName}/${params.objectName}`,
       Key: params.objectName,
-      Metadata: params.metadata,
+      Metadata: mergedMetadata,
       MetadataDirective: "REPLACE",
     });
     
@@ -144,6 +153,7 @@ export class R2Provider implements StorageProvider {
       Key: params.objectName,
     });
     const response = await this.client.send(command);
+    // S3/R2 metadata keys are lowercase by default, normalize them
     return response.Metadata || {};
   }
 }

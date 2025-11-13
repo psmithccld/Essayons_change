@@ -1,5 +1,11 @@
 // Abstract interface for storage providers
 export interface StorageProvider {
+  // Provider name for logging
+  readonly name: string;
+  
+  // Whether this provider supports ACL operations
+  readonly supportsAcl: boolean;
+
   // Get a signed URL for uploading an object
   getSignedUploadUrl(params: {
     bucketName: string;

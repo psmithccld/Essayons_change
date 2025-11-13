@@ -62,6 +62,9 @@ async function signObjectURL({
 }
 
 export class GCSProvider implements StorageProvider {
+  readonly name = "Google Cloud Storage (Replit)";
+  readonly supportsAcl = true;
+
   async getSignedUploadUrl(params: {
     bucketName: string;
     objectName: string;
