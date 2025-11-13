@@ -23,6 +23,7 @@ function createR2Client() {
       accessKeyId,
       secretAccessKey,
     },
+    forcePathStyle: true, // Required for R2 - uses path-style URLs instead of virtual-hosted
   });
 }
 
