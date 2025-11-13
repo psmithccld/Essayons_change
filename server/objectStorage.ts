@@ -1,5 +1,5 @@
 // Referenced from javascript_object_storage integration
-import { Storage, File } from "@google-cloud/storage";
+import { File } from "@google-cloud/storage";
 import { Response } from "express";
 import { randomUUID } from "crypto";
 import {
@@ -9,27 +9,11 @@ import {
   getObjectAclPolicy,
   setObjectAclPolicy,
 } from "./objectAcl";
+import { getStorageProvider, parseObjectPath } from "./storage-providers/factory";
+import { gcsStorageClient } from "./storage-providers/gcs";
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
-
-// The object storage client is used to interact with the object storage service.
-export const objectStorageClient = new Storage({
-  credentials: {
-    audience: "replit",
-    subject_token_type: "access_token",
-    token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
-    type: "external_account",
-    credential_source: {
-      url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
-      format: {
-        type: "json",
-        subject_token_field_name: "access_token",
-      },
-    },
-    universe_domain: "googleapis.com",
-  },
-  projectId: "",
-});
+// Export GCS client for backward compatibility with objectAcl.ts
+export const objectStorageClient = gcsStorageClient;
 
 export class ObjectNotFoundError extends Error {
   constructor() {
@@ -146,11 +130,11 @@ export class ObjectStorageService {
 
     const { bucketName, objectName } = parseObjectPath(fullPath);
 
-    // Sign URL for PUT method with TTL
-    return signObjectURL({
+    // Get storage provider and sign URL for PUT method with TTL
+    const provider = getStorageProvider();
+    return provider.getSignedUploadUrl({
       bucketName,
       objectName,
-      method: "PUT",
       ttlSec: 900,
     });
   }
@@ -238,63 +222,4 @@ export class ObjectStorageService {
       requestedPermission: requestedPermission ?? ObjectPermission.READ,
     });
   }
-}
-
-function parseObjectPath(path: string): {
-  bucketName: string;
-  objectName: string;
-} {
-  if (!path.startsWith("/")) {
-    path = `/${path}`;
-  }
-  const pathParts = path.split("/");
-  if (pathParts.length < 3) {
-    throw new Error("Invalid path: must contain at least a bucket name");
-  }
-
-  const bucketName = pathParts[1];
-  const objectName = pathParts.slice(2).join("/");
-
-  return {
-    bucketName,
-    objectName,
-  };
-}
-
-async function signObjectURL({
-  bucketName,
-  objectName,
-  method,
-  ttlSec,
-}: {
-  bucketName: string;
-  objectName: string;
-  method: "GET" | "PUT" | "DELETE" | "HEAD";
-  ttlSec: number;
-}): Promise<string> {
-  const request = {
-    bucket_name: bucketName,
-    object_name: objectName,
-    method,
-    expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
-  };
-  const response = await fetch(
-    `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(request),
-    }
-  );
-  if (!response.ok) {
-    throw new Error(
-      `Failed to sign object URL, errorcode: ${response.status}, ` +
-        `make sure you're running on Replit`
-    );
-  }
-
-  const { signed_url: signedURL } = await response.json();
-  return signedURL;
 }
