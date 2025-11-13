@@ -27,7 +27,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useFeatures } from "@/hooks/use-features";
@@ -64,6 +66,110 @@ const allNavigationItems: NavigationItem[] = [
 const SIDEBAR_ORDER_KEY = "sidebarOrder";
 const SIDEBAR_COLLAPSED_KEY = "sidebarCollapsed";
 
+// Sortable item component using @dnd-kit
+function SortableNavItem({ 
+  item, 
+  isActive, 
+  isCollapsed, 
+  hasAccess,
+  permissionsLoading 
+}: { 
+  item: NavigationItem; 
+  isActive: boolean; 
+  isCollapsed: boolean;
+  hasAccess: boolean;
+  permissionsLoading: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const IconComponent = item.icon;
+
+  // Show skeleton while loading permissions
+  if (permissionsLoading) {
+    return (
+      <div ref={setNodeRef} style={style} className="mb-1">
+        <div className={cn(
+          "flex items-center p-2",
+          isCollapsed ? "justify-center" : "space-x-3"
+        )}>
+          <Skeleton className="w-4 h-4 rounded" />
+          {!isCollapsed && <Skeleton className="w-24 h-4 rounded" />}
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return null;
+  }
+
+  if (isCollapsed) {
+    return (
+      <div ref={setNodeRef} style={style} className={cn("mb-1", isDragging && "z-50 opacity-50")}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link href={item.path}>
+              <div className={cn(
+                "group flex items-center rounded-md text-sm font-medium transition-colors relative",
+                "hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                "p-2 justify-center",
+                isActive 
+                  ? "bg-accent text-accent-foreground" 
+                  : "text-muted-foreground"
+              )}>
+                <IconComponent className="h-4 w-4 flex-shrink-0" />
+              </div>
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <p>{item.label}</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className={cn("mb-1", isDragging && "z-50 opacity-50")}>
+      <Link href={item.path}>
+        <div className={cn(
+          "group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors relative",
+          "hover:bg-accent hover:text-accent-foreground cursor-pointer",
+          isActive 
+            ? "bg-accent text-accent-foreground" 
+            : "text-muted-foreground"
+        )}>
+          <div 
+            {...attributes}
+            {...listeners}
+            className={cn(
+              "flex items-center justify-center mr-3 opacity-0 group-hover:opacity-100 transition-opacity",
+              "hover:text-foreground cursor-grab active:cursor-grabbing",
+              isDragging && "cursor-grabbing opacity-100"
+            )}
+          >
+            <GripVertical className="w-4 h-4" />
+          </div>
+          <IconComponent className="mr-3 h-4 w-4 flex-shrink-0" />
+          <span className="truncate" data-testid={`nav-${item.id}`}>{item.label}</span>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
 export default function Sidebar() {
   const [location, navigate] = useLocation();
   const [dragOrder, setDragOrder] = useState<string[]>([]);
@@ -78,6 +184,14 @@ export default function Sidebar() {
   const { toast } = useToast();
   const { isLoading: permissionsLoading, hasAllPermissions, hasAnyPermission } = usePermissions();
   const { hasFeature, isLoading: featuresLoading } = useFeatures();
+
+  // Setup sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Toggle sidebar collapse state
   const toggleCollapsed = useCallback(() => {
@@ -193,106 +307,23 @@ export default function Sidebar() {
   }, [navigate, orderedDraggableItems, hasAccessToItem, toast]);
 
   // Handle drag end event
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) {
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
       return;
     }
 
-    const items = Array.from(orderedDraggableItems);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
+    const oldIndex = orderedDraggableItems.findIndex(item => item.id === active.id);
+    const newIndex = orderedDraggableItems.findIndex(item => item.id === over.id);
 
-    const newOrder = items.map(item => item.id);
+    const newItems = arrayMove(orderedDraggableItems, oldIndex, newIndex);
+    const newOrder = newItems.map(item => item.id);
+    
     setDragOrder(newOrder);
     
     // Save to localStorage
     localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(newOrder));
-  };
-
-  // Render a draggable navigation item
-  const renderDraggableItem = (item: NavigationItem, index: number) => {
-    // Check permissions and features at render time
-    if (!hasAccessToItem(item) && !permissionsLoading && !featuresLoading) {
-      return null;
-    }
-
-    const isActive = location === item.path;
-    const IconComponent = item.icon;
-
-    // Show skeleton while loading permissions
-    if (permissionsLoading) {
-      return (
-        <div key={item.id} className="mb-1">
-          <div className={cn(
-            "flex items-center p-2",
-            isCollapsed ? "justify-center" : "space-x-3"
-          )}>
-            <Skeleton className="w-4 h-4 rounded" />
-            {!isCollapsed && <Skeleton className="w-24 h-4 rounded" />}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <Draggable key={item.id} draggableId={item.id} index={index}>
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.draggableProps}
-            className={cn(
-              "mb-1",
-              snapshot.isDragging && "z-50"
-            )}
-          >
-            {isCollapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link href={item.path}>
-                    <div className={cn(
-                      "group flex items-center rounded-md text-sm font-medium transition-colors relative",
-                      "hover:bg-accent hover:text-accent-foreground cursor-pointer",
-                      "p-2 justify-center",
-                      isActive 
-                        ? "bg-accent text-accent-foreground" 
-                        : "text-muted-foreground"
-                    )}>
-                      <IconComponent className="h-4 w-4 flex-shrink-0" />
-                    </div>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <p>{item.label}</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Link href={item.path}>
-                <div className={cn(
-                  "group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors relative",
-                  "hover:bg-accent hover:text-accent-foreground cursor-pointer",
-                  isActive 
-                    ? "bg-accent text-accent-foreground" 
-                    : "text-muted-foreground"
-                )}>
-                  <div 
-                    {...provided.dragHandleProps}
-                    className={cn(
-                      "flex items-center justify-center mr-3 opacity-0 group-hover:opacity-100 transition-opacity",
-                      "hover:text-foreground cursor-grab active:cursor-grabbing",
-                      snapshot.isDragging && "cursor-grabbing opacity-100"
-                    )}
-                  >
-                    <GripVertical className="w-4 h-4" />
-                  </div>
-                  <IconComponent className="mr-3 h-4 w-4 flex-shrink-0" />
-                  <span className="truncate" data-testid={`nav-${item.id}`}>{item.label}</span>
-                </div>
-              </Link>
-            )}
-          </div>
-        )}
-      </Draggable>
-    );
   };
 
   // Render a regular (non-draggable) navigation item
@@ -409,25 +440,29 @@ export default function Sidebar() {
             {renderNavigationItem(allNavigationItems[0])}
             
             {/* Draggable Navigation Items */}
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <Droppable droppableId="navigation">
-                {(provided, snapshot) => (
-                  <div
-                    {...provided.droppableProps}
-                    ref={provided.innerRef}
-                    className={cn(
-                      "space-y-1 mt-1",
-                      snapshot.isDraggingOver && "bg-muted/50 rounded-md p-1"
-                    )}
-                  >
-                    {orderedDraggableItems.map((item, index) => 
-                      renderDraggableItem(item, index)
-                    ).filter(Boolean)}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </DragDropContext>
+            <DndContext 
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext 
+                items={orderedDraggableItems.map(item => item.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-1 mt-1">
+                  {orderedDraggableItems.map((item) => (
+                    <SortableNavItem
+                      key={item.id}
+                      item={item}
+                      isActive={location === item.path}
+                      isCollapsed={isCollapsed}
+                      hasAccess={hasAccessToItem(item)}
+                      permissionsLoading={permissionsLoading}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
         </nav>
       </div>
