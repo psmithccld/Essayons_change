@@ -1,0 +1,115 @@
+[GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="516ed33d-485d-4080" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="95e9c715-984f-48ab" responseTimeMS=3 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="40ac20a6-a609-43c8" responseTimeMS=1 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="0c73d89e-7fef-4230" responseTimeMS=4 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="7210eb83-4f62-44c1" responseTimeMS=16 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="1ef4f37a-8d49-472c" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="30dc10b7-469f-4167" responseTimeMS=3 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="50a5c6a5-2e7e-4115" responseTimeMS=24 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="55d5b503-f9a4-44dd" responseTimeMS=4 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="b46b4e92-c83b-4f31" responseTimeMS=3 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="a1aa8e75-bc58-4be6" responseTimeMS=3 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="82611fca-b230-4af4" responseTimeMS=4 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="83cf52b7-aaaa-4635" responseTimeMS=15 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="fee461a2-a999-4ace" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="cbe9d37b-c5c7-4c00" responseTimeMS=5 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="1242ab1e-9863-4da2" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="6b63355d-f9fd-40ce" responseTimeMS=3 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="c57c0793-3214-4f80" responseTimeMS=4 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="dab61fdc-b414-4ad5" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="729a3361-e3be-4c34" responseTimeMS=6 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="8745055f-5c1a-4da9" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="c72145d5-e801-499e" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [POST]200app.essayonschange.com/api/auth/loginclientIP="69.140.149.160" requestID="0f2a793a-ccc3-436d" responseTimeMS=134 responseBytes=1037 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] method=POST path=/api/auth/login
+[auth-debug] cookie header present=false
+[auth-debug] sessionID=UtoDdXWdy0YoMpa51IgX-T8OryEYIfSV
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+2:43:37 PM [express] POST /api/auth/login 200 in 114ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24…
+[auth-debug] method=GET path=/api/auth/status
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=g7L6Or2QD2BGJLhlZI2_1kDLmMWu_Zdb
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=g7L6Or2QD2BGJLhlZI2_1kDLmMWu_Zdb
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=g7L6Or2QD2BGJLhlZI2_1kDLmMWu_Zdb
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/organization/features
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=g7L6Or2QD2BGJLhlZI2_1kDLmMWu_Zdb
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifacts
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=g7L6Or2QD2BGJLhlZI2_1kDLmMWu_Zdb
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=g7L6Or2QD2BGJLhlZI2_1kDLmMWu_Zdb
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+2:43:37 PM [express] GET /api/organization/features 304 in 154ms :: {"reports":true,"gptCoach":true,…
+2:43:37 PM [express] GET /api/auth/status 200 in 271ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24…
+[auth-debug] method=GET path=/api/auth/status
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=g7L6Or2QD2BGJLhlZI2_1kDLmMWu_Zdb
+[auth-debug] sessionKeys=cookie,userId,user
+     [GET]200app.essayonschange.com/api/auth/statusclientIP="69.140.149.160" requestID="b933cbe5-752c-4acf" responseTimeMS=300 responseBytes=854 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]304app.essayonschange.com/api/organization/featuresclientIP="69.140.149.160" requestID="6e0ce763-437d-4286" responseTimeMS=166 responseBytes=179 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]304app.essayonschange.com/api/auth/statusclientIP="69.140.149.160" requestID="6977cc26-7507-4c58" responseTimeMS=141 responseBytes=180 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+2:43:37 PM [express] GET /api/auth/status 304 in 109ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24…
+     [GET]304app.essayonschange.com/api/notificationsclientIP="69.140.149.160" requestID="8be2ddb4-aad9-4583" responseTimeMS=567 responseBytes=181 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]304app.essayonschange.com/api/notifications/unread-countclientIP="69.140.149.160" requestID="4efc5495-bd41-428c" responseTimeMS=567 responseBytes=178 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]304app.essayonschange.com/api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifactsclientIP="69.140.149.160" requestID="a9817de2-24fe-45fb" responseTimeMS=564 responseBytes=178 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]304app.essayonschange.com/api/users/me/permissionsclientIP="69.140.149.160" requestID="1c3869d6-58b2-4d81" responseTimeMS=582 responseBytes=180 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2:43:38 PM [express] GET /api/notifications/unread-count 304 in 560ms :: {"count":20}
+2:43:38 PM [express] GET /api/users/me/permissions 304 in 492ms :: {"user":{"id":"cca94cb5-5de9-4780…
+2:43:38 PM [express] GET /api/notifications 304 in 559ms :: {"notifications":[{"id":"7093433d-ce35-4…
+2:43:38 PM [express] GET /api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifacts 304 in …
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="757da3ac-1591-4043" responseTimeMS=3 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [POST]500app.essayonschange.com/api/objects/uploadclientIP="69.140.149.160" requestID="f62b8392-5f5e-471f" responseTimeMS=83 responseBytes=311 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] method=POST path=/api/objects/upload
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=g7L6Or2QD2BGJLhlZI2_1kDLmMWu_Zdb
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+Error getting upload URL: Error: PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' tool and set PRIVATE_OBJECT_DIR env var.
+    at ObjectStorageService.getPrivateObjectDir (file:///opt/render/project/src/dist/index.js:9249:13)
+    at ObjectStorageService.getObjectEntityUploadURL (file:///opt/render/project/src/dist/index.js:9297:35)
+    at file:///opt/render/project/src/dist/index.js:15915:52
+    at Layer.handle [as handle_request] (/opt/render/project/src/node_modules/express/lib/router/layer.js:95:5)
+    at next (/opt/render/project/src/node_modules/express/lib/router/route.js:149:13)
+    at requireOrgContext (file:///opt/render/project/src/dist/index.js:10176:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2:44:01 PM [express] POST /api/objects/upload 500 in 61ms :: {"error":"Failed to get upload URL"}
+     [GET]304app.essayonschange.com/api/notifications/unread-countclientIP="69.140.149.160" requestID="c451e7fa-f3c0-451b" responseTimeMS=20 responseBytes=178 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]304app.essayonschange.com/api/users/me/permissionsclientIP="69.140.149.160" requestID="3ab2aab5-b21a-4a1e" responseTimeMS=129 responseBytes=180 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]304app.essayonschange.com/api/notificationsclientIP="69.140.149.160" requestID="312d86af-74ae-4dec" responseTimeMS=40 responseBytes=181 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=g7L6Or2QD2BGJLhlZI2_1kDLmMWu_Zdb
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=g7L6Or2QD2BGJLhlZI2_1kDLmMWu_Zdb
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=g7L6Or2QD2BGJLhlZI2_1kDLmMWu_Zdb
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+2:44:08 PM [express] GET /api/notifications/unread-count 304 in 17ms :: {"count":20}
+2:44:08 PM [express] GET /api/notifications 304 in 37ms :: {"notifications":[{"id":"7093433d-ce35-48…
+2:44:08 PM [express] GET /api/users/me/permissions 304 in 126ms :: {"user":{"id":"cca94cb5-5de9-4780…
