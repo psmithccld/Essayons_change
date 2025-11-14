@@ -8318,12 +8318,28 @@ Please provide coaching guidance based on their question and current context.`;
   app.get("/objects/:objectPath(*)", requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.userId!;
+      const organizationId = req.organizationId!;
       const objectStorageService = new ObjectStorageService();
       const provider = getStorageProvider();
       
+      // SECURITY: Look up artifact and verify user has access to the project
+      // Database stores objectPath without "/objects/" prefix (e.g., "uploads/abc-123")
+      // req.params.objectPath already has the prefix stripped by Express route matching
+      const artifact = await storage.getChangeArtifactByObjectPath(req.params.objectPath);
+      
+      if (!artifact) {
+        return res.sendStatus(404);
+      }
+      
+      // SECURITY: Verify user has access to this project
+      const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId, organizationId);
+      if (!authorizedProjectIds.includes(artifact.projectId)) {
+        return res.status(403).json({ error: 'Access denied to this file' });
+      }
+      
       // Use provider-aware flow if ACL not supported (e.g., R2)
       if (!provider.supportsAcl) {
-        const location = objectStorageService.getObjectLocation(req.path);
+        const location = objectStorageService.getObjectLocation(artifact.filePath);
         
         // Check if object exists (returns 404 for missing objects)
         const exists = await provider.objectExists({

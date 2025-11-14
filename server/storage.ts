@@ -207,6 +207,7 @@ export interface IStorage {
   // Change Artifacts
   getChangeArtifactsByProject(projectId: string): Promise<ChangeArtifact[]>;
   getChangeArtifact(id: string): Promise<ChangeArtifact | undefined>;
+  getChangeArtifactByObjectPath(objectPath: string): Promise<ChangeArtifact | undefined>;
   createChangeArtifact(artifact: InsertChangeArtifact): Promise<ChangeArtifact>;
   updateChangeArtifact(id: string, artifact: Partial<InsertChangeArtifact>): Promise<ChangeArtifact | undefined>;
   deleteChangeArtifact(id: string): Promise<boolean>;
@@ -6630,6 +6631,12 @@ export class DatabaseStorage implements IStorage {
 
   async getChangeArtifact(id: string): Promise<ChangeArtifact | undefined> {
     const [artifact] = await db.select().from(changeArtifacts).where(eq(changeArtifacts.id, id));
+    return artifact || undefined;
+  }
+
+  async getChangeArtifactByObjectPath(objectPath: string): Promise<ChangeArtifact | undefined> {
+    const [artifact] = await db.select().from(changeArtifacts)
+      .where(and(eq(changeArtifacts.objectPath, objectPath), eq(changeArtifacts.isActive, true)));
     return artifact || undefined;
   }
 
