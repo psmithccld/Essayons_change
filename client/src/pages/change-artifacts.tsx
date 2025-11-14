@@ -159,10 +159,26 @@ export default function ChangeArtifacts() {
   const handleUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
     if (result.successful && result.successful.length > 0) {
       const uploadedFile = result.successful[0];
+      
+      if (!uploadedFile.name) {
+        toast({ 
+          title: "Upload failed", 
+          description: "File name is missing",
+          variant: "destructive" 
+        });
+        return;
+      }
+      
+      // Extract file extension from filename
+      const fileExt = uploadedFile.name.includes('.') 
+        ? uploadedFile.name.substring(uploadedFile.name.lastIndexOf('.'))
+        : '';
+      
       const uploadData = {
         filename: uploadedFile.name,
         originalFilename: uploadedFile.name,
         fileSize: uploadedFile.size,
+        fileExt: fileExt,
         contentType: uploadedFile.type || 'application/octet-stream',
         objectPath: uploadedFile.uploadURL,
         category: uploadMetadata.category,
