@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { FeatureGate } from "@/components/auth/FeatureGate";
 import { useToast } from "@/hooks/use-toast";
@@ -125,8 +125,8 @@ export default function ChangeArtifacts() {
     }
   });
 
-  // Store upload metadata including storage paths
-  const [pendingUpload, setPendingUpload] = useState<{
+  // Store upload metadata including storage paths using useRef for synchronous access
+  const pendingUploadRef = useRef<{
     filePath: string;
     objectPath: string;
   } | null>(null);
@@ -150,10 +150,11 @@ export default function ChangeArtifacts() {
       const data = await response.json();
       
       // Store the file path and object path for use after upload completes
-      setPendingUpload({
+      // Using ref for synchronous access when Uppy calls handleUploadComplete
+      pendingUploadRef.current = {
         filePath: data.filePath,
         objectPath: data.objectPath
-      });
+      };
       
       return {
         method: 'PUT' as const,
@@ -182,7 +183,7 @@ export default function ChangeArtifacts() {
         return;
       }
       
-      if (!pendingUpload) {
+      if (!pendingUploadRef.current) {
         toast({ 
           title: "Upload failed", 
           description: "Storage path information is missing",
@@ -196,8 +197,8 @@ export default function ChangeArtifacts() {
         originalFilename: uploadedFile.name,
         fileSize: uploadedFile.size,
         contentType: uploadedFile.type || 'application/octet-stream',
-        filePath: pendingUpload.filePath,
-        objectPath: pendingUpload.objectPath,
+        filePath: pendingUploadRef.current.filePath,
+        objectPath: pendingUploadRef.current.objectPath,
         category: uploadMetadata.category,
         description: uploadMetadata.description || null,
         tags: uploadMetadata.tags ? uploadMetadata.tags.split(',').map(tag => tag.trim()) : [],
@@ -207,7 +208,7 @@ export default function ChangeArtifacts() {
       uploadMutation.mutate(uploadData);
       
       // Clear pending upload
-      setPendingUpload(null);
+      pendingUploadRef.current = null;
     }
   };
 
