@@ -8306,8 +8306,8 @@ Please provide coaching guidance based on their question and current context.`;
   app.post("/api/objects/upload", requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      res.json({ uploadURL });
+      const uploadData = await objectStorageService.getObjectEntityUploadURL();
+      res.json(uploadData);
     } catch (error) {
       console.error('Error getting upload URL:', error);
       res.status(500).json({ error: 'Failed to get upload URL' });

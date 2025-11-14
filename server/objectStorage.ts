@@ -203,7 +203,7 @@ export class ObjectStorageService {
   }
 
   // Gets the upload URL for an object entity.
-  async getObjectEntityUploadURL(): Promise<string> {
+  async getObjectEntityUploadURL(): Promise<{ uploadURL: string; filePath: string; objectPath: string }> {
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {
       throw new Error(
@@ -219,11 +219,20 @@ export class ObjectStorageService {
 
     // Get storage provider and sign URL for PUT method with TTL
     const provider = getStorageProvider();
-    return provider.getSignedUploadUrl({
+    const uploadURL = await provider.getSignedUploadUrl({
       bucketName,
       objectName,
       ttlSec: 900,
     });
+    
+    // Return both the upload URL and the storage path
+    // filePath is used for database storage
+    // objectPath is the URL path for downloading
+    return {
+      uploadURL,
+      filePath: fullPath,
+      objectPath: `/objects/uploads/${objectId}`
+    };
   }
 
   // Gets the object entity file from the object path.

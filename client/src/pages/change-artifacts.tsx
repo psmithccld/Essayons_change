@@ -125,6 +125,12 @@ export default function ChangeArtifacts() {
     }
   });
 
+  // Store upload metadata including storage paths
+  const [pendingUpload, setPendingUpload] = useState<{
+    filePath: string;
+    objectPath: string;
+  } | null>(null);
+
   const handleGetUploadParameters = async () => {
     if (!currentProject?.id) {
       toast({
@@ -142,6 +148,13 @@ export default function ChangeArtifacts() {
       });
       if (!response.ok) throw new Error('Failed to get upload URL');
       const data = await response.json();
+      
+      // Store the file path and object path for use after upload completes
+      setPendingUpload({
+        filePath: data.filePath,
+        objectPath: data.objectPath
+      });
+      
       return {
         method: 'PUT' as const,
         url: data.uploadURL
@@ -169,18 +182,22 @@ export default function ChangeArtifacts() {
         return;
       }
       
-      // Extract file extension from filename
-      const fileExt = uploadedFile.name.includes('.') 
-        ? uploadedFile.name.substring(uploadedFile.name.lastIndexOf('.'))
-        : '';
+      if (!pendingUpload) {
+        toast({ 
+          title: "Upload failed", 
+          description: "Storage path information is missing",
+          variant: "destructive" 
+        });
+        return;
+      }
       
       const uploadData = {
         filename: uploadedFile.name,
         originalFilename: uploadedFile.name,
         fileSize: uploadedFile.size,
-        fileExt: fileExt,
         contentType: uploadedFile.type || 'application/octet-stream',
-        objectPath: uploadedFile.uploadURL,
+        filePath: pendingUpload.filePath,
+        objectPath: pendingUpload.objectPath,
         category: uploadMetadata.category,
         description: uploadMetadata.description || null,
         tags: uploadMetadata.tags ? uploadMetadata.tags.split(',').map(tag => tag.trim()) : [],
@@ -188,6 +205,9 @@ export default function ChangeArtifacts() {
       };
       
       uploadMutation.mutate(uploadData);
+      
+      // Clear pending upload
+      setPendingUpload(null);
     }
   };
 
