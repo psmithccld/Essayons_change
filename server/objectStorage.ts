@@ -314,6 +314,49 @@ export class ObjectStorageService {
     return `/objects/${entityId}`;
   }
 
+  // Derives the canonical object key for database lookups
+  // Input: "/objects/uploads/abc-123" or "https://storage.googleapis.com/bucket/uploads/abc-123"
+  // Output: "uploads/abc-123" (no prefix, no leading slash)
+  deriveObjectKey(rawPath: string): string {
+    // First normalize to /objects/... format
+    let normalized = this.normalizeObjectEntityPath(rawPath);
+    
+    // Strip /objects/ prefix if present
+    if (normalized.startsWith("/objects/")) {
+      normalized = normalized.slice("/objects/".length);
+    }
+    
+    // Remove any leading slashes
+    return normalized.replace(/^\/+/, "");
+  }
+
+  // Derives the provider-specific download path
+  // For GCS: Returns path with /objects/ prefix (required for ACL)
+  // For R2: Returns path without /objects/ prefix (storage key format)
+  deriveDownloadPath(rawPath: string): string {
+    const provider = getStorageProvider();
+    const normalized = this.normalizeObjectEntityPath(rawPath);
+    
+    // For GCS (ACL-enabled), ensure /objects/ prefix is present
+    if (provider.supportsAcl) {
+      if (normalized.startsWith("/objects/")) {
+        return normalized;
+      }
+      // If normalized path doesn't have prefix, add it
+      // Remove leading slashes first
+      const cleanPath = normalized.replace(/^\/+/, "");
+      return `/objects/${cleanPath}`;
+    }
+    
+    // For R2 (non-ACL), strip /objects/ prefix for storage key
+    if (normalized.startsWith("/objects/")) {
+      return normalized.slice("/objects/".length);
+    }
+    
+    // Remove leading slashes for R2
+    return normalized.replace(/^\/+/, "");
+  }
+
   // Tries to set the ACL policy for the object entity and return the normalized path.
   async trySetObjectEntityAclPolicy(
     rawPath: string,

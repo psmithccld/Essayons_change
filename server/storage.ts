@@ -207,7 +207,7 @@ export interface IStorage {
   // Change Artifacts
   getChangeArtifactsByProject(projectId: string): Promise<ChangeArtifact[]>;
   getChangeArtifact(id: string): Promise<ChangeArtifact | undefined>;
-  getChangeArtifactByObjectPath(objectPath: string): Promise<ChangeArtifact | undefined>;
+  getChangeArtifactByObjectKey(objectKey: string): Promise<ChangeArtifact | undefined>;
   createChangeArtifact(artifact: InsertChangeArtifact): Promise<ChangeArtifact>;
   updateChangeArtifact(id: string, artifact: Partial<InsertChangeArtifact>): Promise<ChangeArtifact | undefined>;
   deleteChangeArtifact(id: string): Promise<boolean>;
@@ -6634,10 +6634,40 @@ export class DatabaseStorage implements IStorage {
     return artifact || undefined;
   }
 
-  async getChangeArtifactByObjectPath(objectPath: string): Promise<ChangeArtifact | undefined> {
+  async getChangeArtifactByObjectKey(objectKey: string): Promise<ChangeArtifact | undefined> {
+    // Try to find by objectKey first (new canonical format)
     const [artifact] = await db.select().from(changeArtifacts)
-      .where(and(eq(changeArtifacts.objectPath, objectPath), eq(changeArtifacts.isActive, true)));
-    return artifact || undefined;
+      .where(and(eq(changeArtifacts.objectKey, objectKey), eq(changeArtifacts.isActive, true)));
+    
+    if (artifact) {
+      return artifact;
+    }
+    
+    // Fallback for legacy rows: query all active artifacts and find match by normalizing objectPath
+    // This handles rows created before objectKey/downloadPath were added
+    console.log(`[Storage] Artifact not found by objectKey "${objectKey}", trying legacy objectPath normalization`);
+    
+    const objectStorageService = new ObjectStorageService();
+    const allActiveArtifacts = await db.select().from(changeArtifacts)
+      .where(eq(changeArtifacts.isActive, true));
+    
+    // Find artifact where normalized objectPath matches the requested objectKey
+    const legacyArtifact = allActiveArtifacts.find(art => {
+      try {
+        const normalizedKey = objectStorageService.deriveObjectKey(art.objectPath);
+        return normalizedKey === objectKey;
+      } catch (error) {
+        // Skip artifacts with invalid paths
+        return false;
+      }
+    });
+    
+    if (legacyArtifact) {
+      console.log(`[Storage] Found artifact by normalized objectPath, artifact ID: ${legacyArtifact.id}, consider running backfill migration`);
+      return legacyArtifact;
+    }
+    
+    return undefined;
   }
 
   async createChangeArtifact(artifact: InsertChangeArtifact): Promise<ChangeArtifact> {

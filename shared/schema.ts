@@ -718,7 +718,9 @@ export const changeArtifacts = pgTable("change_artifacts", {
   fileSize: integer("file_size").notNull(), // File size in bytes
   contentType: text("content_type").notNull(), // File MIME type (application/pdf, image/png, etc.)
   filePath: text("file_path").notNull(), // Storage path/URL
-  objectPath: text("object_path").notNull(), // Object storage path
+  objectPath: text("object_path").notNull(), // Object storage path (legacy - being phased out)
+  objectKey: text("object_key"), // Canonical lookup key (e.g., "uploads/abc-123") - nullable for migration
+  downloadPath: text("download_path"), // Provider-specific download path - nullable for migration
   description: text("description"), // User-provided description
   tags: text("tags").array().default([]), // Searchable tags
   category: text("category").default("general"), // document, image, template, presentation, other

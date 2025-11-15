@@ -8322,10 +8322,12 @@ Please provide coaching guidance based on their question and current context.`;
       const objectStorageService = new ObjectStorageService();
       const provider = getStorageProvider();
       
-      // SECURITY: Look up artifact and verify user has access to the project
-      // Database stores objectPath without "/objects/" prefix (e.g., "uploads/abc-123")
-      // req.params.objectPath already has the prefix stripped by Express route matching
-      const artifact = await storage.getChangeArtifactByObjectPath(req.params.objectPath);
+      // SECURITY: Normalize request path to canonical objectKey
+      // Express may include leading slashes, so we normalize using deriveObjectKey
+      const objectKey = objectStorageService.deriveObjectKey(req.params.objectPath);
+      
+      // Look up artifact by objectKey (with legacy fallback)
+      const artifact = await storage.getChangeArtifactByObjectKey(objectKey);
       
       if (!artifact) {
         return res.sendStatus(404);
@@ -8334,12 +8336,31 @@ Please provide coaching guidance based on their question and current context.`;
       // SECURITY: Verify user has access to this project
       const authorizedProjectIds = await storage.getUserAuthorizedProjectIds(userId, organizationId);
       if (!authorizedProjectIds.includes(artifact.projectId)) {
-        return res.status(403).json({ error: 'Access denied to this file' });
+        // Log authorization failure for telemetry, but return 404 to avoid leaking artifact existence
+        console.log(`[Download] Authorization denied for artifact ${artifact.id}, user ${userId} not authorized for project ${artifact.projectId}`);
+        return res.sendStatus(404);
       }
       
-      // Use provider-aware flow if ACL not supported (e.g., R2)
+      // Determine download path: prefer downloadPath, fallback to derived path
+      let pathForDownload: string;
+      if (artifact.downloadPath) {
+        pathForDownload = artifact.downloadPath;
+      } else {
+        // Legacy fallback: derive from objectPath
+        console.log(`[Download] Using legacy objectPath for artifact ${artifact.id}, consider running backfill`);
+        pathForDownload = objectStorageService.deriveDownloadPath(artifact.objectPath);
+      }
+      
+      // Provider-specific download logic
       if (!provider.supportsAcl) {
-        const location = objectStorageService.getObjectLocation(artifact.filePath);
+        // R2: deriveDownloadPath returns storage key without "/objects/" prefix
+        // getObjectLocation() expects "/objects/..." format, so ensure prefix exists
+        // But check first to avoid double-prefixing if path already has it
+        const pathWithPrefix = pathForDownload.startsWith("/objects/") 
+          ? pathForDownload 
+          : `/objects/${pathForDownload.replace(/^\/+/, "")}`; // Strip leading slashes first
+        
+        const location = objectStorageService.getObjectLocation(pathWithPrefix);
         
         // Check if object exists (returns 404 for missing objects)
         const exists = await provider.objectExists({
@@ -8348,6 +8369,7 @@ Please provide coaching guidance based on their question and current context.`;
         });
         
         if (!exists) {
+          console.log(`[Download] Object not found in storage for artifact ${artifact.id}`);
           return res.sendStatus(404);
         }
         
@@ -8361,8 +8383,13 @@ Please provide coaching guidance based on their question and current context.`;
         return res.redirect(302, downloadUrl);
       }
       
-      // Use GCS-based flow with ACL (for development/GCS provider)
-      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      // GCS: deriveDownloadPath returns path with "/objects/" prefix for ACL
+      // Ensure it has the prefix before calling getObjectEntityFile
+      const gcsPath = pathForDownload.startsWith("/objects/")
+        ? pathForDownload
+        : `/objects/${pathForDownload.replace(/^\/+/, "")}`; // Strip leading slashes first
+      
+      const objectFile = await objectStorageService.getObjectEntityFile(gcsPath);
       const canAccess = await objectStorageService.canAccessObjectEntity({
         objectFile,
         userId: userId,
@@ -8370,12 +8397,14 @@ Please provide coaching guidance based on their question and current context.`;
       });
       
       if (!canAccess) {
-        return res.sendStatus(401);
+        // Log ACL failure for telemetry, but return 404 to avoid leaking artifact existence
+        console.log(`[Download] ACL check failed for artifact ${artifact.id}, user ${userId}`);
+        return res.sendStatus(404);
       }
       
       objectStorageService.downloadObject(objectFile, res);
     } catch (error) {
-      console.error("Error checking object access:", error);
+      console.error("Error downloading object:", error);
       if (error instanceof ObjectNotFoundError) {
         return res.sendStatus(404);
       }
@@ -8396,23 +8425,17 @@ Please provide coaching guidance based on their question and current context.`;
         return res.status(403).json({ error: 'Access denied to this project' });
       }
       
-      const validation = insertChangeArtifactSchema.safeParse({
-        ...req.body,
-        projectId,
-        uploadedById: userId,
-        uploadedAt: new Date()
-      });
-
-      if (!validation.success) {
-        return res.status(400).json({ 
-          error: "Invalid change artifact data", 
-          details: validation.error.errors 
-        });
-      }
-
-      // Set ACL policy for the uploaded file
+      const objectStorageService = new ObjectStorageService();
+      
+      // Derive canonical objectKey and downloadPath from objectPath
+      let objectKey: string | undefined;
+      let downloadPath: string | undefined;
+      
       if (req.body.objectPath) {
-        const objectStorageService = new ObjectStorageService();
+        objectKey = objectStorageService.deriveObjectKey(req.body.objectPath);
+        downloadPath = objectStorageService.deriveDownloadPath(req.body.objectPath);
+        
+        // Set ACL policy for the uploaded file
         await objectStorageService.trySetObjectEntityAclPolicy(
           req.body.objectPath,
           {
@@ -8420,6 +8443,22 @@ Please provide coaching guidance based on their question and current context.`;
             visibility: req.body.isPublic ? "public" : "private",
           }
         );
+      }
+      
+      const validation = insertChangeArtifactSchema.safeParse({
+        ...req.body,
+        projectId,
+        uploadedById: userId,
+        uploadedAt: new Date(),
+        objectKey,
+        downloadPath
+      });
+
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid change artifact data", 
+          details: validation.error.errors 
+        });
       }
 
       const artifact = await storage.createChangeArtifact(validation.data);
