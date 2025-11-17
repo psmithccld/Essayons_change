@@ -55,6 +55,10 @@ Preferred communication style: Simple, everyday language.
 ### Development Workflow
 - **Type Safety**: End-to-end TypeScript.
 - **Tooling**: Vite HMR, ESBuild for production builds, Path Aliases.
+- **Production Build**: 
+  - Frontend: Vite builds to `dist/public/` directory with assets, images, and favicon
+  - Backend: ESBuild bundles server to `dist/index.js`
+  - Static File Serving: Production server serves files from `dist/public` using early middleware registration in `server/index.ts` to handle favicon and other root-level assets before API routes
 
 ### Security Configuration
 
