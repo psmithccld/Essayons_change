@@ -10,6 +10,7 @@ import { initializeVectorStore } from "./vectorStore";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pkg from "pg";
+import path from "path";
 const { Pool } = pkg;
 
 // Top-level logging
@@ -149,6 +150,28 @@ app.use((req, _res, next) => {
 });
 
 console.log("Startup: Session and middleware registered.");
+
+// PRODUCTION STATIC FILES - Serve favicon and other public assets from dist/public
+if (process.env.NODE_ENV === "production") {
+  const distPublicPath = path.resolve(process.cwd(), "dist", "public");
+  console.log(`[STATIC] Production mode - serving static files from: ${distPublicPath}`);
+  app.use(
+    express.static(distPublicPath, {
+      maxAge: "1h",
+      setHeaders: (res, filePath) => {
+        // Long-term caching for hashed assets
+        if (filePath.includes("/assets/")) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+        // Moderate caching for other static files (images, favicon, etc.)
+        else {
+          res.setHeader("Cache-Control", "public, max-age=3600");
+        }
+      },
+    })
+  );
+  console.log("[STATIC] Production static middleware registered");
+}
 
 // STATIC EXPORTS
 app.use(
