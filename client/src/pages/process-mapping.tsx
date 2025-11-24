@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Save, Trash2, Download, Upload } from "lucide-react";
+import { Plus, Save, Trash2, Download, Upload, ArrowRight, Minus, Paintbrush, Pencil, Type } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
@@ -37,10 +38,22 @@ export default function ProcessMapping() {
   const [isCanvasReady, setIsCanvasReady] = useState(false);
   const [selectedProcessMap, setSelectedProcessMap] = useState<ProcessMap | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
+  const [drawingLineWidth, setDrawingLineWidth] = useState(2);
+  
+  // UI state for button variants (synced with refs)
+  const [activeConnectorType, setActiveConnectorType] = useState<'line' | 'arrow' | null>(null);
   
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const connectionsRef = useRef<Map<string, { from: string; to: string; line: fabric.Line; arrow?: fabric.Triangle }>>(new Map());
+  
+  // Use refs for connector drawing state to avoid stale closures in event handlers
+  const isDrawingLineRef = useRef(false);
+  const lineStartPointRef = useRef<{ x: number; y: number; object: fabric.Object } | null>(null);
+  const tempLineRef = useRef<fabric.Line | null>(null);
+  const connectorTypeRef = useRef<'line' | 'arrow' | null>(null);
 
   const form = useForm<CreateProcessMapFormData>({
     resolver: zodResolver(createProcessMapSchema),
@@ -87,6 +100,115 @@ export default function ProcessMapping() {
       canvas.on('object:removed', () => {
         console.log("Object removed from canvas - scheduling autosave");
         scheduleSave();
+      });
+
+      // Update connections when objects move
+      canvas.on('object:moving', updateConnections);
+      canvas.on('object:scaling', updateConnections);
+      canvas.on('object:rotating', updateConnections);
+
+      // Handle connector drawing
+      canvas.on('mouse:down', (event) => {
+        if (!isDrawingLineRef.current || !connectorTypeRef.current) return;
+        
+        const target = event.target;
+
+        if (!lineStartPointRef.current && target) {
+          // First click - start point
+          const center = getObjectCenter(target);
+          lineStartPointRef.current = { x: center.x, y: center.y, object: target };
+          
+          // Create temporary line for visual feedback
+          const temp = new fabric.Line(
+            [center.x, center.y, center.x, center.y],
+            {
+              stroke: '#1e293b',
+              strokeWidth: 2,
+              selectable: false,
+              evented: false,
+            }
+          );
+          canvas.add(temp);
+          tempLineRef.current = temp;
+        } else if (lineStartPointRef.current && target) {
+          // Second click - end point
+          const endCenter = getObjectCenter(target);
+          
+          // Remove temporary line
+          if (tempLineRef.current) {
+            canvas.remove(tempLineRef.current);
+            tempLineRef.current = null;
+          }
+
+          // Create the final line
+          const line = new fabric.Line(
+            [lineStartPointRef.current.x, lineStartPointRef.current.y, endCenter.x, endCenter.y],
+            {
+              stroke: '#1e293b',
+              strokeWidth: 2,
+              selectable: false,
+              evented: false,
+            }
+          );
+
+          canvas.add(line);
+          
+          // Create arrow head if arrow type
+          let arrowHead: fabric.Triangle | undefined = undefined;
+          if (connectorTypeRef.current === 'arrow') {
+            const angle = Math.atan2(
+              endCenter.y - lineStartPointRef.current.y,
+              endCenter.x - lineStartPointRef.current.x
+            );
+            arrowHead = createArrowHead();
+            arrowHead.set({
+              left: endCenter.x,
+              top: endCenter.y,
+              angle: (angle * 180) / Math.PI + 90,
+              selectable: false,
+              evented: false,
+            });
+            canvas.add(arrowHead);
+          }
+          
+          // Store connection info with IDs and arrow reference
+          const fromObj = lineStartPointRef.current.object;
+          const toObj = target;
+          
+          const connectionId = `conn_${Date.now()}`;
+          
+          // Assign IDs to objects if they don't have them
+          if (!(fromObj as any).id) (fromObj as any).id = connectionId + '_from';
+          if (!(toObj as any).id) (toObj as any).id = connectionId + '_to';
+          
+          connectionsRef.current.set(connectionId, {
+            from: (fromObj as any).id,
+            to: (toObj as any).id,
+            line: line,
+            arrow: arrowHead,
+          });
+
+          // Reset drawing state
+          lineStartPointRef.current = null;
+          isDrawingLineRef.current = false;
+          connectorTypeRef.current = null;
+          setActiveConnectorType(null); // UI state
+          canvas.selection = true;
+          canvas.hoverCursor = 'move';
+          canvas.defaultCursor = 'default';
+          
+          canvas.renderAll();
+          scheduleSave();
+        }
+      });
+
+      // Update temporary line position as mouse moves
+      canvas.on('mouse:move', (event) => {
+        if (!isDrawingLineRef.current || !lineStartPointRef.current || !tempLineRef.current) return;
+        
+        const pointer = canvas.getPointer(event.e);
+        tempLineRef.current.set({ x2: pointer.x, y2: pointer.y });
+        canvas.renderAll();
       });
 
       return () => {
@@ -167,8 +289,6 @@ export default function ProcessMapping() {
     canvas.loadFromJSON(canvasData, () => {
       canvas.renderAll();
       console.log("Canvas loaded successfully");
-    }, (o: any, object: fabric.Object) => {
-      console.error("Error loading object:", o);
     });
 
     setSelectedProcessMap(processMap);
@@ -376,6 +496,231 @@ export default function ProcessMapping() {
     canvas.renderAll();
   };
 
+  // Add text to selected shape
+  const addTextToShape = () => {
+    if (!fabricCanvasRef.current) return;
+    
+    const canvas = fabricCanvasRef.current;
+    const activeObject = canvas.getActiveObject();
+    
+    if (!activeObject) {
+      toast({
+        title: "No Shape Selected",
+        description: "Please select a shape first, then add text to it.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Don't allow adding text to groups or text objects
+    if (activeObject.type === 'group' || activeObject.type === 'i-text') {
+      toast({
+        title: "Invalid Selection",
+        description: "Select a shape (rectangle, circle, triangle) to add text.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const text = new fabric.IText('Text', {
+      fontSize: 16,
+      fill: '#ffffff',
+      originX: 'center',
+      originY: 'center',
+    });
+
+    // Create a group with the shape and text
+    const group = new fabric.Group([activeObject, text], {
+      left: activeObject.left,
+      top: activeObject.top,
+    });
+
+    canvas.remove(activeObject);
+    canvas.add(group);
+    canvas.setActiveObject(group);
+    canvas.renderAll();
+    
+    console.log("Text added to shape");
+  };
+
+  // Start drawing a line/arrow
+  const startDrawingConnector = (type: 'line' | 'arrow') => {
+    if (!fabricCanvasRef.current) return;
+    
+    connectorTypeRef.current = type;
+    isDrawingLineRef.current = true;
+    setActiveConnectorType(type); // UI state
+    
+    const canvas = fabricCanvasRef.current;
+    canvas.selection = false;
+    canvas.hoverCursor = 'crosshair';
+    canvas.defaultCursor = 'crosshair';
+    
+    toast({
+      title: `Drawing ${type === 'arrow' ? 'Arrow' : 'Line'}`,
+      description: "Click on a shape to start, then click on another shape to connect them.",
+    });
+  };
+
+  // Toggle free draw mode
+  const toggleFreeDrawMode = () => {
+    if (!fabricCanvasRef.current) return;
+    
+    const canvas = fabricCanvasRef.current;
+    const newMode = !isDrawingMode;
+    
+    setIsDrawingMode(newMode);
+    canvas.isDrawingMode = newMode;
+    
+    if (newMode) {
+      canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+      canvas.freeDrawingBrush.width = drawingLineWidth;
+      canvas.freeDrawingBrush.color = '#1e293b';
+      toast({
+        title: "Free Draw Enabled",
+        description: "Draw freely on the canvas. Click again to disable.",
+      });
+    } else {
+      toast({
+        title: "Free Draw Disabled",
+        description: "Selection mode enabled.",
+      });
+    }
+  };
+
+  // Change drawing line width
+  const changeLineWidth = (width: number) => {
+    setDrawingLineWidth(width);
+    if (fabricCanvasRef.current && isDrawingMode) {
+      const canvas = fabricCanvasRef.current;
+      if (canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush.width = width;
+      }
+    }
+  };
+
+  // Change shape color
+  const changeShapeColor = (color: string) => {
+    if (!fabricCanvasRef.current) return;
+    
+    const canvas = fabricCanvasRef.current;
+    const activeObject = canvas.getActiveObject();
+    
+    if (!activeObject) {
+      toast({
+        title: "No Object Selected",
+        description: "Please select a shape to change its color.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (activeObject.type === 'group') {
+      // Change the first object in the group (the shape)
+      const group = activeObject as fabric.Group;
+      const objects = group.getObjects();
+      if (objects[0]) {
+        objects[0].set('fill', color);
+      }
+    } else if (activeObject.type !== 'i-text') {
+      activeObject.set('fill', color);
+    }
+    
+    canvas.renderAll();
+    console.log("Shape color changed to:", color);
+  };
+
+  // Change text color with smart contrast
+  const changeTextColor = (color: string) => {
+    if (!fabricCanvasRef.current) return;
+    
+    const canvas = fabricCanvasRef.current;
+    const activeObject = canvas.getActiveObject();
+    
+    if (!activeObject) {
+      toast({
+        title: "No Object Selected",
+        description: "Please select text or a shape with text to change the text color.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (activeObject.type === 'i-text') {
+      activeObject.set('fill', color);
+    } else if (activeObject.type === 'group') {
+      // Change text in group
+      const group = activeObject as fabric.Group;
+      const objects = group.getObjects();
+      const textObject = objects.find(obj => obj.type === 'i-text');
+      if (textObject) {
+        textObject.set('fill', color);
+      }
+    }
+    
+    canvas.renderAll();
+    console.log("Text color changed to:", color);
+  };
+
+  // Helper to get center point of an object
+  const getObjectCenter = (obj: fabric.Object) => {
+    const center = obj.getCenterPoint();
+    return { x: center.x, y: center.y };
+  };
+
+  // Create arrow marker
+  const createArrowHead = () => {
+    return new fabric.Triangle({
+      width: 10,
+      height: 10,
+      fill: '#1e293b',
+      stroke: '#1e293b',
+      strokeWidth: 1,
+      originX: 'center',
+      originY: 'center',
+    });
+  };
+
+  // Update connections when objects move
+  const updateConnections = () => {
+    if (!fabricCanvasRef.current) return;
+    
+    const canvas = fabricCanvasRef.current;
+    
+    connectionsRef.current.forEach((connection) => {
+      const fromObj = canvas.getObjects().find((obj: any) => obj.id === connection.from);
+      const toObj = canvas.getObjects().find((obj: any) => obj.id === connection.to);
+      
+      if (fromObj && toObj && connection.line) {
+        const fromCenter = getObjectCenter(fromObj);
+        const toCenter = getObjectCenter(toObj);
+        
+        // Update line position
+        connection.line.set({
+          x1: fromCenter.x,
+          y1: fromCenter.y,
+          x2: toCenter.x,
+          y2: toCenter.y,
+        });
+        
+        // Update arrow head position and angle if it exists
+        if (connection.arrow) {
+          const angle = Math.atan2(
+            toCenter.y - fromCenter.y,
+            toCenter.x - fromCenter.x
+          );
+          connection.arrow.set({
+            left: toCenter.x,
+            top: toCenter.y,
+            angle: (angle * 180) / Math.PI + 90,
+          });
+        }
+        
+        canvas.renderAll();
+      }
+    });
+  };
+
   const onSubmit = (data: CreateProcessMapFormData) => {
     createProcessMapMutation.mutate(data);
   };
@@ -539,40 +884,213 @@ export default function ProcessMapping() {
               </div>
             )}
             
-            {/* Canvas Tools */}
-            <div className="mb-4 flex gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => addShape('rect')}
-                disabled={!isCanvasReady || !selectedProcessMap}
-              >
-                Rectangle
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => addShape('circle')}
-                disabled={!isCanvasReady || !selectedProcessMap}
-              >
-                Circle
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => addShape('triangle')}
-                disabled={!isCanvasReady || !selectedProcessMap}
-              >
-                Triangle
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={addText}
-                disabled={!isCanvasReady || !selectedProcessMap}
-              >
-                Add Text
-              </Button>
+            {/* Canvas Tools - Organized by Groups */}
+            <div className="mb-4 space-y-3">
+              {/* Shapes Group */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Shapes</p>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addShape('rect')}
+                    disabled={!isCanvasReady || !selectedProcessMap}
+                    data-testid="button-add-rectangle"
+                  >
+                    Rectangle
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addShape('circle')}
+                    disabled={!isCanvasReady || !selectedProcessMap}
+                    data-testid="button-add-circle"
+                  >
+                    Circle
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addShape('triangle')}
+                    disabled={!isCanvasReady || !selectedProcessMap}
+                    data-testid="button-add-triangle"
+                  >
+                    Triangle
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Connectors Group */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Connectors</p>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant={activeConnectorType === 'line' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => startDrawingConnector('line')}
+                    disabled={!isCanvasReady || !selectedProcessMap}
+                    data-testid="button-draw-line"
+                  >
+                    <Minus className="h-4 w-4 mr-2" />
+                    Line
+                  </Button>
+                  <Button
+                    variant={activeConnectorType === 'arrow' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => startDrawingConnector('arrow')}
+                    disabled={!isCanvasReady || !selectedProcessMap}
+                    data-testid="button-draw-arrow"
+                  >
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Arrow
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Text Group */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Text</p>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addText}
+                    disabled={!isCanvasReady || !selectedProcessMap}
+                    data-testid="button-add-text"
+                  >
+                    <Type className="h-4 w-4 mr-2" />
+                    Add Text
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addTextToShape}
+                    disabled={!isCanvasReady || !selectedProcessMap}
+                    data-testid="button-add-text-to-shape"
+                  >
+                    <Type className="h-4 w-4 mr-2" />
+                    Text on Shape
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Drawing Group */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Drawing</p>
+                <div className="flex gap-2 flex-wrap items-center">
+                  <Button
+                    variant={isDrawingMode ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={toggleFreeDrawMode}
+                    disabled={!isCanvasReady || !selectedProcessMap}
+                    data-testid="button-toggle-free-draw"
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    {isDrawingMode ? 'Stop Drawing' : 'Free Draw'}
+                  </Button>
+                  {isDrawingMode && (
+                    <div className="flex gap-1">
+                      <Button
+                        variant={drawingLineWidth === 1 ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => changeLineWidth(1)}
+                        data-testid="button-line-width-thin"
+                      >
+                        Thin
+                      </Button>
+                      <Button
+                        variant={drawingLineWidth === 2 ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => changeLineWidth(2)}
+                        data-testid="button-line-width-medium"
+                      >
+                        Medium
+                      </Button>
+                      <Button
+                        variant={drawingLineWidth === 5 ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => changeLineWidth(5)}
+                        data-testid="button-line-width-thick"
+                      >
+                        Thick
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Colors Group */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Colors</p>
+                <div className="flex gap-2 flex-wrap items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs">Shape:</span>
+                    <input
+                      type="color"
+                      className="w-8 h-8 rounded cursor-pointer"
+                      onChange={(e) => changeShapeColor(e.target.value)}
+                      disabled={!isCanvasReady || !selectedProcessMap}
+                      data-testid="input-shape-color"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs">Text:</span>
+                    <input
+                      type="color"
+                      className="w-8 h-8 rounded cursor-pointer"
+                      onChange={(e) => changeTextColor(e.target.value)}
+                      disabled={!isCanvasReady || !selectedProcessMap}
+                      data-testid="input-text-color"
+                    />
+                  </div>
+                  <div className="flex gap-1 ml-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => changeShapeColor('#3b82f6')}
+                      disabled={!isCanvasReady || !selectedProcessMap}
+                      className="w-8 h-8 p-0"
+                      style={{ backgroundColor: '#3b82f6' }}
+                      data-testid="button-preset-blue"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => changeShapeColor('#ef4444')}
+                      disabled={!isCanvasReady || !selectedProcessMap}
+                      className="w-8 h-8 p-0"
+                      style={{ backgroundColor: '#ef4444' }}
+                      data-testid="button-preset-red"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => changeShapeColor('#22c55e')}
+                      disabled={!isCanvasReady || !selectedProcessMap}
+                      className="w-8 h-8 p-0"
+                      style={{ backgroundColor: '#22c55e' }}
+                      data-testid="button-preset-green"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => changeShapeColor('#f59e0b')}
+                      disabled={!isCanvasReady || !selectedProcessMap}
+                      className="w-8 h-8 p-0"
+                      style={{ backgroundColor: '#f59e0b' }}
+                      data-testid="button-preset-orange"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Canvas */}
