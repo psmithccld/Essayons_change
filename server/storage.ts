@@ -6895,7 +6895,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           sql`${organizations.licenseExpiresAt} IS NOT NULL`,
-          sql`${organizations.licenseExpiresAt} BETWEEN NOW() AND NOW() + INTERVAL '${days} days'`
+          sql`${organizations.licenseExpiresAt} BETWEEN NOW() AND NOW() + INTERVAL '${sql.raw(days.toString())} days'`
         )
       )
       .orderBy(organizations.licenseExpiresAt);
