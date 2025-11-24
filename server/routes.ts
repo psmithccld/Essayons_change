@@ -83,6 +83,7 @@ import { getStorageProvider } from "./storage-providers/factory";
 import { ObjectPermission } from "./objectAcl";
 import { createRateLimitStore, type RateLimitStore } from "./rateLimit.js";
 import { createProcessMapsRouter } from "./routes/process-maps";
+import { startLicenseChecker } from "./services/licenseChecker";
 import { type SystemSettings } from "@shared/schema";
 import { 
   insertProjectSchema, insertTaskSchema, insertStakeholderSchema, insertRaidLogSchema,
@@ -769,6 +770,62 @@ const requireOrgContext = async (req: AuthenticatedRequest, res: Response, next:
   }
 };
 
+// SECURITY: Read-only enforcement middleware for expired licenses
+const enforceOrganizationLicense = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    // Skip for read-only operations (GET)
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+      return next();
+    }
+
+    // Skip if super admin is making the request
+    if (req.superAdminUser) {
+      return next();
+    }
+
+    // Check if organization context exists
+    if (!req.organizationId) {
+      return next(); // Will be handled by requireOrgContext
+    }
+
+    // Get organization details with license info
+    const organization = await storage.getOrganization(req.organizationId);
+    if (!organization) {
+      return res.status(404).json({ error: "Organization not found" });
+    }
+
+    // Check if organization is in read-only mode
+    if (organization.isReadOnly) {
+      return res.status(403).json({ 
+        error: "Organization is in read-only mode. Please contact your administrator to renew your license.",
+        code: "READ_ONLY_MODE"
+      });
+    }
+
+    // Check if license has expired beyond grace period (7 days)
+    if (organization.licenseExpiresAt) {
+      const expirationDate = new Date(organization.licenseExpiresAt);
+      const gracePeriodEnd = new Date(expirationDate.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      const now = new Date();
+
+      if (now > gracePeriodEnd) {
+        // License expired beyond grace period - enforce read-only
+        // Note: The license checker job should have already set isReadOnly, but this is a safety check
+        return res.status(403).json({ 
+          error: "Your license has expired. Please contact your administrator to renew.",
+          code: "LICENSE_EXPIRED",
+          expirationDate: expirationDate.toISOString()
+        });
+      }
+    }
+
+    next();
+  } catch (error) {
+    console.error("License enforcement error:", error);
+    res.status(500).json({ error: "License check failed" });
+  }
+};
+
 // Permission middleware factory - requires authentication first
 const requirePermission = (permission: keyof Permissions) => {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -800,7 +857,7 @@ const requireAuthAndPermission = (permission: keyof Permissions) => {
 };
 
 // Combined middleware for auth + organization context (for routes that need org context but no special permissions)
-const requireAuthAndOrg = [requireAuth, requireOrgContext];
+const requireAuthAndOrg = [requireAuth, requireOrgContext, enforceOrganizationLicense];
 
 // GLOBAL PLATFORM ENFORCEMENT: Middleware to check global platform-wide settings
 const enforceGlobalPlatformSettings = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -9106,6 +9163,9 @@ Please provide coaching guidance based on their question and current context.`;
       res.status(500).json({ error: "Failed to escalate conversation to ticket" });
     }
   });
+
+  // Start license expiration checker
+  startLicenseChecker();
 
   const httpServer = createServer(app);
   return httpServer;

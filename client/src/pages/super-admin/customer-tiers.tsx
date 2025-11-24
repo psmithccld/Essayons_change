@@ -34,7 +34,8 @@ import {
   Zap,
   Shield,
   Settings,
-  Building2
+  Building2,
+  Copy
 } from "lucide-react";
 import { useSuperAdmin } from "@/contexts/SuperAdminContext";
 import { useToast } from "@/hooks/use-toast";
@@ -298,6 +299,26 @@ export default function SuperAdminCustomerTiers() {
     }
   };
 
+  const handleCloneTier = (tier: CustomerTier) => {
+    createForm.reset({
+      name: `${tier.name} (Copy)`,
+      description: tier.description || "",
+      seatLimit: tier.seatLimit,
+      price: tier.price,
+      pricingModel: tier.pricingModel,
+      maxFileUploadSizeMB: tier.maxFileUploadSizeMB,
+      storageGB: tier.storageGB,
+      currency: tier.currency || "USD",
+      billingInterval: tier.billingInterval || "month",
+      stripeProductId: "",
+      stripePriceId: "",
+      isPopular: false,
+      features: { ...tier.features },
+      isActive: true,
+    });
+    setIsCreateDialogOpen(true);
+  };
+
   const renderTierCard = (tier: CustomerTier) => (
     <Card key={tier.id} className={`relative ${tier.isPopular ? "ring-2 ring-blue-500" : ""}`}>
       {tier.isPopular && (
@@ -405,6 +426,15 @@ export default function SuperAdminCustomerTiers() {
           >
             <Edit className="h-3 w-3 mr-1" />
             Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleCloneTier(tier)}
+            data-testid={`button-clone-tier-${tier.id}`}
+            title="Clone this tier"
+          >
+            <Copy className="h-3 w-3" />
           </Button>
           <Button
             variant="outline"
