@@ -6837,8 +6837,12 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(organizationFiles.uploadedAt));
   }
 
-  async getOrganizationFile(id: string): Promise<OrganizationFile | undefined> {
-    const [file] = await db.select().from(organizationFiles).where(eq(organizationFiles.id, id));
+  async getOrganizationFile(id: string, organizationId: string): Promise<OrganizationFile | undefined> {
+    const [file] = await db.select().from(organizationFiles)
+      .where(and(
+        eq(organizationFiles.id, id),
+        eq(organizationFiles.organizationId, organizationId)
+      ));
     return file || undefined;
   }
 
@@ -6847,8 +6851,12 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async deleteOrganizationFile(id: string): Promise<boolean> {
-    const result = await db.delete(organizationFiles).where(eq(organizationFiles.id, id));
+  async deleteOrganizationFile(id: string, organizationId: string): Promise<boolean> {
+    const result = await db.delete(organizationFiles)
+      .where(and(
+        eq(organizationFiles.id, id),
+        eq(organizationFiles.organizationId, organizationId)
+      ));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 

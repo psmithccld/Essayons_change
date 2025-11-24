@@ -91,7 +91,7 @@ import {
   insertRiskSchema, insertActionSchema, insertIssueSchema, insertDeficiencySchema,
   insertRoleSchema, insertUserSchema, insertUserInitiativeAssignmentSchema,
   insertUserGroupSchema, insertUserGroupMembershipSchema, insertUserPermissionSchema, insertNotificationSchema, insertChangeArtifactSchema,
-  insertOrganizationSettingsSchema,
+  insertOrganizationSettingsSchema, insertOrganizationFileSchema,
   coachContextPayloadSchema,
   type UserInitiativeAssignment, type InsertUserInitiativeAssignment, type User, type Role, type Permissions, type Notification, type CoachContextPayload, type Survey,
   // Add missing schema imports
@@ -2186,6 +2186,157 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching organization details:", error);
       res.status(500).json({ error: "Failed to fetch organization details" });
+    }
+  });
+
+  // Organization file management (contract storage)
+  // Get organization files
+  app.get("/api/super-admin/organizations/:id/files", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      const organization = await storage.getOrganization(id);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      const files = await storage.getOrganizationFiles(id);
+      res.json(files);
+    } catch (error) {
+      console.error("Error fetching organization files:", error);
+      res.status(500).json({ error: "Failed to fetch organization files" });
+    }
+  });
+
+  // Create organization file metadata (after file upload)
+  app.post("/api/super-admin/organizations/:id/files", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id: organizationId } = req.params;
+      
+      // Validate request body
+      const fileSchema = insertOrganizationFileSchema.omit({ uploadedById: true });
+      const validation = fileSchema.safeParse({
+        ...req.body,
+        organizationId
+      });
+      
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid file data", 
+          details: validation.error.errors 
+        });
+      }
+      
+      const organization = await storage.getOrganization(organizationId);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      const file = await storage.createOrganizationFile({
+        ...validation.data,
+        uploadedById: req.superAdminUser!.id
+      });
+      
+      console.log(`Super admin ${req.superAdminUser!.username} uploaded file ${validation.data.fileName} to organization ${organization.name}`);
+      res.status(201).json(file);
+    } catch (error) {
+      console.error("Error creating organization file:", error);
+      res.status(500).json({ error: "Failed to create organization file" });
+    }
+  });
+
+  // Download organization file
+  app.get("/api/super-admin/organizations/:id/files/:fileId/download", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id: organizationId, fileId } = req.params;
+      
+      const file = await storage.getOrganizationFile(fileId, organizationId);
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
+      const objectStorageService = new ObjectStorageService();
+      const downloadUrl = await objectStorageService.getSignedDownloadUrl(file.fileKey);
+      
+      res.json({ downloadUrl, fileName: file.fileName });
+    } catch (error) {
+      console.error("Error downloading organization file:", error);
+      res.status(500).json({ error: "Failed to download file" });
+    }
+  });
+
+  // Delete organization file
+  app.delete("/api/super-admin/organizations/:id/files/:fileId", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id: organizationId, fileId } = req.params;
+      
+      const file = await storage.getOrganizationFile(fileId, organizationId);
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
+      // Delete file from object storage
+      const objectStorageService = new ObjectStorageService();
+      await objectStorageService.deleteObject(file.fileKey);
+      
+      // Delete file metadata from database
+      await storage.deleteOrganizationFile(fileId, organizationId);
+      
+      console.log(`Super admin ${req.superAdminUser!.username} deleted file ${file.fileName} from organization`);
+      res.json({ message: "File deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting organization file:", error);
+      res.status(500).json({ error: "Failed to delete file" });
+    }
+  });
+
+  // Update organization license information
+  app.patch("/api/super-admin/organizations/:id/license", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Validate request body
+      const licenseSchema = z.object({
+        licenseExpiresAt: z.string().datetime().nullable().optional(),
+        isReadOnly: z.boolean().optional(),
+        primaryContactEmail: z.string().email().nullable().optional()
+      });
+      
+      const validation = licenseSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid license data", 
+          details: validation.error.errors 
+        });
+      }
+      
+      const organization = await storage.getOrganization(id);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      const updatedOrg = await storage.updateOrganizationLicense(id, {
+        licenseExpiresAt: validation.data.licenseExpiresAt ? new Date(validation.data.licenseExpiresAt) : null,
+        isReadOnly: validation.data.isReadOnly,
+        primaryContactEmail: validation.data.primaryContactEmail
+      });
+      
+      console.log(`Super admin ${req.superAdminUser!.username} updated license for organization ${organization.name}`);
+      res.json(updatedOrg);
+    } catch (error) {
+      console.error("Error updating organization license:", error);
+      res.status(500).json({ error: "Failed to update organization license" });
+    }
+  });
+
+  // Get organizations with expired licenses
+  app.get("/api/super-admin/organizations/expired-licenses", requireSuperAdminAuth, async (req: AuthenticatedSuperAdminRequest, res: Response) => {
+    try {
+      const expiredOrgs = await storage.getOrganizationsWithExpiredLicenses();
+      res.json(expiredOrgs);
+    } catch (error) {
+      console.error("Error fetching expired licenses:", error);
+      res.status(500).json({ error: "Failed to fetch expired licenses" });
     }
   });
 
