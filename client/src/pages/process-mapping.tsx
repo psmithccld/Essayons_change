@@ -752,7 +752,7 @@ export default function ProcessMapping() {
         <div className="flex gap-2">
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button disabled={!isCanvasReady}>
+              <Button disabled={!isCanvasReady} data-testid="button-new-process-map">
                 <Plus className="h-4 w-4 mr-2" />
                 New Process Map
               </Button>
