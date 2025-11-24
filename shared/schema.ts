@@ -236,6 +236,7 @@ export const organizations = pgTable("organizations", {
   contactPhone: text("contact_phone"),
   address: text("address"),
   website: text("website"),
+  primaryContactEmail: text("primary_contact_email"), // Primary contact for license notifications
   // Subscription and Limits
   maxUsers: integer("max_users").notNull().default(10),
   taxId: text("tax_id"),
@@ -246,11 +247,29 @@ export const organizations = pgTable("organizations", {
     changeArtifacts: true,
     reports: true
   }), // Feature flags for this organization
+  // License Management
+  licenseExpiresAt: timestamp("license_expires_at"), // When the license expires
+  isReadOnly: boolean("is_read_only").notNull().default(false), // Read-only mode after license expiration
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   slugIdx: index("organizations_slug_idx").on(table.slug),
   ownerIdx: index("organizations_owner_idx").on(table.ownerUserId),
+}));
+
+// Organization Files - contract files and documents stored per organization
+export const organizationFiles = pgTable("organization_files", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  fileName: text("file_name").notNull(), // Original filename
+  fileKey: text("file_key").notNull(), // Storage key for retrieval
+  fileType: text("file_type").notNull(), // MIME type (application/pdf, application/msword, etc.)
+  fileSize: integer("file_size").notNull(), // File size in bytes
+  uploadedById: uuid("uploaded_by_id").references(() => users.id, { onDelete: "restrict" }).notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("organization_files_org_idx").on(table.organizationId),
+  uploadedByIdx: index("organization_files_uploaded_by_idx").on(table.uploadedById),
 }));
 
 // Security Roles - organization-scoped roles with permissions
@@ -1350,6 +1369,11 @@ export const insertOrganizationMembershipSchema = createInsertSchema(organizatio
   joinedAt: true,
 });
 
+export const insertOrganizationFileSchema = createInsertSchema(organizationFiles).omit({
+  id: true,
+  uploadedAt: true,
+});
+
 export const insertCustomerTierSchema = createInsertSchema(customerTiers).omit({
   id: true,
   createdAt: true,
@@ -1782,6 +1806,9 @@ export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 
 export type OrganizationMembership = typeof organizationMemberships.$inferSelect;
 export type InsertOrganizationMembership = z.infer<typeof insertOrganizationMembershipSchema>;
+
+export type OrganizationFile = typeof organizationFiles.$inferSelect;
+export type InsertOrganizationFile = z.infer<typeof insertOrganizationFileSchema>;
 
 export type CustomerTier = typeof customerTiers.$inferSelect;
 export type InsertCustomerTier = z.infer<typeof insertCustomerTierSchema>;
