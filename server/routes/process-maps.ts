@@ -16,8 +16,13 @@ import { insertProcessMapSchema } from "@shared/schema";
  * to be set by tenant middleware when multi-tenancy is in use.
  */
 
-export function createProcessMapsRouter(storage: any) {
+export function createProcessMapsRouter(storage: any, authMiddleware?: any | any[]) {
   const router = express.Router();
+
+  // Normalize middleware to array (handles single function or array of functions)
+  const middleware = authMiddleware 
+    ? (Array.isArray(authMiddleware) ? authMiddleware : [authMiddleware])
+    : [];
 
   const createProcessMapBodySchema = z.object({
     name: z.string().min(1),
@@ -28,7 +33,7 @@ export function createProcessMapsRouter(storage: any) {
     connections: z.any().optional(),
   });
 
-  router.post("/api/projects/:projectId/process-maps", async (req: Request, res: Response) => {
+  router.post("/api/projects/:projectId/process-maps", ...middleware, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
       const organizationId = (req as any).organizationId;
@@ -114,6 +119,112 @@ export function createProcessMapsRouter(storage: any) {
       }
       console.error("Error in create process map route:", err);
       return res.status(500).json({ message: "Internal server error while creating process map" });
+    }
+  });
+
+  // GET list of process maps for a project
+  router.get("/api/projects/:projectId/process-maps", ...middleware, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const organizationId = (req as any).organizationId;
+
+      if (!user || !user.id) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const { projectId } = req.params;
+      if (!projectId) {
+        return res.status(400).json({ message: "Missing projectId in URL" });
+      }
+
+      const processMaps = await storage.getProcessMapsByProject(projectId, organizationId);
+      return res.status(200).json(processMaps);
+    } catch (err: any) {
+      console.error("Error fetching process maps:", err);
+      return res.status(500).json({ message: "Failed to fetch process maps" });
+    }
+  });
+
+  // GET single process map by ID
+  router.get("/api/process-maps/:id", ...middleware, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const organizationId = (req as any).organizationId;
+
+      if (!user || !user.id) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const processMap = await storage.getProcessMap(req.params.id, organizationId);
+      if (!processMap) {
+        return res.status(404).json({ message: "Process map not found" });
+      }
+
+      return res.status(200).json(processMap);
+    } catch (err: any) {
+      console.error("Error fetching process map:", err);
+      return res.status(500).json({ message: "Failed to fetch process map" });
+    }
+  });
+
+  // PUT update process map
+  router.put("/api/process-maps/:id", ...middleware, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const organizationId = (req as any).organizationId;
+
+      if (!user || !user.id) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const { id } = req.params;
+      if (!id) {
+        return res.status(400).json({ message: "Missing process map ID" });
+      }
+
+      // Validate canvasData if provided
+      let updateData: any = { ...req.body };
+      if (updateData.canvasData !== undefined && updateData.canvasData !== null) {
+        try {
+          updateData.canvasData = typeof updateData.canvasData === "string" 
+            ? JSON.parse(updateData.canvasData) 
+            : updateData.canvasData;
+        } catch (err) {
+          return res.status(400).json({ message: "Invalid canvasData JSON" });
+        }
+      }
+
+      const updatedMap = await storage.updateProcessMap(id, organizationId, updateData);
+      if (!updatedMap) {
+        return res.status(404).json({ message: "Process map not found" });
+      }
+
+      return res.status(200).json(updatedMap);
+    } catch (err: any) {
+      console.error("Error updating process map:", err);
+      return res.status(500).json({ message: "Failed to update process map" });
+    }
+  });
+
+  // DELETE process map
+  router.delete("/api/process-maps/:id", ...middleware, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const organizationId = (req as any).organizationId;
+
+      if (!user || !user.id) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const success = await storage.deleteProcessMap(req.params.id, organizationId);
+      if (!success) {
+        return res.status(404).json({ message: "Process map not found" });
+      }
+
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error("Error deleting process map:", err);
+      return res.status(500).json({ message: "Failed to delete process map" });
     }
   });
 
