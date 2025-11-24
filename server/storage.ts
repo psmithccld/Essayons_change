@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import { 
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
-  organizations, organizationMemberships, organizationSettings, customerTiers, subscriptions, invitations,
+  organizations, organizationMemberships, organizationFiles, organizationSettings, customerTiers, subscriptions, invitations,
   superAdminUsers, superAdminSessions, superAdminMfaSetup, supportTickets, supportConversations, systemSettings,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
@@ -19,6 +19,7 @@ import {
   type PasswordResetToken, type InsertPasswordResetToken, type RegistrationRequest, type EmailVerificationResponse,
   type ChangeArtifact, type InsertChangeArtifact,
   type Organization, type InsertOrganization, type OrganizationMembership, type InsertOrganizationMembership,
+  type OrganizationFile, type InsertOrganizationFile,
   type OrganizationSettings, type InsertOrganizationSettings,
   type CustomerTier, type InsertCustomerTier, type Subscription, type InsertSubscription, type Invitation, type InsertInvitation,
   type SuperAdminUser, type InsertSuperAdminUser, type SuperAdminSession, type InsertSuperAdminSession, type SuperAdminMfaSetup, type InsertSuperAdminMfaSetup,
@@ -219,6 +220,21 @@ export interface IStorage {
     limit?: number;
     offset?: number;
   }): Promise<{ artifacts: ChangeArtifact[]; total: number; }>;
+
+  // Organization Files - Contract storage
+  getOrganizationFiles(organizationId: string): Promise<OrganizationFile[]>;
+  getOrganizationFile(id: string): Promise<OrganizationFile | undefined>;
+  createOrganizationFile(file: InsertOrganizationFile): Promise<OrganizationFile>;
+  deleteOrganizationFile(id: string): Promise<boolean>;
+
+  // Organization License Management
+  updateOrganizationLicense(organizationId: string, licenseData: {
+    licenseExpiresAt?: Date | null;
+    isReadOnly?: boolean;
+    primaryContactEmail?: string | null;
+  }): Promise<Organization | undefined>;
+  getOrganizationsWithExpiredLicenses(): Promise<Organization[]>;
+  getOrganizationsNearingLicenseExpiration(days: number): Promise<Organization[]>;
 
   // Dashboard Analytics
   getDashboardStats(userId: string, organizationId: string): Promise<{
@@ -6809,6 +6825,72 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     
     return subscription || undefined;
+  }
+
+  // ===============================================
+  // ORGANIZATION FILES - Contract storage
+  // ===============================================
+
+  async getOrganizationFiles(organizationId: string): Promise<OrganizationFile[]> {
+    return await db.select().from(organizationFiles)
+      .where(eq(organizationFiles.organizationId, organizationId))
+      .orderBy(desc(organizationFiles.uploadedAt));
+  }
+
+  async getOrganizationFile(id: string): Promise<OrganizationFile | undefined> {
+    const [file] = await db.select().from(organizationFiles).where(eq(organizationFiles.id, id));
+    return file || undefined;
+  }
+
+  async createOrganizationFile(file: InsertOrganizationFile): Promise<OrganizationFile> {
+    const [created] = await db.insert(organizationFiles).values(file).returning();
+    return created;
+  }
+
+  async deleteOrganizationFile(id: string): Promise<boolean> {
+    const result = await db.delete(organizationFiles).where(eq(organizationFiles.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // ===============================================
+  // ORGANIZATION LICENSE MANAGEMENT
+  // ===============================================
+
+  async updateOrganizationLicense(organizationId: string, licenseData: {
+    licenseExpiresAt?: Date | null;
+    isReadOnly?: boolean;
+    primaryContactEmail?: string | null;
+  }): Promise<Organization | undefined> {
+    const [updated] = await db.update(organizations)
+      .set({
+        ...licenseData,
+        updatedAt: new Date()
+      })
+      .where(eq(organizations.id, organizationId))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getOrganizationsWithExpiredLicenses(): Promise<Organization[]> {
+    return await db.select().from(organizations)
+      .where(
+        and(
+          sql`${organizations.licenseExpiresAt} IS NOT NULL`,
+          sql`${organizations.licenseExpiresAt} < NOW()`
+        )
+      )
+      .orderBy(organizations.licenseExpiresAt);
+  }
+
+  async getOrganizationsNearingLicenseExpiration(days: number): Promise<Organization[]> {
+    return await db.select().from(organizations)
+      .where(
+        and(
+          sql`${organizations.licenseExpiresAt} IS NOT NULL`,
+          sql`${organizations.licenseExpiresAt} BETWEEN NOW() AND NOW() + INTERVAL '${days} days'`
+        )
+      )
+      .orderBy(organizations.licenseExpiresAt);
   }
 }
 
