@@ -223,9 +223,9 @@ export interface IStorage {
 
   // Organization Files - Contract storage
   getOrganizationFiles(organizationId: string): Promise<OrganizationFile[]>;
-  getOrganizationFile(id: string): Promise<OrganizationFile | undefined>;
+  getOrganizationFile(id: string, organizationId: string): Promise<OrganizationFile | undefined>;
   createOrganizationFile(file: InsertOrganizationFile): Promise<OrganizationFile>;
-  deleteOrganizationFile(id: string): Promise<boolean>;
+  deleteOrganizationFile(id: string, organizationId: string): Promise<boolean>;
 
   // Organization License Management
   updateOrganizationLicense(organizationId: string, licenseData: {
