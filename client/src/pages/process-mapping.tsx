@@ -8,10 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Save, Trash2, Download, Upload, ArrowRight, Minus, Paintbrush, Pencil, Type } from "lucide-react";
+import { Plus, Save, Trash2, Download, Upload, ArrowRight, Minus, Paintbrush, Pencil, Type, Square, Circle, Triangle as TriangleIcon, Shapes, Eraser } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentProject } from "@/contexts/CurrentProjectContext";
@@ -211,11 +212,155 @@ export default function ProcessMapping() {
         canvas.renderAll();
       });
 
+      // Double-click to add text to shape or edit existing text
+      canvas.on('mouse:dblclick', (event) => {
+        const target = event.target;
+        if (!target) return;
+
+        // If it's a standalone text object, enter editing mode
+        if (target.type === 'i-text' && !(target as any).__isShapeText) {
+          (target as fabric.IText).enterEditing();
+          return;
+        }
+
+        // If it's a group with text, make text editable by overlaying
+        if (target.type === 'group') {
+          const group = target as fabric.Group;
+          const objects = group.getObjects();
+          const shapeObj = objects[0]; // First object is the shape
+          const textObj = objects.find(obj => obj.type === 'i-text') as fabric.IText | undefined;
+          
+          if (textObj) {
+            // Position text as overlay (not in group) for editing
+            const groupCenter = group.getCenterPoint();
+            const overlayText = new fabric.IText(textObj.text || 'Text', {
+              left: groupCenter.x,
+              top: groupCenter.y,
+              fontSize: textObj.fontSize,
+              fill: textObj.fill,
+              originX: 'center',
+              originY: 'center',
+            });
+            
+            // Mark this as a temporary overlay
+            (overlayText as any).__tempOverlay = true;
+            (overlayText as any).__groupId = (group as any).id;
+            
+            canvas.add(overlayText);
+            canvas.setActiveObject(overlayText);
+            overlayText.enterEditing();
+            
+            // Hide the group's text while editing
+            textObj.set({ opacity: 0 });
+            canvas.renderAll();
+            return;
+          }
+        }
+
+        // Add new text to shape
+        const text = new fabric.IText('Text', {
+          fontSize: 16,
+          fill: '#ffffff',
+          originX: 'center',
+          originY: 'center',
+        });
+
+        // Mark this text as belonging to a shape
+        (text as any).__isShapeText = true;
+
+        // Preserve the original object's ID
+        const originalId = (target as any).id;
+
+        // Create a group with the shape and text
+        const group = new fabric.Group([target, text], {
+          left: target.left,
+          top: target.top,
+        });
+
+        // Transfer the ID to the group so connectors still work
+        if (originalId) {
+          (group as any).id = originalId;
+        }
+
+        canvas.remove(target);
+        canvas.add(group);
+        canvas.setActiveObject(group);
+        canvas.renderAll();
+        scheduleSave();
+      });
+
+      // Handle text editing exit - update group text
+      canvas.on('text:editing:exited', (event) => {
+        const text = event.target as fabric.IText;
+        
+        // If this is a temporary overlay, update the group
+        if ((text as any).__tempOverlay) {
+          const groupId = (text as any).__groupId;
+          const group = canvas.getObjects().find(obj => (obj as any).id === groupId) as fabric.Group;
+          
+          if (group && group.type === 'group') {
+            const objects = group.getObjects();
+            const textObj = objects.find(obj => obj.type === 'i-text') as fabric.IText;
+            
+            if (textObj) {
+              // Update the group's text with new content
+              textObj.set({
+                text: text.text,
+                opacity: 1,
+              });
+            }
+          }
+          
+          // Remove the temporary overlay
+          canvas.remove(text);
+          canvas.renderAll();
+          scheduleSave();
+        }
+      });
+
+      // Keyboard event listener for Delete/Backspace
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          // Prevent default browser behavior for Backspace
+          if (e.key === 'Backspace') {
+            const activeElement = document.activeElement;
+            // Only prevent if not in an input field
+            if (activeElement?.tagName !== 'INPUT' && activeElement?.tagName !== 'TEXTAREA') {
+              e.preventDefault();
+            } else {
+              return; // Don't delete canvas object if typing in input
+            }
+          }
+          
+          const activeObject = canvas.getActiveObject();
+          if (activeObject) {
+            // Check if it's part of a connection and remove the connection
+            connectionsRef.current.forEach((connection, connectionId) => {
+              const fromObj = canvas.getObjects().find((obj: any) => obj.id === connection.from);
+              const toObj = canvas.getObjects().find((obj: any) => obj.id === connection.to);
+              
+              if (fromObj === activeObject || toObj === activeObject) {
+                if (connection.line) canvas.remove(connection.line);
+                if (connection.arrow) canvas.remove(connection.arrow);
+                connectionsRef.current.delete(connectionId);
+              }
+            });
+            
+            canvas.remove(activeObject);
+            canvas.renderAll();
+            scheduleSave();
+          }
+        }
+      };
+
+      document.addEventListener('keydown', handleKeyDown);
+
       return () => {
         console.log("Cleaning up canvas...");
         if (autoSaveTimerRef.current) {
           clearTimeout(autoSaveTimerRef.current);
         }
+        document.removeEventListener('keydown', handleKeyDown);
         canvas.dispose();
         fabricCanvasRef.current = null;
         setIsCanvasReady(false);
@@ -446,7 +591,7 @@ export default function ProcessMapping() {
   });
 
   // Add shape to canvas
-  const addShape = (type: 'rect' | 'circle' | 'triangle') => {
+  const addShape = (type: 'rect' | 'circle' | 'triangle' | 'trapezoid' | 'pentagon' | 'heptagon' | 'octagon') => {
     if (!fabricCanvasRef.current) return;
 
     console.log("Adding shape:", type);
@@ -470,6 +615,54 @@ export default function ProcessMapping() {
         break;
       case 'triangle':
         shape = new fabric.Triangle({ ...options, width: 100, height: 100 });
+        break;
+      case 'trapezoid':
+        // Create trapezoid using polygon
+        shape = new fabric.Polygon(
+          [
+            { x: 20, y: 0 },
+            { x: 80, y: 0 },
+            { x: 100, y: 60 },
+            { x: 0, y: 60 }
+          ],
+          options
+        );
+        break;
+      case 'pentagon':
+        // Create regular pentagon
+        const pentagonPoints = [];
+        for (let i = 0; i < 5; i++) {
+          const angle = (i * 2 * Math.PI) / 5 - Math.PI / 2;
+          pentagonPoints.push({
+            x: 50 + 50 * Math.cos(angle),
+            y: 50 + 50 * Math.sin(angle)
+          });
+        }
+        shape = new fabric.Polygon(pentagonPoints, options);
+        break;
+      case 'heptagon':
+        // Create regular heptagon (septagon)
+        const heptagonPoints = [];
+        for (let i = 0; i < 7; i++) {
+          const angle = (i * 2 * Math.PI) / 7 - Math.PI / 2;
+          heptagonPoints.push({
+            x: 50 + 50 * Math.cos(angle),
+            y: 50 + 50 * Math.sin(angle)
+          });
+        }
+        shape = new fabric.Polygon(heptagonPoints, options);
+        break;
+      case 'octagon':
+        // Create regular octagon
+        const octagonPoints = [];
+        for (let i = 0; i < 8; i++) {
+          const angle = (i * 2 * Math.PI) / 8 - Math.PI / 2;
+          octagonPoints.push({
+            x: 50 + 50 * Math.cos(angle),
+            y: 50 + 50 * Math.sin(angle)
+          });
+        }
+        shape = new fabric.Polygon(octagonPoints, options);
         break;
     }
 
@@ -529,11 +722,22 @@ export default function ProcessMapping() {
       originY: 'center',
     });
 
+    // Mark this text as belonging to a shape
+    (text as any).__isShapeText = true;
+
+    // Preserve the original object's ID for connector tracking
+    const originalId = (activeObject as any).id;
+
     // Create a group with the shape and text
     const group = new fabric.Group([activeObject, text], {
       left: activeObject.left,
       top: activeObject.top,
     });
+
+    // Transfer the ID to the group so connectors still work
+    if (originalId) {
+      (group as any).id = originalId;
+    }
 
     canvas.remove(activeObject);
     canvas.add(group);
@@ -660,6 +864,43 @@ export default function ProcessMapping() {
     
     canvas.renderAll();
     console.log("Text color changed to:", color);
+  };
+
+  // Delete selected object(s)
+  const deleteSelectedObject = () => {
+    if (!fabricCanvasRef.current) return;
+    
+    const canvas = fabricCanvasRef.current;
+    const activeObject = canvas.getActiveObject();
+    
+    if (!activeObject) {
+      toast({
+        title: "No Object Selected",
+        description: "Please select an object to delete.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if it's part of a connection and remove the connection
+    connectionsRef.current.forEach((connection, connectionId) => {
+      const fromObj = canvas.getObjects().find((obj: any) => obj.id === connection.from);
+      const toObj = canvas.getObjects().find((obj: any) => obj.id === connection.to);
+      
+      if (fromObj === activeObject || toObj === activeObject) {
+        if (connection.line) canvas.remove(connection.line);
+        if (connection.arrow) canvas.remove(connection.arrow);
+        connectionsRef.current.delete(connectionId);
+      }
+    });
+    
+    canvas.remove(activeObject);
+    canvas.renderAll();
+    
+    toast({
+      title: "Object Deleted",
+      description: "The selected object has been removed.",
+    });
   };
 
   // Helper to get center point of an object
@@ -884,213 +1125,314 @@ export default function ProcessMapping() {
               </div>
             )}
             
-            {/* Canvas Tools - Organized by Groups */}
-            <div className="mb-4 space-y-3">
-              {/* Shapes Group */}
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Shapes</p>
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addShape('rect')}
-                    disabled={!isCanvasReady || !selectedProcessMap}
-                    data-testid="button-add-rectangle"
-                  >
-                    Rectangle
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addShape('circle')}
-                    disabled={!isCanvasReady || !selectedProcessMap}
-                    data-testid="button-add-circle"
-                  >
-                    Circle
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addShape('triangle')}
-                    disabled={!isCanvasReady || !selectedProcessMap}
-                    data-testid="button-add-triangle"
-                  >
-                    Triangle
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Connectors Group */}
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Connectors</p>
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    variant={activeConnectorType === 'line' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => startDrawingConnector('line')}
-                    disabled={!isCanvasReady || !selectedProcessMap}
-                    data-testid="button-draw-line"
-                  >
-                    <Minus className="h-4 w-4 mr-2" />
-                    Line
-                  </Button>
-                  <Button
-                    variant={activeConnectorType === 'arrow' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => startDrawingConnector('arrow')}
-                    disabled={!isCanvasReady || !selectedProcessMap}
-                    data-testid="button-draw-arrow"
-                  >
-                    <ArrowRight className="h-4 w-4 mr-2" />
-                    Arrow
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Text Group */}
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Text</p>
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={addText}
-                    disabled={!isCanvasReady || !selectedProcessMap}
-                    data-testid="button-add-text"
-                  >
-                    <Type className="h-4 w-4 mr-2" />
-                    Add Text
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={addTextToShape}
-                    disabled={!isCanvasReady || !selectedProcessMap}
-                    data-testid="button-add-text-to-shape"
-                  >
-                    <Type className="h-4 w-4 mr-2" />
-                    Text on Shape
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Drawing Group */}
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Drawing</p>
-                <div className="flex gap-2 flex-wrap items-center">
-                  <Button
-                    variant={isDrawingMode ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={toggleFreeDrawMode}
-                    disabled={!isCanvasReady || !selectedProcessMap}
-                    data-testid="button-toggle-free-draw"
-                  >
-                    <Pencil className="h-4 w-4 mr-2" />
-                    {isDrawingMode ? 'Stop Drawing' : 'Free Draw'}
-                  </Button>
-                  {isDrawingMode && (
-                    <div className="flex gap-1">
+            {/* Canvas Tools - Collapsible Sections */}
+            <div className="mb-4">
+              <Accordion type="multiple" defaultValue={["shapes", "tools", "colors"]} className="w-full">
+                {/* Shapes Section */}
+                <AccordionItem value="shapes">
+                  <AccordionTrigger className="text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                      <Shapes className="h-4 w-4" />
+                      Shapes
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="flex gap-2 flex-wrap pt-2">
                       <Button
-                        variant={drawingLineWidth === 1 ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => changeLineWidth(1)}
-                        data-testid="button-line-width-thin"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => addShape('rect')}
+                        disabled={!isCanvasReady || !selectedProcessMap}
+                        title="Rectangle (Double-click shape to add text)"
+                        data-testid="button-add-rectangle"
                       >
-                        Thin
+                        <Square className="h-4 w-4" />
                       </Button>
                       <Button
-                        variant={drawingLineWidth === 2 ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => changeLineWidth(2)}
-                        data-testid="button-line-width-medium"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => addShape('circle')}
+                        disabled={!isCanvasReady || !selectedProcessMap}
+                        title="Circle (Double-click shape to add text)"
+                        data-testid="button-add-circle"
                       >
-                        Medium
+                        <Circle className="h-4 w-4" />
                       </Button>
                       <Button
-                        variant={drawingLineWidth === 5 ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => changeLineWidth(5)}
-                        data-testid="button-line-width-thick"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => addShape('triangle')}
+                        disabled={!isCanvasReady || !selectedProcessMap}
+                        title="Triangle (Double-click shape to add text)"
+                        data-testid="button-add-triangle"
                       >
-                        Thick
+                        <TriangleIcon className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => addShape('trapezoid')}
+                        disabled={!isCanvasReady || !selectedProcessMap}
+                        title="Trapezoid (Double-click shape to add text)"
+                        data-testid="button-add-trapezoid"
+                      >
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polygon points="6,4 18,4 22,20 2,20" />
+                        </svg>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => addShape('pentagon')}
+                        disabled={!isCanvasReady || !selectedProcessMap}
+                        title="Pentagon (Double-click shape to add text)"
+                        data-testid="button-add-pentagon"
+                      >
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polygon points="12,2 22,9 18,22 6,22 2,9" />
+                        </svg>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => addShape('heptagon')}
+                        disabled={!isCanvasReady || !selectedProcessMap}
+                        title="Heptagon (Double-click shape to add text)"
+                        data-testid="button-add-heptagon"
+                      >
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polygon points="12,1 20,5 23,13 18,21 6,21 1,13 4,5" />
+                        </svg>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => addShape('octagon')}
+                        disabled={!isCanvasReady || !selectedProcessMap}
+                        title="Octagon (Double-click shape to add text)"
+                        data-testid="button-add-octagon"
+                      >
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polygon points="8,2 16,2 22,8 22,16 16,22 8,22 2,16 2,8" />
+                        </svg>
                       </Button>
                     </div>
-                  )}
-                </div>
-              </div>
+                    <p className="text-xs text-muted-foreground mt-2 italic">
+                      Tip: Double-click any shape to add text
+                    </p>
+                  </AccordionContent>
+                </AccordionItem>
 
-              <Separator />
+                {/* Tools Section */}
+                <AccordionItem value="tools">
+                  <AccordionTrigger className="text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                      <Pencil className="h-4 w-4" />
+                      Tools
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-3 pt-2">
+                      {/* Connectors */}
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Connectors</p>
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            variant={activeConnectorType === 'line' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => startDrawingConnector('line')}
+                            disabled={!isCanvasReady || !selectedProcessMap}
+                            data-testid="button-draw-line"
+                          >
+                            <Minus className="h-4 w-4 mr-2" />
+                            Line
+                          </Button>
+                          <Button
+                            variant={activeConnectorType === 'arrow' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => startDrawingConnector('arrow')}
+                            disabled={!isCanvasReady || !selectedProcessMap}
+                            data-testid="button-draw-arrow"
+                          >
+                            <ArrowRight className="h-4 w-4 mr-2" />
+                            Arrow
+                          </Button>
+                        </div>
+                      </div>
 
-              {/* Colors Group */}
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Colors</p>
-                <div className="flex gap-2 flex-wrap items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs">Shape:</span>
-                    <input
-                      type="color"
-                      className="w-8 h-8 rounded cursor-pointer"
-                      onChange={(e) => changeShapeColor(e.target.value)}
-                      disabled={!isCanvasReady || !selectedProcessMap}
-                      data-testid="input-shape-color"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs">Text:</span>
-                    <input
-                      type="color"
-                      className="w-8 h-8 rounded cursor-pointer"
-                      onChange={(e) => changeTextColor(e.target.value)}
-                      disabled={!isCanvasReady || !selectedProcessMap}
-                      data-testid="input-text-color"
-                    />
-                  </div>
-                  <div className="flex gap-1 ml-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => changeShapeColor('#3b82f6')}
-                      disabled={!isCanvasReady || !selectedProcessMap}
-                      className="w-8 h-8 p-0"
-                      style={{ backgroundColor: '#3b82f6' }}
-                      data-testid="button-preset-blue"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => changeShapeColor('#ef4444')}
-                      disabled={!isCanvasReady || !selectedProcessMap}
-                      className="w-8 h-8 p-0"
-                      style={{ backgroundColor: '#ef4444' }}
-                      data-testid="button-preset-red"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => changeShapeColor('#22c55e')}
-                      disabled={!isCanvasReady || !selectedProcessMap}
-                      className="w-8 h-8 p-0"
-                      style={{ backgroundColor: '#22c55e' }}
-                      data-testid="button-preset-green"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => changeShapeColor('#f59e0b')}
-                      disabled={!isCanvasReady || !selectedProcessMap}
-                      className="w-8 h-8 p-0"
-                      style={{ backgroundColor: '#f59e0b' }}
-                      data-testid="button-preset-orange"
-                    />
-                  </div>
-                </div>
-              </div>
+                      {/* Text */}
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Text</p>
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={addText}
+                            disabled={!isCanvasReady || !selectedProcessMap}
+                            data-testid="button-add-text"
+                          >
+                            <Type className="h-4 w-4 mr-2" />
+                            Add Text
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Delete */}
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Edit</p>
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={deleteSelectedObject}
+                            disabled={!isCanvasReady || !selectedProcessMap}
+                            data-testid="button-delete-object"
+                          >
+                            <Eraser className="h-4 w-4 mr-2" />
+                            Delete Selected
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2 italic">
+                          Or press Delete/Backspace key
+                        </p>
+                      </div>
+
+                      {/* Free Drawing */}
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Drawing</p>
+                        <div className="flex gap-2 flex-wrap items-center">
+                          <Button
+                            variant={isDrawingMode ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={toggleFreeDrawMode}
+                            disabled={!isCanvasReady || !selectedProcessMap}
+                            data-testid="button-toggle-free-draw"
+                          >
+                            <Pencil className="h-4 w-4 mr-2" />
+                            {isDrawingMode ? 'Stop Drawing' : 'Free Draw'}
+                          </Button>
+                          {isDrawingMode && (
+                            <div className="flex gap-1">
+                              <Button
+                                variant={drawingLineWidth === 1 ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => changeLineWidth(1)}
+                                data-testid="button-line-width-thin"
+                              >
+                                Thin
+                              </Button>
+                              <Button
+                                variant={drawingLineWidth === 2 ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => changeLineWidth(2)}
+                                data-testid="button-line-width-medium"
+                              >
+                                Medium
+                              </Button>
+                              <Button
+                                variant={drawingLineWidth === 5 ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => changeLineWidth(5)}
+                                data-testid="button-line-width-thick"
+                              >
+                                Thick
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Colors Section */}
+                <AccordionItem value="colors">
+                  <AccordionTrigger className="text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                      <Paintbrush className="h-4 w-4" />
+                      Colors
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-4 pt-2">
+                      {/* Custom Color Pickers */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium">Shape Color</label>
+                          <input
+                            type="color"
+                            className="w-full h-10 rounded cursor-pointer border"
+                            onChange={(e) => changeShapeColor(e.target.value)}
+                            disabled={!isCanvasReady || !selectedProcessMap}
+                            data-testid="input-shape-color"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium">Text Color</label>
+                          <input
+                            type="color"
+                            className="w-full h-10 rounded cursor-pointer border"
+                            onChange={(e) => changeTextColor(e.target.value)}
+                            disabled={!isCanvasReady || !selectedProcessMap}
+                            data-testid="input-text-color"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Color Presets */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium">Quick Color Presets</label>
+                        <div className="grid grid-cols-4 gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => changeShapeColor('#3b82f6')}
+                            disabled={!isCanvasReady || !selectedProcessMap}
+                            className="h-10 p-0 flex flex-col items-center justify-center"
+                            data-testid="button-preset-blue"
+                          >
+                            <div className="w-full h-6 rounded-t" style={{ backgroundColor: '#3b82f6' }} />
+                            <span className="text-xs mt-1">Blue</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => changeShapeColor('#ef4444')}
+                            disabled={!isCanvasReady || !selectedProcessMap}
+                            className="h-10 p-0 flex flex-col items-center justify-center"
+                            data-testid="button-preset-red"
+                          >
+                            <div className="w-full h-6 rounded-t" style={{ backgroundColor: '#ef4444' }} />
+                            <span className="text-xs mt-1">Red</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => changeShapeColor('#22c55e')}
+                            disabled={!isCanvasReady || !selectedProcessMap}
+                            className="h-10 p-0 flex flex-col items-center justify-center"
+                            data-testid="button-preset-green"
+                          >
+                            <div className="w-full h-6 rounded-t" style={{ backgroundColor: '#22c55e' }} />
+                            <span className="text-xs mt-1">Green</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => changeShapeColor('#f59e0b')}
+                            disabled={!isCanvasReady || !selectedProcessMap}
+                            className="h-10 p-0 flex flex-col items-center justify-center"
+                            data-testid="button-preset-orange"
+                          >
+                            <div className="w-full h-6 rounded-t" style={{ backgroundColor: '#f59e0b' }} />
+                            <span className="text-xs mt-1">Orange</span>
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
 
             {/* Canvas */}
