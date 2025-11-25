@@ -5172,7 +5172,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const oldTask = await storage.getTask(req.params.id, req.organizationId!);
       
       // Strip organizationId and projectId from request body to prevent cross-tenant changes
-      const { organizationId, projectId, ...updateData } = req.body;
+      const { organizationId, projectId, ...rawUpdateData } = req.body;
+      
+      // Convert date strings to Date objects for database compatibility
+      const updateData = {
+        ...rawUpdateData,
+        startDate: rawUpdateData.startDate ? new Date(rawUpdateData.startDate) : rawUpdateData.startDate,
+        dueDate: rawUpdateData.dueDate ? new Date(rawUpdateData.dueDate) : rawUpdateData.dueDate,
+        completedDate: rawUpdateData.completedDate ? new Date(rawUpdateData.completedDate) : rawUpdateData.completedDate,
+      };
+      
       const task = await storage.updateTask(req.params.id, req.organizationId!, updateData);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
@@ -5198,9 +5207,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json(task);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating task:", error);
-      res.status(400).json({ error: "Failed to update task" });
+      console.error("Task update request body:", JSON.stringify(req.body, null, 2));
+      console.error("Task ID:", req.params.id);
+      console.error("Error details:", error?.message || error);
+      res.status(400).json({ error: "Failed to update task", details: error?.message });
     }
   });
 
