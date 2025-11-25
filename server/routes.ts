@@ -4081,7 +4081,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Alert ID is required" });
       }
       
-      await storage.acknowledgeAlert(alertId);
+      // Get super admin user ID from the authenticated request
+      const superAdminUserId = req.superAdminUser?.id;
+      if (!superAdminUserId) {
+        return res.status(401).json({ error: "Super admin authentication required" });
+      }
+      
+      await storage.acknowledgeAlert(alertId, superAdminUserId);
       res.json({ success: true, message: "Alert acknowledged successfully" });
     } catch (error) {
       console.error("Error acknowledging alert:", error);
@@ -4100,7 +4106,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Alert ID is required" });
       }
       
-      await storage.resolveAlert(alertId);
+      // Get super admin user ID from the authenticated request
+      const superAdminUserId = req.superAdminUser?.id;
+      if (!superAdminUserId) {
+        return res.status(401).json({ error: "Super admin authentication required" });
+      }
+      
+      await storage.resolveAlert(alertId, superAdminUserId);
       res.json({ success: true, message: "Alert resolved successfully" });
     } catch (error) {
       console.error("Error resolving alert:", error);
