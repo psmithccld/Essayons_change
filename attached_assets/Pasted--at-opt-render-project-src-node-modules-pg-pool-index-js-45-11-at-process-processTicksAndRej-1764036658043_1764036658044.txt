@@ -1,0 +1,212 @@
+   at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getOrganization (file:///opt/render/project/src/dist/index.js:5544:23)
+    at async requireOrgContext (file:///opt/render/project/src/dist/index.js:10879:26) {
+  length: 122,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '145',
+  internalPosition: undefined,
+     [GET]200app.essayonschange.com/assets/star-lacw4Di4.jsclientIP="69.140.149.160" requestID="77268ed2-01c1-4fc3" responseTimeMS=229 responseBytes=659 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/copy-B5iwL9WZ.jsclientIP="69.140.149.160" requestID="c51cf3cc-3040-43b5" responseTimeMS=807 responseBytes=677 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/key-DXQeSZo_.jsclientIP="69.140.149.160" requestID="6c1e079e-a39c-48c2" responseTimeMS=295 responseBytes=694 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/dashboard-Dpji16nr.jsclientIP="69.140.149.160" requestID="37bc2750-cb51-448c" responseTimeMS=902 responseBytes=6793 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+[auth-debug] method=GET path=/api/super-admin/auth/status
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=R1qU4yqmrrym0ZDRq2wjI_Kw8etH1FOq
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+2:05:10 AM [express] GET /api/projects 500 in 794ms :: {"error":"Organization service unavailable"}
+2:05:10 AM [express] GET /api/auth/status 200 in 701ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24…
+2:05:10 AM [express] GET /api/super-admin/auth/status 200 in 231ms :: {"user":{"id":"87fce4ea-998d-4…
+[auth-debug] method=GET path=/api/super-admin/organizations
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=R1qU4yqmrrym0ZDRq2wjI_Kw8etH1FOq
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/super-admin/customer-tiers
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=R1qU4yqmrrym0ZDRq2wjI_Kw8etH1FOq
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+Error fetching organizations for super admin: error: column "primary_contact_email" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getOrganizations (file:///opt/render/project/src/dist/index.js:5551:16)
+    at async file:///opt/render/project/src/dist/index.js:11885:28 {
+  length: 122,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '145',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+     [GET]200app.essayonschange.com/assets/BarChart-BhFvgFpo.jsclientIP="69.140.149.160" requestID="2fa13925-880a-4e10" responseTimeMS=617 responseBytes=99114 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/super-admin/auth/statusclientIP="69.140.149.160" requestID="984c25a8-b7c3-4a95" responseTimeMS=237 responseBytes=489 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/zap-sVvZeZ0V.jsclientIP="69.140.149.160" requestID="8048ad7a-8ca3-41d0" responseTimeMS=908 responseBytes=767 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]500app.essayonschange.com/api/projectsclientIP="69.140.149.160" requestID="ac8176a6-697f-46a8" responseTimeMS=1095 responseBytes=307 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/auth/statusclientIP="69.140.149.160" requestID="8f210bd4-ecf0-4067" responseTimeMS=1093 responseBytes=848 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/credit-card-BOKQIWuK.jsclientIP="69.140.149.160" requestID="14bff7df-6a39-4c66" responseTimeMS=809 responseBytes=806 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]500app.essayonschange.com/api/super-admin/organizationsclientIP="69.140.149.160" requestID="994d5e0f-0e7a-4873" responseTimeMS=32 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/super-admin/customer-tiersclientIP="69.140.149.160" requestID="7718b076-f374-4be1" responseTimeMS=30 responseBytes=776 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+2:05:11 AM [express] GET /api/super-admin/organizations 500 in 28ms :: {"error":"Failed to fetch org…
+2:05:11 AM [express] GET /api/super-admin/customer-tiers 200 in 26ms :: {"tiers":[{"id":"17deb7a9-39…
+     [GET]200app.essayonschange.com/super-admin/organizationsclientIP="69.140.149.160" requestID="fe38fcc7-9195-42e2" responseTimeMS=20 responseBytes=1151 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] method=GET path=/super-admin/organizations
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=R1qU4yqmrrym0ZDRq2wjI_Kw8etH1FOq
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+2025-11-25T02:05:25.959Z [serveStatic] sending index.html (no-store) from /opt/render/project/src/dist/public for /super-admin/organizations
+     [GET]200app.essayonschange.com/assets/throttle-DUgPtoR3.jsclientIP="69.140.149.160" requestID="f6d77010-910c-4ce5" responseTimeMS=149 responseBytes=1749 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/switch-D4TLkXTB.jsclientIP="69.140.149.160" requestID="04c4165f-ba0a-4db7" responseTimeMS=10 responseBytes=1576 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/circle-x-4ffVq5sq.jsclientIP="69.140.149.160" requestID="3d6a5b70-84ce-4d9d" responseTimeMS=180 responseBytes=647 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/upload-zm07b7ai.jsclientIP="69.140.149.160" requestID="81a506ff-a12b-439b" responseTimeMS=68 responseBytes=690 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/tabs-pQ9hwmUO.jsclientIP="69.140.149.160" requestID="ea95fc56-58e2-423b" responseTimeMS=8 responseBytes=1692 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/textarea-Ct-24kGG.jsclientIP="69.140.149.160" requestID="1db2d079-dc01-440a" responseTimeMS=62 responseBytes=692 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/external-link-Csd_LqSv.jsclientIP="69.140.149.160" requestID="26e6728e-1b52-432a" responseTimeMS=70 responseBytes=670 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/globe-DMi3-vQF.jsclientIP="69.140.149.160" requestID="f55815cc-86f9-4518" responseTimeMS=13 responseBytes=663 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/dashboard-Dpji16nr.jsclientIP="69.140.149.160" requestID="56e5a322-15fa-47d3" responseTimeMS=5 responseBytes=6793 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/BarChart-BhFvgFpo.jsclientIP="69.140.149.160" requestID="b4a78bdc-316a-43ec" responseTimeMS=77 responseBytes=99114 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/index-Xar1TGBB.cssclientIP="69.140.149.160" requestID="6b6af753-205e-4aca" responseTimeMS=9 responseBytes=15286 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/dialog-CmBZ_zaW.jsclientIP="69.140.149.160" requestID="bbd0f1f4-b809-4a5d" responseTimeMS=8 responseBytes=1224 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/square-pen-qOX1lptY.jsclientIP="69.140.149.160" requestID="d9423b50-1e44-4c55" responseTimeMS=64 responseBytes=708 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/download-EifGOBdS.jsclientIP="69.140.149.160" requestID="9b6876c6-401e-4d28" responseTimeMS=250 responseBytes=689 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/index-D5eJEsK2.jsclientIP="69.140.149.160" requestID="1476c7ae-0667-4d10" responseTimeMS=29 responseBytes=175998 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/clock-Df7Gp3vw.jsclientIP="69.140.149.160" requestID="2f2453de-cd7c-48bf" responseTimeMS=18 responseBytes=645 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] method=GET path=/api/auth/status
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=R1qU4yqmrrym0ZDRq2wjI_Kw8etH1FOq
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/projects
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=R1qU4yqmrrym0ZDRq2wjI_Kw8etH1FOq
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+     [GET]200app.essayonschange.com/assets/users-Ut0KT0p-.jsclientIP="69.140.149.160" requestID="bff92c21-d556-41af" responseTimeMS=68 responseBytes=694 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/favicon.pngclientIP="69.140.149.160" requestID="59ae967e-7aad-42da" responseTimeMS=314 responseBytes=16418 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/trending-up-CwVVNMts.jsclientIP="69.140.149.160" requestID="5958efda-1204-4d13" responseTimeMS=765 responseBytes=652 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/star-lacw4Di4.jsclientIP="69.140.149.160" requestID="f189b895-9db8-4c43" responseTimeMS=69 responseBytes=659 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/user-check-cpdzz4CY.jsclientIP="69.140.149.160" requestID="a6c535ce-a65b-4995" responseTimeMS=375 responseBytes=695 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/copy-B5iwL9WZ.jsclientIP="69.140.149.160" requestID="00e6a3ae-e700-403e" responseTimeMS=16 responseBytes=677 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/calendar-BC4wtY7D.jsclientIP="69.140.149.160" requestID="50842484-73f2-4186" responseTimeMS=250 responseBytes=671 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/format-BiEKWRn3.jsclientIP="69.140.149.160" requestID="bf118d6e-3562-4671" responseTimeMS=257 responseBytes=3829 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/key-DXQeSZo_.jsclientIP="69.140.149.160" requestID="f66635a4-141e-44f5" responseTimeMS=325 responseBytes=694 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/checkbox-WDT09dRQ.jsclientIP="69.140.149.160" requestID="fb9df374-a075-4fdf" responseTimeMS=248 responseBytes=1746 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/super-admin-app-CecfQeBQ.jsclientIP="69.140.149.160" requestID="9a9943d4-9832-49cd" responseTimeMS=1265 responseBytes=33900 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]500app.essayonschange.com/api/projectsclientIP="69.140.149.160" requestID="8a9f2c5d-cf91-415c" responseTimeMS=1241 responseBytes=307 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/zap-sVvZeZ0V.jsclientIP="69.140.149.160" requestID="d6a62256-f73b-4521" responseTimeMS=866 responseBytes=767 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+Organization context error: error: column "primary_contact_email" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getOrganization (file:///opt/render/project/src/dist/index.js:5544:23)
+    at async requireOrgContext (file:///opt/render/project/src/dist/index.js:10879:26) {
+  length: 122,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '145',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+2:05:27 AM [express] GET /api/projects 500 in 895ms :: {"error":"Organization service unavailable"}
+[auth-debug] method=GET path=/api/super-admin/auth/status
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=R1qU4yqmrrym0ZDRq2wjI_Kw8etH1FOq
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+2:05:27 AM [express] GET /api/auth/status 200 in 1391ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a2…
+2:05:27 AM [express] GET /api/super-admin/auth/status 200 in 140ms :: {"user":{"id":"87fce4ea-998d-4…
+[auth-debug] method=GET path=/api/super-admin/customer-tiers
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=R1qU4yqmrrym0ZDRq2wjI_Kw8etH1FOq
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="314a8765-581a-4639" responseTimeMS=954 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/search-cJyqDBtm.jsclientIP="69.140.149.160" requestID="70106c1e-e1d5-46ce" responseTimeMS=965 responseBytes=636 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/auth/statusclientIP="69.140.149.160" requestID="689f0dd2-9300-4d13" responseTimeMS=1460 responseBytes=848 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/assets/credit-card-BOKQIWuK.jsclientIP="69.140.149.160" requestID="1e7f3216-c832-4d33" responseTimeMS=1361 responseBytes=806 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/super-admin/customer-tiersclientIP="69.140.149.160" requestID="738f7b25-71ac-498c" responseTimeMS=139 responseBytes=776 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/super-admin/auth/statusclientIP="69.140.149.160" requestID="dcdae315-2da2-46df" responseTimeMS=143 responseBytes=489 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] method=GET path=/api/super-admin/organizations
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=R1qU4yqmrrym0ZDRq2wjI_Kw8etH1FOq
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+2:05:27 AM [express] GET /api/super-admin/customer-tiers 200 in 135ms :: {"tiers":[{"id":"17deb7a9-3…
+     [GET]500app.essayonschange.com/api/super-admin/organizationsclientIP="69.140.149.160" requestID="60ee2ea1-0ddf-4e47" responseTimeMS=436 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+Error fetching organizations for super admin: error: column "primary_contact_email" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getOrganizations (file:///opt/render/project/src/dist/index.js:5551:16)
+    at async file:///opt/render/project/src/dist/index.js:11885:28 {
+  length: 122,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '145',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+2:05:28 AM [express] GET /api/super-admin/organizations 500 in 403ms :: {"error":"Failed to fetch or…
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="99a53053-2247-48fb" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="07e59dfc-eed3-4a01" responseTimeMS=1 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="90524b13-ce51-4fe9" responseTimeMS=22 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="b13e4cc3-dba5-4916" responseTimeMS=12 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="475755d3-b923-461a" responseTimeMS=3 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="84f40593-3c19-42c0" responseTimeMS=1 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="a89667c5-af63-46f6" responseTimeMS=4 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="6433a7a3-4e32-4e47" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="b006bab7-5146-47e3" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="cadc8c39-6420-4759" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="8bd3985f-2ad3-4253" responseTimeMS=3 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]200app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="b30f2a6c-1879-490c" responseTimeMS=3 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
