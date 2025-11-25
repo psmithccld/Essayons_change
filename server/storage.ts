@@ -82,8 +82,9 @@ export interface IStorage {
   
   // Platform Alerts
   getPlatformAlerts(limit?: number, severity?: string): Promise<Alert[]>;
-  acknowledgeAlert(alertId: string): Promise<void>;
-  resolveAlert(alertId: string): Promise<void>;
+  acknowledgeAlert(alertId: string, superAdminUserId?: string): Promise<void>;
+  resolveAlert(alertId: string, superAdminUserId?: string): Promise<void>;
+  getAcknowledgedAlertIds(): Promise<string[]>;
 
   // Projects - SECURITY: Organization-scoped for tenant isolation
   getProjects(userId: string, organizationId: string): Promise<Project[]>;
@@ -1630,6 +1631,9 @@ export class DatabaseStorage implements IStorage {
     try {
       const alerts: Alert[] = [];
       
+      // Get list of acknowledged alert IDs to filter them out
+      const acknowledgedAlertIds = await this.getAcknowledgedAlertIds();
+      
       // 1. Check for failed payments
       const failedPayments = await db.select({
         id: subscriptions.id,
@@ -1718,10 +1722,12 @@ export class DatabaseStorage implements IStorage {
         });
       }
 
+      // Filter out acknowledged alerts
+      let filteredAlerts = alerts.filter(alert => !acknowledgedAlertIds.includes(alert.id));
+      
       // Filter by severity if specified
-      let filteredAlerts = alerts;
       if (severity) {
-        filteredAlerts = alerts.filter(alert => alert.severity === severity);
+        filteredAlerts = filteredAlerts.filter(alert => alert.severity === severity);
       }
 
       // Sort by severity priority (critical > high > medium > low) and then by creation date
