@@ -36,7 +36,14 @@ import {
   MapPin,
   CreditCard,
   Package,
-  DollarSign
+  DollarSign,
+  FileText,
+  Shield,
+  AlertTriangle,
+  Clock,
+  Upload,
+  Download,
+  X as XIcon
 } from "lucide-react";
 import { useSuperAdmin } from "@/contexts/SuperAdminContext";
 import { useToast } from "@/hooks/use-toast";
@@ -55,6 +62,9 @@ const organizationSchema = z.object({
   maxUsers: z.number().min(1, "Must allow at least 1 user").max(10000, "Maximum 10000 users allowed"),
   billingEmail: z.string().email("Valid billing email is required"),
   taxId: z.string().optional(),
+  licenseExpiresAt: z.string().optional(),
+  isReadOnly: z.boolean().default(false),
+  primaryContactEmail: z.string().email("Valid email required").optional().or(z.literal("")),
 });
 
 type OrganizationFormData = z.infer<typeof organizationSchema>;
@@ -77,6 +87,9 @@ interface Organization {
   tierName?: string;
   createdAt: string;
   updatedAt: string;
+  licenseExpiresAt?: string | null;
+  isReadOnly?: boolean;
+  primaryContactEmail?: string | null;
   subscription?: {
     id: string;
     tierId: string;
@@ -120,8 +133,23 @@ export default function SuperAdminOrganizations() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTier, setSelectedTier] = useState<string>("");
   const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const { isAuthenticated } = useSuperAdmin();
   const { toast } = useToast();
+
+  // Fetch organization files
+  const { data: organizationFiles = [], refetch: refetchFiles } = useQuery({
+    queryKey: ["/api/super-admin/organizations", selectedOrg?.id, "files"],
+    queryFn: async () => {
+      if (!selectedOrg?.id) return [];
+      const response = await fetch(`/api/super-admin/organizations/${selectedOrg.id}/files`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error("Failed to fetch files");
+      return response.json();
+    },
+    enabled: isAuthenticated && !!selectedOrg?.id,
+  });
   
   // Fetch available customer tiers from API
   const { data: tiersData } = useQuery<{ tiers: CustomerTier[] }>({
@@ -166,6 +194,10 @@ export default function SuperAdminOrganizations() {
         maxUsers: data.maxUsers,
         taxId: data.taxId,
         status: data.isActive ? "active" : "inactive", // Map isActive to status
+        // Include license management fields
+        licenseExpiresAt: data.licenseExpiresAt || null,
+        isReadOnly: data.isReadOnly || false,
+        primaryContactEmail: data.primaryContactEmail || null,
         // ownerUserId is optional - can be set later when users are added to organization
       };
       
@@ -217,6 +249,10 @@ export default function SuperAdminOrganizations() {
         maxUsers: data.maxUsers,
         taxId: data.taxId,
         status: data.isActive ? "active" : "inactive", // Map isActive to status
+        // Include license management fields
+        licenseExpiresAt: data.licenseExpiresAt || null,
+        isReadOnly: data.isReadOnly || false,
+        primaryContactEmail: data.primaryContactEmail || null,
         // Include selected customer tier information
         tierId: selectedTier || undefined,
         tierName: selectedTier ? availableTiers.find((t: CustomerTier) => t.id === selectedTier)?.name : undefined
@@ -285,6 +321,119 @@ export default function SuperAdminOrganizations() {
     },
   });
 
+  // File upload handler
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || !event.target.files[0] || !selectedOrg) return;
+    
+    const file = event.target.files[0];
+    setUploadingFile(true);
+    
+    try {
+      // Step 1: Get pre-signed upload URL
+      const uploadUrlResponse = await fetch(`/api/objects/upload?filename=${encodeURIComponent(file.name)}&type=${encodeURIComponent(file.type)}`, {
+        credentials: 'include',
+      });
+      
+      if (!uploadUrlResponse.ok) throw new Error("Failed to get upload URL");
+      
+      const { uploadUrl, fileKey } = await uploadUrlResponse.json();
+      
+      // Step 2: Upload file directly to object storage
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
+      });
+      
+      if (!uploadResponse.ok) throw new Error("Failed to upload file");
+      
+      // Step 3: Create file metadata record
+      const metadataResponse = await fetch(`/api/super-admin/organizations/${selectedOrg.id}/files`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          organizationId: selectedOrg.id,
+          fileName: file.name,
+          fileKey: fileKey,
+          fileType: file.type,
+          fileSize: file.size,
+        }),
+      });
+      
+      if (!metadataResponse.ok) throw new Error("Failed to save file metadata");
+      
+      await refetchFiles();
+      toast({
+        title: "Success",
+        description: `File "${file.name}" uploaded successfully`,
+      });
+      
+      // Reset file input
+      event.target.value = '';
+    } catch (error: any) {
+      toast({
+        title: "Upload Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  // File delete handler
+  const handleDeleteFile = async (fileId: string, fileName: string) => {
+    if (!selectedOrg || !confirm(`Are you sure you want to delete "${fileName}"?`)) return;
+    
+    try {
+      const response = await fetch(`/api/super-admin/organizations/${selectedOrg.id}/files/${fileId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) throw new Error("Failed to delete file");
+      
+      await refetchFiles();
+      toast({
+        title: "Success",
+        description: `File "${fileName}" deleted successfully`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Delete Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // File download handler
+  const handleDownloadFile = async (fileId: string, fileName: string) => {
+    if (!selectedOrg) return;
+    
+    try {
+      const response = await fetch(`/api/super-admin/organizations/${selectedOrg.id}/files/${fileId}/download`, {
+        credentials: 'include',
+      });
+      
+      if (!response.ok) throw new Error("Failed to get download URL");
+      
+      const { downloadUrl } = await response.json();
+      
+      // Open download URL in new tab
+      window.open(downloadUrl, '_blank');
+    } catch (error: any) {
+      toast({
+        title: "Download Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Forms
   const createForm = useForm<OrganizationFormData>({
     resolver: zodResolver(organizationSchema),
@@ -345,6 +494,9 @@ export default function SuperAdminOrganizations() {
       maxUsers: org.maxUsers,
       billingEmail: org.billingEmail,
       taxId: org.taxId || "",
+      licenseExpiresAt: org.licenseExpiresAt || "",
+      isReadOnly: org.isReadOnly || false,
+      primaryContactEmail: org.primaryContactEmail || "",
     });
     
     // Set current tier from subscription
@@ -705,8 +857,9 @@ export default function SuperAdminOrganizations() {
             <Form {...editForm}>
               <form onSubmit={editForm.handleSubmit((data) => updateOrgMutation.mutate({ id: selectedOrg.id, data }))} className="space-y-6">
                 <Tabs defaultValue="basic" className="space-y-4">
-                  <TabsList className="grid w-full grid-cols-3">
+                  <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                    <TabsTrigger value="license">License</TabsTrigger>
                     <TabsTrigger value="subscription">Subscription</TabsTrigger>
                     <TabsTrigger value="billing">Billing</TabsTrigger>
                   </TabsList>
@@ -856,6 +1009,196 @@ export default function SuperAdminOrganizations() {
                         </FormItem>
                       )}
                     />
+                  </TabsContent>
+
+                  <TabsContent value="license" className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Shield className="h-5 w-5" />
+                      <h3 className="text-lg font-semibold">License Management</h3>
+                    </div>
+
+                    <FormField
+                      control={editForm.control}
+                      name="licenseExpiresAt"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>License Expiration Date</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="datetime-local" 
+                              value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ""}
+                              onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value).toISOString() : "")}
+                              data-testid="input-license-expires"
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <Clock className="h-3 w-3 inline mr-1" />
+                            Leave empty for unlimited license. Organization enters read-only mode 7 days after expiration.
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="primaryContactEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Primary Contact Email</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="email" 
+                              placeholder="contact@organization.com"
+                              data-testid="input-primary-contact"
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <Mail className="h-3 w-3 inline mr-1" />
+                            Will receive license expiration notifications 7 days before expiration
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="isReadOnly"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base flex items-center gap-2">
+                              <AlertTriangle className="h-4 w-4 text-orange-500" />
+                              Read-Only Mode
+                            </FormLabel>
+                            <div className="text-sm text-muted-foreground">
+                              Restrict organization to read-only access (automatically enabled after license expiration grace period)
+                            </div>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-read-only"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    {selectedOrg.licenseExpiresAt && (
+                      <Card className="bg-muted/50">
+                        <CardContent className="pt-4">
+                          <div className="space-y-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              <span className="font-medium">License Status</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <span className="text-muted-foreground">Current Status:</span>
+                                <div className="font-medium">
+                                  {selectedOrg.isReadOnly ? (
+                                    <Badge variant="destructive">Read-Only</Badge>
+                                  ) : new Date(selectedOrg.licenseExpiresAt) < new Date() ? (
+                                    <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">Grace Period</Badge>
+                                  ) : (
+                                    <Badge variant="default">Active</Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Expires:</span>
+                                <div className="font-medium">
+                                  {new Date(selectedOrg.licenseExpiresAt).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Contract Files Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-5 w-5" />
+                          <h3 className="text-lg font-semibold">Contract Documents</h3>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            id="contract-upload"
+                            className="hidden"
+                            onChange={handleFileUpload}
+                            disabled={uploadingFile}
+                            data-testid="input-contract-file"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => document.getElementById('contract-upload')?.click()}
+                            disabled={uploadingFile}
+                            data-testid="button-upload-contract"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {uploadingFile ? 'Uploading...' : 'Upload Contract'}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {organizationFiles.length === 0 ? (
+                        <Card>
+                          <CardContent className="pt-6 text-center text-muted-foreground">
+                            <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                            <p>No contract documents uploaded yet</p>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <div className="space-y-2">
+                          {organizationFiles.map((file: any) => (
+                            <Card key={file.id} data-testid={`card-file-${file.id}`}>
+                              <CardContent className="pt-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <FileText className="h-5 w-5 text-muted-foreground" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium truncate">{file.fileName}</p>
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <span>{(file.fileSize / 1024).toFixed(1)} KB</span>
+                                        <span>•</span>
+                                        <span>{new Date(file.uploadedAt).toLocaleDateString()}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleDownloadFile(file.id, file.fileName)}
+                                      data-testid={`button-download-${file.id}`}
+                                    >
+                                      <Download className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleDeleteFile(file.id, file.fileName)}
+                                      data-testid={`button-delete-${file.id}`}
+                                    >
+                                      <XIcon className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </TabsContent>
 
                   <TabsContent value="subscription" className="space-y-4">

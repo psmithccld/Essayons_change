@@ -17,7 +17,8 @@ import {
   AlertCircle,
   Server,
   Monitor,
-  Zap
+  Zap,
+  FileText
 } from "lucide-react";
 import { useSuperAdmin } from "@/contexts/SuperAdminContext";
 import type { Activity as ActivityType, SystemHealth, Alert } from "@shared/schema";
@@ -126,6 +127,36 @@ export default function SuperAdminDashboard() {
     enabled: isAuthenticated,
     refetchInterval: 60000, // Refetch every minute for alerts
     staleTime: 30000, // Consider data stale after 30 seconds
+  });
+
+  // Fetch license status data
+  const { data: licenseStatus } = useQuery({
+    queryKey: ["/api/super-admin/organizations", "license-status"],
+    queryFn: async () => {
+      const response = await fetch("/api/super-admin/organizations", {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error("Failed to fetch organizations");
+      const orgs = await response.json();
+      
+      const now = new Date();
+      const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      const expired = orgs.filter((org: any) => 
+        org.licenseExpiresAt && new Date(org.licenseExpiresAt) < now && !org.isReadOnly
+      ).length;
+      
+      const expiringSoon = orgs.filter((org: any) => 
+        org.licenseExpiresAt && 
+        new Date(org.licenseExpiresAt) > now && 
+        new Date(org.licenseExpiresAt) < sevenDaysFromNow
+      ).length;
+      
+      const readOnly = orgs.filter((org: any) => org.isReadOnly).length;
+      
+      return { expired, expiringSoon, readOnly };
+    },
+    enabled: isAuthenticated,
   });
 
   const statCards = [
@@ -458,6 +489,73 @@ export default function SuperAdminDashboard() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* License Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                License Management
+              </CardTitle>
+              <CardDescription>
+                Organization license status overview
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 border rounded-lg bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    <div>
+                      <p className="font-medium text-sm">Expired Licenses (Grace Period)</p>
+                      <p className="text-xs text-muted-foreground">Organizations with expired licenses still active</p>
+                    </div>
+                  </div>
+                  <Badge variant="destructive" className="text-lg px-3 py-1" data-testid="badge-expired-licenses">
+                    {licenseStatus?.expired || 0}
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between p-3 border rounded-lg bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800">
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-5 w-5 text-orange-600" />
+                    <div>
+                      <p className="font-medium text-sm">Expiring Soon</p>
+                      <p className="text-xs text-muted-foreground">Licenses expiring in next 7 days</p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary" className="text-lg px-3 py-1 bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" data-testid="badge-expiring-soon">
+                    {licenseStatus?.expiringSoon || 0}
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <XCircle className="h-5 w-5 text-gray-600" />
+                    <div>
+                      <p className="font-medium text-sm">Read-Only Mode</p>
+                      <p className="text-xs text-muted-foreground">Organizations with restricted access</p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-lg px-3 py-1" data-testid="badge-read-only">
+                    {licenseStatus?.readOnly || 0}
+                  </Badge>
+                </div>
+
+                <div className="pt-3 border-t">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => window.location.href = '/super-admin/organizations'}
+                    data-testid="button-manage-licenses"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Manage Licenses
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
