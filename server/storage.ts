@@ -4,7 +4,7 @@ import {
   users, projects, tasks, stakeholders, raidLogs, communications, communicationVersions, surveys, surveyResponses, gptInteractions, milestones, processMaps, roles, userInitiativeAssignments,
   userGroups, userGroupMemberships, userPermissions, communicationStrategy, communicationTemplates, notifications, emailVerificationTokens, passwordResetTokens, changeArtifacts,
   organizations, organizationMemberships, organizationFiles, organizationSettings, customerTiers, subscriptions, invitations,
-  superAdminUsers, superAdminSessions, superAdminMfaSetup, supportTickets, supportConversations, systemSettings,
+  superAdminUsers, superAdminSessions, superAdminMfaSetup, superAdminAlertAcknowledgments, supportTickets, supportConversations, systemSettings,
   type User, type UserWithPassword, type InsertUser, type Project, type InsertProject, type Task, type InsertTask,
   type Stakeholder, type InsertStakeholder, type RaidLog, type InsertRaidLog,
   type Communication, type InsertCommunication, type CommunicationVersion, type InsertCommunicationVersion, type Survey, type InsertSurvey,
@@ -1739,16 +1739,76 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async acknowledgeAlert(alertId: string): Promise<void> {
-    // For now, we'll just log this. In a real implementation, 
-    // you'd store acknowledged alerts in a database table
-    console.log(`Alert ${alertId} acknowledged by super admin`);
+  async acknowledgeAlert(alertId: string, superAdminUserId?: string): Promise<void> {
+    try {
+      // Check if already acknowledged
+      const existing = await db.select()
+        .from(superAdminAlertAcknowledgments)
+        .where(eq(superAdminAlertAcknowledgments.alertId, alertId))
+        .limit(1);
+      
+      if (existing.length > 0) {
+        // Already acknowledged - update if needed
+        console.log(`Alert ${alertId} already acknowledged`);
+        return;
+      }
+
+      // Insert acknowledgment record
+      await db.insert(superAdminAlertAcknowledgments).values({
+        alertId,
+        superAdminUserId: superAdminUserId || '00000000-0000-0000-0000-000000000000', // Default if not provided
+        status: 'acknowledged',
+      });
+      
+      console.log(`Alert ${alertId} acknowledged by super admin`);
+    } catch (error) {
+      console.error(`Error acknowledging alert ${alertId}:`, error);
+      throw error;
+    }
   }
 
-  async resolveAlert(alertId: string): Promise<void> {
-    // For now, we'll just log this. In a real implementation,
-    // you'd mark alerts as resolved in a database table
-    console.log(`Alert ${alertId} resolved by super admin`);
+  async resolveAlert(alertId: string, superAdminUserId?: string): Promise<void> {
+    try {
+      // Check if already exists
+      const existing = await db.select()
+        .from(superAdminAlertAcknowledgments)
+        .where(eq(superAdminAlertAcknowledgments.alertId, alertId))
+        .limit(1);
+      
+      if (existing.length > 0) {
+        // Update to resolved
+        await db.update(superAdminAlertAcknowledgments)
+          .set({ 
+            status: 'resolved',
+            resolvedAt: new Date()
+          })
+          .where(eq(superAdminAlertAcknowledgments.alertId, alertId));
+      } else {
+        // Insert as resolved
+        await db.insert(superAdminAlertAcknowledgments).values({
+          alertId,
+          superAdminUserId: superAdminUserId || '00000000-0000-0000-0000-000000000000',
+          status: 'resolved',
+          resolvedAt: new Date(),
+        });
+      }
+      
+      console.log(`Alert ${alertId} resolved by super admin`);
+    } catch (error) {
+      console.error(`Error resolving alert ${alertId}:`, error);
+      throw error;
+    }
+  }
+
+  async getAcknowledgedAlertIds(): Promise<string[]> {
+    try {
+      const acknowledged = await db.select({ alertId: superAdminAlertAcknowledgments.alertId })
+        .from(superAdminAlertAcknowledgments);
+      return acknowledged.map(a => a.alertId);
+    } catch (error) {
+      console.error("Error getting acknowledged alert IDs:", error);
+      return [];
+    }
   }
 
   // SECURITY: MFA Management for Super Admin Users
