@@ -250,6 +250,11 @@ export const organizations = pgTable("organizations", {
   // License Management
   licenseExpiresAt: timestamp("license_expires_at"), // When the license expires
   isReadOnly: boolean("is_read_only").notNull().default(false), // Read-only mode after license expiration
+  // Contract Management (for Financial Dashboard)
+  contractValue: integer("contract_value"), // Total contract value in cents
+  contractStartDate: timestamp("contract_start_date"), // When the contract started
+  contractEndDate: timestamp("contract_end_date"), // When the contract ends
+  stripeCustomerId: text("stripe_customer_id"), // Link to Stripe customer for payment tracking
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

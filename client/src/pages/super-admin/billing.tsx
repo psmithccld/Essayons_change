@@ -1,21 +1,12 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
-} from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
-  CreditCard, 
   DollarSign, 
   TrendingUp, 
   AlertTriangle,
@@ -23,242 +14,174 @@ import {
   XCircle,
   Calendar,
   Building2,
-  Users,
   Activity,
   RefreshCw,
   ExternalLink,
-  FileText
+  FileText,
+  PieChart,
+  BarChart3,
+  Clock,
+  Wallet
 } from "lucide-react";
 import { useSuperAdmin } from "@/contexts/SuperAdminContext";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
-interface BillingStats {
-  totalRevenue: number;
-  monthlyRevenue: number;
-  activeSubscriptions: number;
-  cancelledSubscriptions: number;
-  overdueInvoices: number;
-  totalInvoices: number;
-  revenueGrowth: number;
-  churnRate: number;
-}
-
-interface Subscription {
+interface Organization {
   id: string;
-  organizationId: string;
-  organizationName: string;
-  tierId: string;
-  tierName: string;
+  name: string;
   status: string;
-  currentPeriodStart: string;
-  currentPeriodEnd: string;
-  price: number;
-  currency: string;
-  stripeSubscriptionId: string;
-  stripeCustomerId: string;
-  cancelAtPeriodEnd: boolean;
-  trialEnd?: string;
-  createdAt: string;
-  updatedAt: string;
+  contractValue: number | null;
+  contractStartDate: string | null;
+  contractEndDate: string | null;
+  stripeCustomerId: string | null;
+  licenseExpiresAt: string | null;
+  isReadOnly: boolean;
+  tierName?: string;
+  tierPrice?: number;
 }
 
-interface Invoice {
+interface FinancialStats {
+  totalContractValue: number;
+  monthlyRecurringRevenue: number;
+  activeOrganizations: number;
+  outstandingPayments: number;
+  organizationsWithContracts: number;
+  expiringContracts: number;
+}
+
+interface StripeInvoice {
   id: string;
-  organizationId: string;
-  organizationName: string;
-  subscriptionId: string;
-  stripeInvoiceId: string;
+  customer: string;
+  customerName?: string;
   amount: number;
   currency: string;
   status: string;
-  dueDate: string;
-  paidAt?: string;
-  periodStart: string;
-  periodEnd: string;
-  createdAt: string;
+  dueDate: string | null;
+  paidAt: string | null;
+  created: string;
+  invoiceUrl?: string;
 }
 
-export default function SuperAdminBilling() {
+export default function SuperAdminFinancialDashboard() {
   const [selectedTab, setSelectedTab] = useState("overview");
-  const [subscriptionFilter, setSubscriptionFilter] = useState<string>("all");
-  const [invoiceFilter, setInvoiceFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const { sessionId } = useSuperAdmin();
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const { isAuthenticated } = useSuperAdmin();
   const { toast } = useToast();
 
-  // Fetch billing statistics
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ["/api/super-admin/billing/stats"],
+  // Fetch organizations with contract data
+  const { data: organizations = [], isLoading: orgsLoading } = useQuery({
+    queryKey: ["/api/super-admin/organizations"],
     queryFn: async () => {
-      const response = await fetch("/api/super-admin/billing/stats", {
-        credentials: 'include' // Use cookies for authentication
+      const response = await fetch("/api/super-admin/organizations", {
+        credentials: 'include'
       });
-      if (!response.ok) throw new Error("Failed to fetch billing stats");
-      return response.json() as Promise<BillingStats>;
+      if (!response.ok) throw new Error("Failed to fetch organizations");
+      return response.json() as Promise<Organization[]>;
     },
-    enabled: !!sessionId,
+    enabled: isAuthenticated,
   });
 
-  // Fetch subscriptions
-  const { data: subscriptions = [], isLoading: subscriptionsLoading } = useQuery({
-    queryKey: ["/api/super-admin/billing/subscriptions"],
+  // Fetch Stripe invoices for payment tracking
+  const { data: stripeInvoices = [], isLoading: invoicesLoading, refetch: refetchInvoices } = useQuery({
+    queryKey: ["/api/super-admin/financial/stripe-invoices"],
     queryFn: async () => {
-      const response = await fetch("/api/super-admin/billing/subscriptions", {
-        credentials: 'include' // Use cookies for authentication
-      });
-      if (!response.ok) throw new Error("Failed to fetch subscriptions");
-      return response.json() as Promise<Subscription[]>;
-    },
-    enabled: !!sessionId,
-  });
-
-  // Fetch invoices
-  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
-    queryKey: ["/api/super-admin/billing/invoices"],
-    queryFn: async () => {
-      const response = await fetch("/api/super-admin/billing/invoices", {
-        credentials: 'include' // Use cookies for authentication
-      });
-      if (!response.ok) throw new Error("Failed to fetch invoices");
-      return response.json() as Promise<Invoice[]>;
-    },
-    enabled: !!sessionId,
-  });
-
-  // Sync with Stripe mutation
-  const syncStripeMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch("/api/super-admin/billing/sync-stripe", {
-        method: "POST",
-        credentials: 'include' // Use cookies for authentication
+      const response = await fetch("/api/super-admin/financial/stripe-invoices", {
+        credentials: 'include'
       });
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to sync with Stripe");
+        if (response.status === 404) return []; // API not yet implemented
+        throw new Error("Failed to fetch Stripe invoices");
       }
-      return response.json();
+      return response.json() as Promise<StripeInvoice[]>;
     },
-    onSuccess: () => {
-      // Invalidate all billing-related queries
-      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/billing/subscriptions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/billing/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/billing/invoices"] });
-      toast({
-        title: "Success",
-        description: "Billing data synced with Stripe successfully",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Sync Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+    enabled: isAuthenticated,
   });
 
-  // Cancel subscription mutation
-  const cancelSubscriptionMutation = useMutation({
-    mutationFn: async ({ subscriptionId, immediate }: { subscriptionId: string; immediate: boolean }) => {
-      const response = await fetch(`/api/super-admin/billing/subscriptions/${subscriptionId}/cancel`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: 'include', // Use cookies for authentication
-        body: JSON.stringify({ immediate }),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to cancel subscription");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/billing/subscriptions"] });
-      toast({
-        title: "Success",
-        description: "Subscription cancelled successfully",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+  // Calculate financial statistics from organizations data
+  const stats: FinancialStats = {
+    totalContractValue: organizations.reduce((sum, org) => sum + (org.contractValue || 0), 0),
+    monthlyRecurringRevenue: organizations
+      .filter(org => org.status === 'active' && org.tierPrice)
+      .reduce((sum, org) => sum + (org.tierPrice || 0), 0),
+    activeOrganizations: organizations.filter(org => org.status === 'active').length,
+    outstandingPayments: stripeInvoices.filter(inv => inv.status === 'open' || inv.status === 'past_due').length,
+    organizationsWithContracts: organizations.filter(org => org.contractValue).length,
+    expiringContracts: organizations.filter(org => {
+      if (!org.contractEndDate) return false;
+      const endDate = new Date(org.contractEndDate);
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+      return endDate <= thirtyDaysFromNow && endDate >= new Date();
+    }).length,
+  };
+
+  // Calculate outstanding payment amount
+  const outstandingAmount = stripeInvoices
+    .filter(inv => inv.status === 'open' || inv.status === 'past_due')
+    .reduce((sum, inv) => sum + inv.amount, 0);
+
+  // Filter organizations for contracts tab
+  const filteredOrganizations = organizations.filter((org) => {
+    const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === "all" || 
+      (statusFilter === "with_contract" && org.contractValue) ||
+      (statusFilter === "no_contract" && !org.contractValue) ||
+      (statusFilter === "expiring" && org.contractEndDate && new Date(org.contractEndDate) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+    return matchesSearch && matchesStatus;
   });
 
-  // Filter subscriptions
-  const filteredSubscriptions = subscriptions.filter((sub) => {
-    const matchesSearch = sub.organizationName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sub.tierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sub.stripeSubscriptionId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = subscriptionFilter === "all" || sub.status === subscriptionFilter;
-    return matchesSearch && matchesFilter;
-  });
-
-  // Filter invoices
-  const filteredInvoices = invoices.filter((invoice) => {
-    const matchesSearch = invoice.organizationName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         invoice.stripeInvoiceId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = invoiceFilter === "all" || invoice.status === invoiceFilter;
-    return matchesSearch && matchesFilter;
-  });
-
-  const getStatusBadge = (status: string) => {
+  const getInvoiceStatusBadge = (status: string) => {
     const statusConfig = {
-      active: { variant: "default" as const, label: "Active" },
-      trialing: { variant: "secondary" as const, label: "Trial" },
-      past_due: { variant: "destructive" as const, label: "Past Due" },
-      canceled: { variant: "outline" as const, label: "Cancelled" },
-      unpaid: { variant: "destructive" as const, label: "Unpaid" },
-      incomplete: { variant: "secondary" as const, label: "Incomplete" },
-      incomplete_expired: { variant: "destructive" as const, label: "Expired" },
-      paid: { variant: "default" as const, label: "Paid" },
-      open: { variant: "secondary" as const, label: "Open" },
-      void: { variant: "outline" as const, label: "Void" },
-      draft: { variant: "outline" as const, label: "Draft" },
+      paid: { variant: "default" as const, label: "Paid", className: "bg-green-100 text-green-800" },
+      open: { variant: "secondary" as const, label: "Open", className: "bg-blue-100 text-blue-800" },
+      past_due: { variant: "destructive" as const, label: "Past Due", className: "" },
+      void: { variant: "outline" as const, label: "Void", className: "" },
+      draft: { variant: "outline" as const, label: "Draft", className: "" },
+      uncollectible: { variant: "destructive" as const, label: "Uncollectible", className: "" },
     };
     
-    const config = statusConfig[status as keyof typeof statusConfig] || { variant: "outline" as const, label: status };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    const config = statusConfig[status as keyof typeof statusConfig] || { variant: "outline" as const, label: status, className: "" };
+    return <Badge variant={config.variant} className={config.className}>{config.label}</Badge>;
+  };
+
+  const formatCurrency = (cents: number) => {
+    return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const statCards = [
     {
-      title: "Total Revenue",
-      value: `$${(stats?.totalRevenue || 0).toLocaleString()}`,
-      icon: DollarSign,
-      description: "All-time revenue",
+      title: "Total Contract Value",
+      value: formatCurrency(stats.totalContractValue),
+      icon: Wallet,
+      description: `${stats.organizationsWithContracts} organizations with contracts`,
       color: "text-green-600 dark:text-green-400",
       bgColor: "bg-green-100 dark:bg-green-900/20"
     },
     {
-      title: "Monthly Revenue",
-      value: `$${(stats?.monthlyRevenue || 0).toLocaleString()}`,
+      title: "Monthly Recurring Revenue",
+      value: formatCurrency(stats.monthlyRecurringRevenue),
       icon: TrendingUp,
-      description: `${stats?.revenueGrowth ? (stats.revenueGrowth > 0 ? '+' : '') + stats.revenueGrowth.toFixed(1) : '0'}% from last month`,
+      description: "Based on active tier subscriptions",
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-100 dark:bg-blue-900/20"
     },
     {
-      title: "Active Subscriptions",
-      value: stats?.activeSubscriptions || 0,
-      icon: CreditCard,
-      description: `${stats?.cancelledSubscriptions || 0} cancelled`,
+      title: "Active Organizations",
+      value: stats.activeOrganizations,
+      icon: Building2,
+      description: `${stats.expiringContracts} contracts expiring soon`,
       color: "text-purple-600 dark:text-purple-400",
       bgColor: "bg-purple-100 dark:bg-purple-900/20"
     },
     {
-      title: "Overdue Invoices",
-      value: stats?.overdueInvoices || 0,
+      title: "Outstanding Payments",
+      value: stats.outstandingPayments,
       icon: AlertTriangle,
-      description: `${stats?.totalInvoices || 0} total invoices`,
-      color: "text-red-600 dark:text-red-400",
-      bgColor: "bg-red-100 dark:bg-red-900/20"
+      description: outstandingAmount > 0 ? formatCurrency(outstandingAmount) + " total" : "All payments current",
+      color: stats.outstandingPayments > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400",
+      bgColor: stats.outstandingPayments > 0 ? "bg-red-100 dark:bg-red-900/20" : "bg-green-100 dark:bg-green-900/20"
     }
   ];
 
@@ -268,20 +191,21 @@ export default function SuperAdminBilling() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Billing Management
+            Financial Dashboard
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Manage subscriptions, invoices, and Stripe integration
+            Executive-level visibility into contracts, revenue, and payments
           </p>
         </div>
         
         <Button
-          onClick={() => syncStripeMutation.mutate()}
-          disabled={syncStripeMutation.isPending}
-          data-testid="button-sync-stripe"
+          onClick={() => refetchInvoices()}
+          disabled={invoicesLoading}
+          variant="outline"
+          data-testid="button-refresh-financial"
         >
-          <RefreshCw className={`h-4 w-4 mr-2 ${syncStripeMutation.isPending ? 'animate-spin' : ''}`} />
-          {syncStripeMutation.isPending ? "Syncing..." : "Sync with Stripe"}
+          <RefreshCw className={`h-4 w-4 mr-2 ${invoicesLoading ? 'animate-spin' : ''}`} />
+          Refresh Data
         </Button>
       </div>
 
@@ -299,7 +223,7 @@ export default function SuperAdminBilling() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid={`stat-${stat.title.toLowerCase().replace(/\s+/g, '-')}`}>
-                {statsLoading ? "..." : stat.value}
+                {orgsLoading ? "..." : stat.value}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 {stat.description}
@@ -312,175 +236,218 @@ export default function SuperAdminBilling() {
       {/* Main Content Tabs */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview" data-testid="tab-billing-overview">
-            <Activity className="h-4 w-4 mr-2" />
+          <TabsTrigger value="overview" data-testid="tab-financial-overview">
+            <PieChart className="h-4 w-4 mr-2" />
             Overview
           </TabsTrigger>
-          <TabsTrigger value="subscriptions" data-testid="tab-subscriptions">
-            <CreditCard className="h-4 w-4 mr-2" />
-            Subscriptions
-          </TabsTrigger>
-          <TabsTrigger value="invoices" data-testid="tab-invoices">
+          <TabsTrigger value="contracts" data-testid="tab-contracts">
             <FileText className="h-4 w-4 mr-2" />
-            Invoices
+            Contracts
+          </TabsTrigger>
+          <TabsTrigger value="payments" data-testid="tab-payments">
+            <DollarSign className="h-4 w-4 mr-2" />
+            Payments
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Revenue Trends */}
+            {/* Revenue Breakdown */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Revenue Overview
+                  <BarChart3 className="h-5 w-5" />
+                  Revenue Breakdown
                 </CardTitle>
                 <CardDescription>
-                  Key billing metrics and performance
+                  Contract and subscription revenue overview
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <span className="text-sm">Total Contract Value</span>
+                    </div>
+                    <span className="text-sm font-semibold">{formatCurrency(stats.totalContractValue)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                      <span className="text-sm">Monthly Recurring</span>
+                    </div>
+                    <span className="text-sm font-semibold">{formatCurrency(stats.monthlyRecurringRevenue)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                      <span className="text-sm">Annual Run Rate</span>
+                    </div>
+                    <span className="text-sm font-semibold">{formatCurrency(stats.monthlyRecurringRevenue * 12)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Contract Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Contract Status
+                </CardTitle>
+                <CardDescription>
+                  Contract renewal and expiration tracking
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Revenue Growth</span>
-                    <span className={`text-sm font-medium ${(stats?.revenueGrowth || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {stats?.revenueGrowth ? (stats.revenueGrowth > 0 ? '+' : '') + stats.revenueGrowth.toFixed(1) : '0'}%
-                    </span>
+                    <span className="text-sm text-muted-foreground">Active Contracts</span>
+                    <Badge variant="default">{stats.organizationsWithContracts}</Badge>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Churn Rate</span>
-                    <span className="text-sm font-medium">
-                      {stats?.churnRate ? stats.churnRate.toFixed(1) : '0'}%
-                    </span>
+                    <span className="text-sm text-muted-foreground">Expiring in 30 Days</span>
+                    <Badge variant={stats.expiringContracts > 0 ? "destructive" : "secondary"}>
+                      {stats.expiringContracts}
+                    </Badge>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Avg. Revenue per User</span>
+                    <span className="text-sm text-muted-foreground">Without Contracts</span>
+                    <Badge variant="outline">{organizations.length - stats.organizationsWithContracts}</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Avg. Contract Value</span>
                     <span className="text-sm font-medium">
-                      ${stats?.activeSubscriptions ? (stats.monthlyRevenue / stats.activeSubscriptions).toFixed(2) : '0'}
+                      {stats.organizationsWithContracts > 0 
+                        ? formatCurrency(stats.totalContractValue / stats.organizationsWithContracts) 
+                        : '$0.00'}
                     </span>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Activity */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Recent Activity
-                </CardTitle>
-                <CardDescription>
-                  Latest billing events and updates
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {filteredInvoices.slice(0, 5).map((invoice) => (
-                    <div key={invoice.id} className="flex items-center justify-between p-2 border rounded">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-gray-100 dark:bg-gray-800 rounded">
-                          <FileText className="h-3 w-3" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{invoice.organizationName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            ${invoice.amount} • {new Date(invoice.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      {getStatusBadge(invoice.status)}
-                    </div>
-                  ))}
-                  {filteredInvoices.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No recent billing activity
-                    </p>
-                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          {/* Expiring Contracts Alert */}
+          {stats.expiringContracts > 0 && (
+            <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-200">
+                  <AlertTriangle className="h-5 w-5" />
+                  Contracts Requiring Attention
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {organizations
+                    .filter(org => {
+                      if (!org.contractEndDate) return false;
+                      const endDate = new Date(org.contractEndDate);
+                      const thirtyDaysFromNow = new Date();
+                      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+                      return endDate <= thirtyDaysFromNow && endDate >= new Date();
+                    })
+                    .map(org => (
+                      <div key={org.id} className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4" />
+                          <span className="font-medium">{org.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            Expires: {new Date(org.contractEndDate!).toLocaleDateString()}
+                          </span>
+                          <Badge variant="outline">{formatCurrency(org.contractValue || 0)}</Badge>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
-        <TabsContent value="subscriptions" className="space-y-6">
+        <TabsContent value="contracts" className="space-y-6">
           {/* Filters */}
           <Card>
             <CardContent className="pt-6">
               <div className="flex gap-4 items-center">
                 <div className="relative flex-1">
                   <Input
-                    placeholder="Search subscriptions..."
+                    placeholder="Search organizations..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    data-testid="input-search-subscriptions"
+                    data-testid="input-search-contracts"
                   />
                 </div>
                 
-                <Select value={subscriptionFilter} onValueChange={setSubscriptionFilter}>
-                  <SelectTrigger className="w-48" data-testid="select-subscription-filter">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-48" data-testid="select-contract-filter">
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Subscriptions</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="trialing">Trial</SelectItem>
-                    <SelectItem value="past_due">Past Due</SelectItem>
-                    <SelectItem value="canceled">Cancelled</SelectItem>
+                    <SelectItem value="all">All Organizations</SelectItem>
+                    <SelectItem value="with_contract">With Contract</SelectItem>
+                    <SelectItem value="no_contract">No Contract</SelectItem>
+                    <SelectItem value="expiring">Expiring Soon</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </CardContent>
           </Card>
 
-          {/* Subscriptions List */}
+          {/* Contracts List */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Subscriptions ({filteredSubscriptions.length})
+                <FileText className="h-5 w-5" />
+                Organization Contracts ({filteredOrganizations.length})
               </CardTitle>
               <CardDescription>
-                Manage all active and inactive subscriptions
+                Contract values and terms for all organizations
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {subscriptionsLoading ? (
-                <p className="text-center py-8 text-muted-foreground">Loading subscriptions...</p>
-              ) : filteredSubscriptions.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">No subscriptions found</p>
+              {orgsLoading ? (
+                <p className="text-center py-8 text-muted-foreground">Loading contracts...</p>
+              ) : filteredOrganizations.length === 0 ? (
+                <p className="text-center py-8 text-muted-foreground">No organizations found</p>
               ) : (
                 <div className="space-y-4">
-                  {filteredSubscriptions.map((subscription) => (
-                    <div key={subscription.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  {filteredOrganizations.map((org) => (
+                    <div key={org.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold" data-testid={`subscription-org-${subscription.id}`}>
-                            {subscription.organizationName}
+                          <h3 className="font-semibold" data-testid={`contract-org-${org.id}`}>
+                            {org.name}
                           </h3>
-                          {getStatusBadge(subscription.status)}
-                          <Badge variant="outline">{subscription.tierName}</Badge>
-                          {subscription.cancelAtPeriodEnd && (
-                            <Badge variant="destructive">Cancelling</Badge>
-                          )}
+                          <Badge variant={org.status === 'active' ? 'default' : 'secondary'}>
+                            {org.status}
+                          </Badge>
+                          {org.tierName && <Badge variant="outline">{org.tierName}</Badge>}
+                          {org.isReadOnly && <Badge variant="destructive">Read-Only</Badge>}
                         </div>
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <DollarSign className="h-3 w-3" />
-                            ${subscription.price}/{subscription.currency}
+                            Contract: {org.contractValue ? formatCurrency(org.contractValue) : 'Not set'}
                           </div>
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                            Start: {org.contractStartDate ? new Date(org.contractStartDate).toLocaleDateString() : 'N/A'}
                           </div>
                           <div className="flex items-center gap-1">
-                            <Building2 className="h-3 w-3" />
-                            {subscription.stripeCustomerId}
+                            <Clock className="h-3 w-3" />
+                            End: {org.contractEndDate ? new Date(org.contractEndDate).toLocaleDateString() : 'N/A'}
                           </div>
-                          <div className="flex items-center gap-1">
-                            <ExternalLink className="h-3 w-3" />
-                            {subscription.stripeSubscriptionId}
-                          </div>
+                          {org.stripeCustomerId && (
+                            <div className="flex items-center gap-1">
+                              <ExternalLink className="h-3 w-3" />
+                              Stripe: {org.stripeCustomerId.substring(0, 15)}...
+                            </div>
+                          )}
                         </div>
                       </div>
                       
@@ -488,63 +455,21 @@ export default function SuperAdminBilling() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => window.open(`https://dashboard.stripe.com/subscriptions/${subscription.stripeSubscriptionId}`, '_blank')}
-                          data-testid={`button-view-stripe-${subscription.id}`}
+                          onClick={() => window.location.href = `/super-admin/organizations`}
+                          data-testid={`button-edit-contract-${org.id}`}
                         >
-                          <ExternalLink className="h-3 w-3 mr-1" />
-                          Stripe
+                          Edit
                         </Button>
-                        {subscription.status === "active" && !subscription.cancelAtPeriodEnd && (
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-red-600 hover:text-red-700"
-                                data-testid={`button-cancel-subscription-${subscription.id}`}
-                              >
-                                <XCircle className="h-3 w-3 mr-1" />
-                                Cancel
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Cancel Subscription</DialogTitle>
-                                <DialogDescription>
-                                  Cancel subscription for {subscription.organizationName}
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <p className="text-sm text-muted-foreground">
-                                  Choose when to cancel this subscription:
-                                </p>
-                                <div className="flex gap-2">
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => cancelSubscriptionMutation.mutate({ 
-                                      subscriptionId: subscription.id, 
-                                      immediate: false 
-                                    })}
-                                    disabled={cancelSubscriptionMutation.isPending}
-                                    data-testid="button-cancel-at-period-end"
-                                  >
-                                    Cancel at Period End
-                                  </Button>
-                                  <Button
-                                    variant="destructive"
-                                    onClick={() => cancelSubscriptionMutation.mutate({ 
-                                      subscriptionId: subscription.id, 
-                                      immediate: true 
-                                    })}
-                                    disabled={cancelSubscriptionMutation.isPending}
-                                    data-testid="button-cancel-immediately"
-                                  >
-                                    Cancel Immediately
-                                  </Button>
-                                </div>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
+                        {org.stripeCustomerId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`https://dashboard.stripe.com/customers/${org.stripeCustomerId}`, '_blank')}
+                            data-testid={`button-view-stripe-${org.id}`}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Stripe
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -555,97 +480,124 @@ export default function SuperAdminBilling() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="invoices" className="space-y-6">
-          {/* Invoice Filters */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex gap-4 items-center">
-                <div className="relative flex-1">
-                  <Input
-                    placeholder="Search invoices..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    data-testid="input-search-invoices"
-                  />
+        <TabsContent value="payments" className="space-y-6">
+          {/* Payment Status Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Paid Invoices</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {stripeInvoices.filter(inv => inv.status === 'paid').length}
+                    </p>
+                  </div>
+                  <CheckCircle className="h-8 w-8 text-green-600" />
                 </div>
-                
-                <Select value={invoiceFilter} onValueChange={setInvoiceFilter}>
-                  <SelectTrigger className="w-48" data-testid="select-invoice-filter">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Invoices</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="past_due">Past Due</SelectItem>
-                    <SelectItem value="void">Void</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Open Invoices</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {stripeInvoices.filter(inv => inv.status === 'open').length}
+                    </p>
+                  </div>
+                  <Clock className="h-8 w-8 text-blue-600" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Past Due</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {stripeInvoices.filter(inv => inv.status === 'past_due').length}
+                    </p>
+                  </div>
+                  <XCircle className="h-8 w-8 text-red-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Invoices List */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Invoices ({filteredInvoices.length})
+                <DollarSign className="h-5 w-5" />
+                Stripe Invoices
               </CardTitle>
               <CardDescription>
-                Track all billing invoices and payment status
+                Payment status from Stripe for linked organizations
               </CardDescription>
             </CardHeader>
             <CardContent>
               {invoicesLoading ? (
                 <p className="text-center py-8 text-muted-foreground">Loading invoices...</p>
-              ) : filteredInvoices.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">No invoices found</p>
+              ) : stripeInvoices.length === 0 ? (
+                <div className="text-center py-8">
+                  <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-2">No Stripe invoices found</p>
+                  <p className="text-sm text-muted-foreground">
+                    Link organizations to Stripe customers and create invoices in Stripe to see payment data here.
+                  </p>
+                </div>
               ) : (
                 <div className="space-y-4">
-                  {filteredInvoices.map((invoice) => (
+                  {stripeInvoices.map((invoice) => (
                     <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold" data-testid={`invoice-org-${invoice.id}`}>
-                            {invoice.organizationName}
-                          </h3>
-                          {getStatusBadge(invoice.status)}
-                          <span className="text-sm font-medium">
-                            ${invoice.amount} {invoice.currency.toUpperCase()}
-                          </span>
+                          <h3 className="font-semibold">{invoice.customerName || invoice.customer}</h3>
+                          {getInvoiceStatusBadge(invoice.status)}
                         </div>
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            Due: {new Date(invoice.dueDate).toLocaleDateString()}
+                            <DollarSign className="h-3 w-3" />
+                            {formatCurrency(invoice.amount)}
                           </div>
                           <div className="flex items-center gap-1">
-                            <FileText className="h-3 w-3" />
-                            Period: {new Date(invoice.periodStart).toLocaleDateString()} - {new Date(invoice.periodEnd).toLocaleDateString()}
+                            <Calendar className="h-3 w-3" />
+                            Created: {new Date(invoice.created).toLocaleDateString()}
                           </div>
+                          {invoice.dueDate && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              Due: {new Date(invoice.dueDate).toLocaleDateString()}
+                            </div>
+                          )}
                           {invoice.paidAt && (
                             <div className="flex items-center gap-1">
-                              <CheckCircle className="h-3 w-3 text-green-500" />
+                              <CheckCircle className="h-3 w-3" />
                               Paid: {new Date(invoice.paidAt).toLocaleDateString()}
                             </div>
                           )}
-                          <div className="flex items-center gap-1">
-                            <ExternalLink className="h-3 w-3" />
-                            {invoice.stripeInvoiceId}
-                          </div>
                         </div>
                       </div>
                       
                       <div className="flex items-center gap-2">
+                        {invoice.invoiceUrl && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(invoice.invoiceUrl, '_blank')}
+                            data-testid={`button-view-invoice-${invoice.id}`}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            View Invoice
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => window.open(`https://dashboard.stripe.com/invoices/${invoice.stripeInvoiceId}`, '_blank')}
-                          data-testid={`button-view-invoice-stripe-${invoice.id}`}
+                          onClick={() => window.open(`https://dashboard.stripe.com/invoices/${invoice.id}`, '_blank')}
+                          data-testid={`button-stripe-invoice-${invoice.id}`}
                         >
-                          <ExternalLink className="h-3 w-3 mr-1" />
-                          View in Stripe
+                          Stripe
                         </Button>
                       </div>
                     </div>

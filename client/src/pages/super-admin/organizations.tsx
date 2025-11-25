@@ -65,6 +65,10 @@ const organizationSchema = z.object({
   licenseExpiresAt: z.string().optional(),
   isReadOnly: z.boolean().default(false),
   primaryContactEmail: z.string().email("Valid email required").optional().or(z.literal("")),
+  contractValue: z.coerce.number().min(0, "Contract value must be positive").optional().nullable(),
+  contractStartDate: z.string().optional().nullable(),
+  contractEndDate: z.string().optional().nullable(),
+  stripeCustomerId: z.string().optional().nullable(),
 });
 
 type OrganizationFormData = z.infer<typeof organizationSchema>;
@@ -90,6 +94,10 @@ interface Organization {
   licenseExpiresAt?: string | null;
   isReadOnly?: boolean;
   primaryContactEmail?: string | null;
+  contractValue?: number | null;
+  contractStartDate?: string | null;
+  contractEndDate?: string | null;
+  stripeCustomerId?: string | null;
   subscription?: {
     id: string;
     tierId: string;
@@ -198,6 +206,13 @@ export default function SuperAdminOrganizations() {
         licenseExpiresAt: data.licenseExpiresAt || null,
         isReadOnly: data.isReadOnly || false,
         primaryContactEmail: data.primaryContactEmail || null,
+        // Include contract management fields
+        contractValue: data.contractValue !== undefined && data.contractValue !== null 
+          ? Math.round(data.contractValue * 100) 
+          : null, // Convert dollars to cents, preserving 0 as valid
+        contractStartDate: data.contractStartDate || null,
+        contractEndDate: data.contractEndDate || null,
+        stripeCustomerId: data.stripeCustomerId || null,
         // ownerUserId is optional - can be set later when users are added to organization
       };
       
@@ -253,6 +268,13 @@ export default function SuperAdminOrganizations() {
         licenseExpiresAt: data.licenseExpiresAt || null,
         isReadOnly: data.isReadOnly || false,
         primaryContactEmail: data.primaryContactEmail || null,
+        // Include contract management fields
+        contractValue: data.contractValue !== undefined && data.contractValue !== null 
+          ? Math.round(data.contractValue * 100) 
+          : null, // Convert dollars to cents, preserving 0 as valid
+        contractStartDate: data.contractStartDate || null,
+        contractEndDate: data.contractEndDate || null,
+        stripeCustomerId: data.stripeCustomerId || null,
         // Include selected customer tier information
         tierId: selectedTier || undefined,
         tierName: selectedTier ? availableTiers.find((t: CustomerTier) => t.id === selectedTier)?.name : undefined
@@ -449,6 +471,13 @@ export default function SuperAdminOrganizations() {
       maxUsers: 100,
       billingEmail: "",
       taxId: "",
+      licenseExpiresAt: "",
+      isReadOnly: false,
+      primaryContactEmail: "",
+      contractValue: undefined,
+      contractStartDate: "",
+      contractEndDate: "",
+      stripeCustomerId: "",
     },
   });
 
@@ -466,6 +495,13 @@ export default function SuperAdminOrganizations() {
       maxUsers: 100,
       billingEmail: "",
       taxId: "",
+      licenseExpiresAt: "",
+      isReadOnly: false,
+      primaryContactEmail: "",
+      contractValue: undefined,
+      contractStartDate: "",
+      contractEndDate: "",
+      stripeCustomerId: "",
     },
   });
 
@@ -497,6 +533,12 @@ export default function SuperAdminOrganizations() {
       licenseExpiresAt: org.licenseExpiresAt || "",
       isReadOnly: org.isReadOnly || false,
       primaryContactEmail: org.primaryContactEmail || "",
+      contractValue: org.contractValue !== undefined && org.contractValue !== null 
+        ? org.contractValue / 100 
+        : undefined, // Convert from cents to dollars for display, preserving 0 as valid
+      contractStartDate: org.contractStartDate || "",
+      contractEndDate: org.contractEndDate || "",
+      stripeCustomerId: org.stripeCustomerId || "",
     });
     
     // Set current tier from subscription
@@ -1121,6 +1163,100 @@ export default function SuperAdminOrganizations() {
                         </CardContent>
                       </Card>
                     )}
+
+                    {/* Contract Value Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <DollarSign className="h-5 w-5" />
+                        <h3 className="text-lg font-semibold">Contract Details</h3>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={editForm.control}
+                          name="contractValue"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Contract Value ($)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field}
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="0.00"
+                                  value={field.value || ""}
+                                  onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                                  data-testid="input-contract-value"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={editForm.control}
+                          name="stripeCustomerId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Stripe Customer ID</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field}
+                                  placeholder="cus_..."
+                                  value={field.value || ""}
+                                  data-testid="input-stripe-customer-id"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={editForm.control}
+                          name="contractStartDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Contract Start Date</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field}
+                                  type="date"
+                                  value={field.value ? new Date(field.value).toISOString().split('T')[0] : ""}
+                                  onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value).toISOString() : "")}
+                                  data-testid="input-contract-start-date"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={editForm.control}
+                          name="contractEndDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Contract End Date</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field}
+                                  type="date"
+                                  value={field.value ? new Date(field.value).toISOString().split('T')[0] : ""}
+                                  onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value).toISOString() : "")}
+                                  data-testid="input-contract-end-date"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
 
                     {/* Contract Files Section */}
                     <div className="space-y-4">
