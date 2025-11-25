@@ -2031,6 +2031,22 @@ export const superAdminMfaSetup = pgTable("super_admin_mfa_setup", {
   expiresIdx: index("super_admin_mfa_setup_expires_idx").on(table.expiresAt),
 }));
 
+// Super Admin Alert Acknowledgments - tracks which alerts have been acknowledged/resolved
+export const superAdminAlertAcknowledgments = pgTable("super_admin_alert_acknowledgments", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  alertId: text("alert_id").notNull(), // The generated alert ID (e.g., "inactive-org-xxx", "payment-failed-xxx")
+  superAdminUserId: uuid("super_admin_user_id").references(() => superAdminUsers.id, { onDelete: "cascade" }).notNull(),
+  status: text("status").notNull().default("acknowledged"), // acknowledged, resolved
+  acknowledgedAt: timestamp("acknowledged_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+  notes: text("notes"),
+}, (table) => ({
+  alertIdIdx: index("super_admin_alert_ack_alert_id_idx").on(table.alertId),
+  userIdx: index("super_admin_alert_ack_user_idx").on(table.superAdminUserId),
+  statusIdx: index("super_admin_alert_ack_status_idx").on(table.status),
+  alertIdUnique: index("super_admin_alert_ack_alert_id_unique").on(table.alertId),
+}));
+
 // Super Admin Insert Schemas
 export const insertSuperAdminUserSchema = createInsertSchema(superAdminUsers).omit({
   id: true,
@@ -2059,6 +2075,8 @@ export type InsertSuperAdminSession = z.infer<typeof insertSuperAdminSessionSche
 
 export type SuperAdminMfaSetup = typeof superAdminMfaSetup.$inferSelect;
 export type InsertSuperAdminMfaSetup = z.infer<typeof insertSuperAdminMfaSetupSchema>;
+
+export type SuperAdminAlertAcknowledgment = typeof superAdminAlertAcknowledgments.$inferSelect;
 
 // Super Admin authentication schemas
 export const superAdminLoginSchema = z.object({
