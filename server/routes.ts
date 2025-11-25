@@ -4775,6 +4775,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DELETE /api/notifications/clear-all - clear all user notifications
+  // NOTE: This route MUST come before /:id to avoid "clear-all" being treated as a notification ID
+  app.delete("/api/notifications/clear-all", requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+      
+      const count = await storage.clearAllNotifications(userId);
+      res.json({ success: true, deletedCount: count });
+    } catch (error) {
+      console.error("Error clearing all notifications:", error);
+      res.status(500).json({ error: "Failed to clear all notifications" });
+    }
+  });
+
   // DELETE /api/notifications/:id - delete single notification
   app.delete("/api/notifications/:id", requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -4790,19 +4804,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting notification:", error);
       res.status(500).json({ error: "Failed to delete notification" });
-    }
-  });
-
-  // DELETE /api/notifications/clear-all - clear all user notifications
-  app.delete("/api/notifications/clear-all", requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const userId = req.userId!;
-      
-      const count = await storage.clearAllNotifications(userId);
-      res.json({ success: true, deletedCount: count });
-    } catch (error) {
-      console.error("Error clearing all notifications:", error);
-      res.status(500).json({ error: "Failed to clear all notifications" });
     }
   });
 
