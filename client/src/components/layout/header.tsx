@@ -87,8 +87,7 @@ export default function Header() {
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {
-      const response = await apiRequest("POST", `/api/notifications/${notificationId}/read`);
-      return response.json();
+      return await apiRequest("POST", `/api/notifications/${notificationId}/read`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
@@ -108,8 +107,7 @@ export default function Header() {
 
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/notifications/mark-all-read");
-      return response.json();
+      return await apiRequest("POST", "/api/notifications/mark-all-read");
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
@@ -130,8 +128,7 @@ export default function Header() {
 
   const clearAllNotificationsMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("DELETE", "/api/notifications/clear-all");
-      return response.json();
+      return await apiRequest("DELETE", "/api/notifications/clear-all");
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
@@ -152,8 +149,7 @@ export default function Header() {
 
   const deleteNotificationMutation = useMutation({
     mutationFn: async (notificationId: string) => {
-      const response = await apiRequest("DELETE", `/api/notifications/${notificationId}`);
-      return response.json();
+      return await apiRequest("DELETE", `/api/notifications/${notificationId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
