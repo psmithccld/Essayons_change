@@ -58,8 +58,8 @@ export default function ChangeProcessFlow({ initiativesByPhase }: ChangeProcessF
   const [positions, setPositions] = useState<number[]>([]); // absolute x positions in px
   const rafRef = useRef<number | null>(null);
   const roRef = useRef<ResizeObserver | null>(null);
-  const leftMargin = 40; // matches the existing left/right offsets in the background bars
-  const rightMargin = 40;
+  const leftMargin = 100; // 40px bar margin + 60px (half card width) to keep cards within bar bounds
+  const rightMargin = 100;
   const verticalCenter = 300; // same y-level as before
 
   // compute even positions whenever container width changes
