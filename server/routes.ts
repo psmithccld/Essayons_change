@@ -2448,6 +2448,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract and validate tierId separately for security
       const { tierId, tierName, ...orgData } = req.body;
       
+      // Convert date strings to Date objects before validation
+      const dateFields = ['licenseExpiresAt', 'contractStartDate', 'contractEndDate'] as const;
+      for (const field of dateFields) {
+        if (orgData[field] && typeof orgData[field] === 'string') {
+          orgData[field] = new Date(orgData[field]);
+        }
+      }
+      
       // Validate tier if provided
       let validatedTierId: string | null = undefined as any;
       let tierIdProvided = 'tierId' in req.body;
