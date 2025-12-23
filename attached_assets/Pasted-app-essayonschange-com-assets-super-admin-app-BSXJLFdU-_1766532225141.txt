@@ -1,0 +1,352 @@
+app.essayonschange.com/assets/super-admin-app-BSXJLFdU.js clientIP="69.140.149.160" requestID="466ec592-c394-435d" responseTimeMS=33 responseBytes=34945 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/api/super-admin/auth/status clientIP="69.140.149.160" requestID="b422ce93-15c8-4267" responseTimeMS=7 responseBytes=318 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/key-Cu5BFAAf.js clientIP="69.140.149.160" requestID="cc4e21d4-1d77-4559" responseTimeMS=12 responseBytes=694 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/format-BnB1JejR.js clientIP="69.140.149.160" requestID="425cb4f9-7616-4952" responseTimeMS=82 responseBytes=3831 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/api/auth/status clientIP="69.140.149.160" requestID="863cf5ed-679b-4e82" responseTimeMS=164 responseBytes=304 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/BarChart-BNjwyKMf.js clientIP="69.140.149.160" requestID="4e5036d1-4ab6-42cf" responseTimeMS=92 responseBytes=99114 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/throttle-BGiqGnsM.js clientIP="69.140.149.160" requestID="ae98be6b-1fa5-4e83" responseTimeMS=79 responseBytes=1750 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/trending-up-B42ZQ_Q-.js clientIP="69.140.149.160" requestID="70b931b4-563d-4b38" responseTimeMS=76 responseBytes=653 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/calendar-dxk9ra0A.js clientIP="69.140.149.160" requestID="c4ab91b7-650f-4f8e" responseTimeMS=74 responseBytes=672 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/dialog-B1HsUG3J.js clientIP="69.140.149.160" requestID="4debfb0f-f355-49f8" responseTimeMS=31 responseBytes=1223 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/checkbox-CMIWrOj8.js clientIP="69.140.149.160" requestID="cf458790-5804-4910" responseTimeMS=74 responseBytes=1744 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/search-D_dhfRzD.js clientIP="69.140.149.160" requestID="bb74c12b-30a7-4085" responseTimeMS=79 responseBytes=637 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/download-BaLATp1f.js clientIP="69.140.149.160" requestID="29c5ddef-c850-4350" responseTimeMS=71 responseBytes=691 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/circle-x-CKRX6DZD.js clientIP="69.140.149.160" requestID="86798b88-eb7e-4397" responseTimeMS=28 responseBytes=647 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/upload-yKqIvq_V.js clientIP="69.140.149.160" requestID="a9d7d83a-559a-4df8" responseTimeMS=10 responseBytes=691 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/dashboard-Bn-vuq5n.js clientIP="69.140.149.160" requestID="bed7c2d1-e167-4151" responseTimeMS=9 responseBytes=6794 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/clock-DuUFK2qI.js clientIP="69.140.149.160" requestID="5cf8049f-86e0-47e6" responseTimeMS=2 responseBytes=646 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/users-Bzd7BNnW.js clientIP="69.140.149.160" requestID="55ffb216-2d25-4e2b" responseTimeMS=3 responseBytes=695 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/super-admin clientIP="69.140.149.160" requestID="72b18c55-7f13-45cf" responseTimeMS=5 responseBytes=1154 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/copy-DrkRgyw7.js clientIP="69.140.149.160" requestID="e327e521-8b5d-44c9" responseTimeMS=8 responseBytes=678 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/api/projects clientIP="69.140.149.160" requestID="f02de42c-e2f5-4a99" responseTimeMS=91 responseBytes=321 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/external-link-Yie7k_9V.js clientIP="69.140.149.160" requestID="67b42f68-c63d-4cf6" responseTimeMS=78 responseBytes=669 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/textarea-COBfAkvo.js clientIP="69.140.149.160" requestID="9651bdba-7219-4e10" responseTimeMS=68 responseBytes=693 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/star-9U546pMn.js clientIP="69.140.149.160" requestID="cde704f3-0f6f-42f6" responseTimeMS=69 responseBytes=660 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/switch-B_AvOAwS.js clientIP="69.140.149.160" requestID="e0e9c27a-8d81-4592" responseTimeMS=33 responseBytes=1577 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/square-pen-Oa0YZiPM.js clientIP="69.140.149.160" requestID="a6d58cbc-0401-43dd" responseTimeMS=77 responseBytes=709 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/zap-Cbm_BLOF.js clientIP="69.140.149.160" requestID="f406be45-5838-4ed8" responseTimeMS=10 responseBytes=767 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/globe-8-hmktP0.js clientIP="69.140.149.160" requestID="84b75374-1feb-4fcb" responseTimeMS=5 responseBytes=664 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/tabs-BrHIRAu4.js clientIP="69.140.149.160" requestID="fc8b6956-b8b2-4e19" responseTimeMS=2 responseBytes=1691 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/api/version clientIP="69.140.149.160" requestID="d1285ea3-971e-4a7d" responseTimeMS=1 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/user-check-xC2-ldE5.js clientIP="69.140.149.160" requestID="15bc1ca4-45c1-463e" responseTimeMS=79 responseBytes=695 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/assets/credit-card-DGRBE9d_.js clientIP="69.140.149.160" requestID="2d9271d3-3641-4d11" responseTimeMS=79 responseBytes=806 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[auth-debug] sessionID=vbSfT12Cv-1CUgZPigLA9rdRBoYWkJIW
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+11:19:14 PM [express] GET /api/projects 401 in 85ms :: {"error":"Authentication required. Please log …
+[auth-debug] method=GET path=/api/super-admin/auth/status
+[auth-debug] cookie header present=false
+[auth-debug] sessionID=O0agYle9eCaxzjhohcwkPYZBxvus0M01
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+11:19:14 PM [express] GET /api/super-admin/auth/status 401 in 6ms :: {"error":"Super admin authentica…
+11:19:14 PM [express] GET /api/auth/status 401 in 88ms :: {"error":"Not authenticated"}
+[auth-debug] method=POST path=/api/super-admin/auth/login
+[auth-debug] cookie header present=false
+[auth-debug] sessionID=74Xpl-KgraSY9cdQ-WhJk5PXqWUWMLiY
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+SECURITY: Successful Super Admin login for user 'essayon6' from IP 172.71.191.27
+11:19:24 PM [express] POST /api/super-admin/auth/login 200 in 142ms :: {"user":{"id":"87fce4ea-998d-4…
+[GET]
+app.essayonschange.com/api/super-admin/auth/status clientIP="69.140.149.160" requestID="4124c166-2b11-4250" responseTimeMS=6 responseBytes=487 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[POST]
+app.essayonschange.com/api/super-admin/auth/login clientIP="69.140.149.160" requestID="1df5f369-b4e8-4f26" responseTimeMS=162 responseBytes=729 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[auth-debug] method=GET path=/api/super-admin/auth/status
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=WALliJYcxZyMffAR1LMDvBcc1vB0k70F
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+11:19:24 PM [express] GET /api/super-admin/auth/status 200 in 4ms :: {"user":{"id":"87fce4ea-998d-4e0…
+[auth-debug] method=GET path=/api/super-admin/organizations
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=wokb766HopK_BRHSiTw8BwCsyW1j1cys
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+[auth-debug] method=GET path=/api/super-admin/dashboard/stats
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=u9oQCRGlknKVBkU0PM2ADxjoLN6uAxLz
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+[auth-debug] method=GET path=/api/super-admin/dashboard/alerts
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=LMzA9JJmRgJG9Nw3g6uf4sFC32kWGZuZ
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+[auth-debug] method=GET path=/api/super-admin/organizations
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=pE_yAR-J-aw0_DMdAleXaV3FDpnca8Q1
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+[auth-debug] method=GET path=/api/super-admin/dashboard/recent-activity
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=tfNxvtKf2guv_YpyokWPZciLmHZl_XBL
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+[auth-debug] method=GET path=/api/super-admin/dashboard/system-health
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=gac4gHAOv8lzIpM66VkjH8lIW5bG9sBI
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+11:19:25 PM [express] GET /api/super-admin/dashboard/system-health 200 in 810ms :: {"status":"healthy…
+Error getting acknowledged alert IDs: error: relation "super_admin_alert_acknowledgments" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getAcknowledgedAlertIds (file:///opt/render/project/src/dist/index.js:2990:32)
+    at async DatabaseStorage.getPlatformAlerts (file:///opt/render/project/src/dist/index.js:2863:40)
+    at async file:///opt/render/project/src/dist/index.js:13330:22 {
+  length: 132,
+  severity: 'ERROR',
+  code: '42P01',
+  detail: undefined,
+[GET]
+app.essayonschange.com/api/super-admin/dashboard/system-health clientIP="69.140.149.160" requestID="1da97329-0084-4f8f" responseTimeMS=818 responseBytes=423 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/api/super-admin/dashboard/stats clientIP="69.140.149.160" requestID="96362b39-e8a3-4fc3" responseTimeMS=954 responseBytes=371 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+  hint: undefined,
+  position: '24',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '1449',
+  routine: 'parserOpenTable'
+}
+11:19:25 PM [express] GET /api/super-admin/dashboard/stats 200 in 949ms :: {"totalOrganizations":5,"a…
+[GET]
+app.essayonschange.com/api/super-admin/dashboard/alerts?limit=5 clientIP="69.140.149.160" requestID="71209395-8529-46d1" responseTimeMS=1143 responseBytes=669 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/api/super-admin/organizations?limit=5&sort=recent clientIP="69.140.149.160" requestID="d8eb1c70-bd36-4b19" responseTimeMS=1046 responseBytes=1574 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/api/super-admin/organizations clientIP="69.140.149.160" requestID="e0319c9d-b64f-4f8a" responseTimeMS=1041 responseBytes=1591 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/api/super-admin/dashboard/recent-activity?limit=10 clientIP="69.140.149.160" requestID="7466de4e-1616-43a8" responseTimeMS=1035 responseBytes=1065 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+11:19:26 PM [express] GET /api/super-admin/organizations 200 in 1040ms :: [{"id":"52df9da1-63a5-451e-…
+11:19:26 PM [express] GET /api/super-admin/organizations 200 in 1036ms :: [{"id":"2bb4689f-7f54-4c40-…
+11:19:26 PM [express] GET /api/super-admin/dashboard/recent-activity 200 in 1031ms :: [{"id":"user-6b…
+11:19:26 PM [express] GET /api/super-admin/dashboard/alerts 200 in 1137ms :: [{"id":"inactive-org-a0e…
+[auth-debug] method=POST path=/api/super-admin/dashboard/alerts/inactive-org-a0e043cb-91e8-4b20-b3d0-b1b516bf8e3e/acknowledge
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=ERybdZLTVvTBCgxSiIePcM8PhpQfncDB
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+Error acknowledging alert inactive-org-a0e043cb-91e8-4b20-b3d0-b1b516bf8e3e: error: relation "super_admin_alert_acknowledgments" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.acknowledgeAlert (file:///opt/render/project/src/dist/index.js:2949:28)
+    at async file:///opt/render/project/src/dist/index.js:13350:7 {
+  length: 133,
+  severity: 'ERROR',
+  code: '42P01',
+  detail: undefined,
+  hint: undefined,
+  position: '106',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+[POST]
+app.essayonschange.com/api/super-admin/dashboard/alerts/inactive-org-a0e043cb-91e8-4b20-b3d0-b1b516bf8e3e/acknowledge clientIP="69.140.149.160" requestID="e802e0e4-9065-4f09" responseTimeMS=20 responseBytes=357 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+  file: 'parse_relation.c',
+  line: '1449',
+  routine: 'parserOpenTable'
+}
+Error acknowledging alert: error: relation "super_admin_alert_acknowledgments" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.acknowledgeAlert (file:///opt/render/project/src/dist/index.js:2949:28)
+    at async file:///opt/render/project/src/dist/index.js:13350:7 {
+  length: 133,
+  severity: 'ERROR',
+  code: '42P01',
+  detail: undefined,
+  hint: undefined,
+  position: '106',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '1449',
+  routine: 'parserOpenTable'
+}
+11:19:43 PM [express] POST /api/super-admin/dashboard/alerts/inactive-org-a0e043cb-91e8-4b20-b3d0-b1b…
+[GET]
+app.essayonschange.com/api/version clientIP="69.140.149.160" requestID="2a08e0cd-0077-46bb" responseTimeMS=4 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[auth-debug] method=POST path=/api/super-admin/dashboard/alerts/inactive-org-a0e043cb-91e8-4b20-b3d0-b1b516bf8e3e/acknowledge
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=KOgfZ-evsJy4yad8Uqp2VIZks83eA-ze
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+Error acknowledging alert inactive-org-a0e043cb-91e8-4b20-b3d0-b1b516bf8e3e: error: relation "super_admin_alert_acknowledgments" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.acknowledgeAlert (file:///opt/render/project/src/dist/index.js:2949:28)
+    at async file:///opt/render/project/src/dist/index.js:13350:7 {
+  length: 133,
+  severity: 'ERROR',
+  code: '42P01',
+  detail: undefined,
+  hint: undefined,
+  position: '106',
+  internalPosition: undefined,
+  internalQuery: undefined,
+[POST]
+app.essayonschange.com/api/super-admin/dashboard/alerts/inactive-org-a0e043cb-91e8-4b20-b3d0-b1b516bf8e3e/acknowledge clientIP="69.140.149.160" requestID="970d41b5-e998-46c2" responseTimeMS=38 responseBytes=357 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '1449',
+  routine: 'parserOpenTable'
+}
+Error acknowledging alert: error: relation "super_admin_alert_acknowledgments" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.acknowledgeAlert (file:///opt/render/project/src/dist/index.js:2949:28)
+    at async file:///opt/render/project/src/dist/index.js:13350:7 {
+  length: 133,
+  severity: 'ERROR',
+  code: '42P01',
+  detail: undefined,
+  hint: undefined,
+  position: '106',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '1449',
+  routine: 'parserOpenTable'
+}
+11:19:45 PM [express] POST /api/super-admin/dashboard/alerts/inactive-org-a0e043cb-91e8-4b20-b3d0-b1b…
+[auth-debug] method=GET path=/api/super-admin/customer-tiers
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=J2WXnqGZhmI2Wnh3HfiuDVEi_lS06EYt
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+[auth-debug] method=GET path=/api/super-admin/organizations
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=XWGwu9WUJTLngRWo6E3gnfPG4mmWpDcZ
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+[GET]
+app.essayonschange.com/api/super-admin/customer-tiers clientIP="69.140.149.160" requestID="e6633da1-8700-4c79" responseTimeMS=108 responseBytes=776 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/api/super-admin/organizations clientIP="69.140.149.160" requestID="b3bfada1-9830-4c17" responseTimeMS=901 responseBytes=181 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+11:19:52 PM [express] GET /api/super-admin/customer-tiers 200 in 106ms :: {"tiers":[{"id":"17deb7a9-3…
+11:19:52 PM [express] GET /api/super-admin/organizations 304 in 899ms :: [{"id":"2bb4689f-7f54-4c40-b…
+[GET]
+app.essayonschange.com/api/super-admin/organizations/2bb4689f-7f54-4c40-bd5a-c4e0cbca942f/files clientIP="69.140.149.160" requestID="69a3df7a-d4a2-4acc" responseTimeMS=10 responseBytes=319 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[auth-debug] method=GET path=/api/super-admin/organizations/2bb4689f-7f54-4c40-bd5a-c4e0cbca942f/files
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=jGoiaTrLsVbb5_nO1fcmF_vy0pGQPiDp
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+Error fetching organization files: error: relation "organization_files" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getOrganizationFiles (file:///opt/render/project/src/dist/index.js:6403:16)
+    at async file:///opt/render/project/src/dist/index.js:12090:21 {
+  length: 118,
+  severity: 'ERROR',
+  code: '42P01',
+  detail: undefined,
+  hint: undefined,
+  position: '121',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '1449',
+  routine: 'parserOpenTable'
+}
+11:19:55 PM [express] GET /api/super-admin/organizations/2bb4689f-7f54-4c40-bd5a-c4e0cbca942f/files 5…
+[GET]
+app.essayonschange.com/api/version clientIP="69.140.149.160" requestID="6667d01f-ab47-4de6" responseTimeMS=3 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[PUT]
+app.essayonschange.com/api/super-admin/organizations/2bb4689f-7f54-4c40-bd5a-c4e0cbca942f clientIP="69.140.149.160" requestID="9285c1d4-a362-45cd" responseTimeMS=23 responseBytes=400 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[auth-debug] method=PUT path=/api/super-admin/organizations/2bb4689f-7f54-4c40-bd5a-c4e0cbca942f
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=5TQ7_3BYCzMBLnaruGYMWa7B4PpnoJqB
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+11:20:25 PM [express] PUT /api/super-admin/organizations/2bb4689f-7f54-4c40-bd5a-c4e0cbca942f 400 in …
+[PUT]
+app.essayonschange.com/api/super-admin/organizations/2bb4689f-7f54-4c40-bd5a-c4e0cbca942f clientIP="69.140.149.160" requestID="5bcf72cc-d95e-4544" responseTimeMS=17 responseBytes=400 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[auth-debug] method=PUT path=/api/super-admin/organizations/2bb4689f-7f54-4c40-bd5a-c4e0cbca942f
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=fe6SCh9U4C33DlRqaERfe90DHIVIGBtZ
+[auth-debug] sessionKeys=cookie
+[auth-debug] req.user absent
+11:20:36 PM [express] PUT /api/super-admin/organizations/2bb4689f-7f54-4c40-bd5a-c4e0cbca942f 400 in …
+[GET]
+app.essayonschange.com/api/version clientIP="69.140.149.160" requestID="edbf840c-5881-4b96" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/api/version clientIP="69.140.149.160" requestID="88d6d4d1-e3b9-45f7" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/api/version clientIP="69.140.149.160" requestID="2ebc9724-4acd-482a" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+app.essayonschange.com/api/version clientIP="69.140.149.160" requestID="6cee08a7-7253-4fb9" responseTimeMS=3 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) 

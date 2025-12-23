@@ -1,0 +1,262 @@
+[GET]app.essayonschange.com/api/notifications/unread-countclientIP="69.140.149.160" requestID="d43263dd-7349-4f6c" responseTimeMS=56 responseBytes=178 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:39:45 AM [express] GET /api/notifications/unread-count 304 in 39ms :: {"count":0}
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+     [GET]app.essayonschange.com/api/notificationsclientIP="69.140.149.160" requestID="2a7ca4cc-0031-47e4" responseTimeMS=34 responseBytes=181 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+12:39:47 AM [express] GET /api/notifications 304 in 31ms :: {"notifications":[{"id":"7093433d-ce35-48…
+[auth-debug] method=GET path=/api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifacts
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+     [GET]app.essayonschange.com/api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifactsclientIP="69.140.149.160" requestID="e8ae4e10-4d89-429d" responseTimeMS=149 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+Error getting change artifacts: error: column "object_key" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getChangeArtifactsByProject (file:///opt/render/project/src/dist/index.js:6285:16)
+    at async file:///opt/render/project/src/dist/index.js:16921:25 {
+  length: 111,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '137',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+12:40:04 AM [express] GET /api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifacts 500 in …
+[auth-debug] method=GET path=/change-artifacts
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+2025-12-05T00:40:07.309Z [serveStatic] sending index.html (no-store) from /opt/render/project/src/dist/public for /change-artifacts
+[auth-debug] method=GET path=/api/projects
+[auth-debug] cookie header present=true
+     [GET]app.essayonschange.com/change-artifactsclientIP="69.140.149.160" requestID="97cfe614-a7ab-4091" responseTimeMS=11 responseBytes=1154 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="a092b051-9be3-4455" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/auth/statusclientIP="69.140.149.160" requestID="3784e643-ef09-45a9" responseTimeMS=312 responseBytes=180 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/auth/status
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:40:07 AM [express] GET /api/auth/status 304 in 207ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24…
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/organization/features
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:40:08 AM [express] GET /api/projects 304 in 707ms :: [{"id":"c142dbd8-98ee-4883-be8a-d15aab3d4ce8"…
+12:40:08 AM [express] GET /api/organization/features 304 in 332ms :: {"reports":true,"gptCoach":true,…
+12:40:08 AM [express] GET /api/notifications/unread-count 304 in 340ms :: {"count":0}
+[auth-debug] method=GET path=/api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifacts
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:40:08 AM [express] GET /api/notifications 304 in 402ms :: {"notifications":[{"id":"7093433d-ce35-4…
+12:40:08 AM [express] GET /api/users/me/permissions 304 in 505ms :: {"user":{"id":"cca94cb5-5de9-4780…
+Error getting change artifacts: error: column "object_key" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getChangeArtifactsByProject (file:///opt/render/project/src/dist/index.js:6285:16)
+    at async file:///opt/render/project/src/dist/index.js:16921:25 {
+  length: 111,
+  severity: 'ERROR',
+     [GET]app.essayonschange.com/favicon.pngclientIP="69.140.149.160" requestID="f1a08275-3e23-46b6" responseTimeMS=47 responseBytes=270 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/notifications/unread-countclientIP="69.140.149.160" requestID="211d47f4-9ada-4a33" responseTimeMS=342 responseBytes=178 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/organization/featuresclientIP="69.140.149.160" requestID="0cad03b8-fd69-4f8f" responseTimeMS=334 responseBytes=179 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/projectsclientIP="69.140.149.160" requestID="4328a285-b73f-4efe" responseTimeMS=710 responseBytes=181 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifactsclientIP="69.140.149.160" requestID="94955b58-3f6a-4760" responseTimeMS=148 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/notificationsclientIP="69.140.149.160" requestID="2599aaed-b4ca-4014" responseTimeMS=436 responseBytes=181 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/users/me/permissionsclientIP="69.140.149.160" requestID="ebc9a0b1-6750-48c4" responseTimeMS=520 responseBytes=180 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '137',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+12:40:08 AM [express] GET /api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifacts 500 in …
+[auth-debug] method=GET path=/api/projects/c142dbd8-98ee-4883-be8a-d15aab3d4ce8/change-artifacts
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+Error getting change artifacts: error: column "object_key" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getChangeArtifactsByProject (file:///opt/render/project/src/dist/index.js:6285:16)
+    at async file:///opt/render/project/src/dist/index.js:16921:25 {
+  length: 111,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '137',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+     [GET]app.essayonschange.com/api/projects/c142dbd8-98ee-4883-be8a-d15aab3d4ce8/change-artifactsclientIP="69.140.149.160" requestID="069a7e2e-b1f4-443f" responseTimeMS=45 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+12:40:10 AM [express] GET /api/projects/c142dbd8-98ee-4883-be8a-d15aab3d4ce8/change-artifacts 500 in …
+     [GET]app.essayonschange.com/api/projects/cb57ee2c-3b91-4a4d-8a30-8a474638a72b/change-artifactsclientIP="69.140.149.160" requestID="24557c59-48bf-4135" responseTimeMS=26 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] method=GET path=/api/projects/cb57ee2c-3b91-4a4d-8a30-8a474638a72b/change-artifacts
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+Error getting change artifacts: error: column "object_key" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getChangeArtifactsByProject (file:///opt/render/project/src/dist/index.js:6285:16)
+    at async file:///opt/render/project/src/dist/index.js:16921:25 {
+  length: 111,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '137',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+12:40:11 AM [express] GET /api/projects/cb57ee2c-3b91-4a4d-8a30-8a474638a72b/change-artifacts 500 in …
+     [POST]app.essayonschange.com/api/objects/uploadclientIP="69.140.149.160" requestID="e5425c0d-6be6-4de6" responseTimeMS=622 responseBytes=698 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] method=POST path=/api/objects/upload
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:40:27 AM [express] POST /api/objects/upload 200 in 414ms :: {"uploadURL":"https://aa90abd528996d60…
+[auth-debug] method=POST path=/api/projects/cb57ee2c-3b91-4a4d-8a30-8a474638a72b/change-artifacts
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[Storage] ACL not supported by Cloudflare R2, skipping ACL policy set
+Error creating change artifact: error: column "object_key" of relation "change_artifacts" does not exist
+     [POST]app.essayonschange.com/api/projects/cb57ee2c-3b91-4a4d-8a30-8a474638a72b/change-artifactsclientIP="69.140.149.160" requestID="907a9440-0b6d-4e7d" responseTimeMS=23 responseBytes=316 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.createChangeArtifact (file:///opt/render/project/src/dist/index.js:6314:27)
+    at async file:///opt/render/project/src/dist/index.js:16905:24 {
+  length: 140,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '162',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_target.c',
+  line: '1065',
+  routine: 'checkInsertTargets'
+}
+12:40:28 AM [express] POST /api/projects/cb57ee2c-3b91-4a4d-8a30-8a474638a72b/change-artifacts 500 in…
+     [GET]app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="fcc27596-90e5-442e" responseTimeMS=2 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/notificationsclientIP="69.140.149.160" requestID="bfef41f6-70f0-4bae" responseTimeMS=206 responseBytes=1875 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/notifications/unread-countclientIP="69.140.149.160" requestID="552b142c-d437-4af9" responseTimeMS=221 responseBytes=285 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/users/me/permissionsclientIP="69.140.149.160" requestID="a8bf180f-d2ff-482f" responseTimeMS=139 responseBytes=614 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:40:38 AM [express] GET /api/notifications/unread-count 200 in 201ms :: {"count":0}
+12:40:38 AM [express] GET /api/notifications 200 in 203ms :: {"notifications":[{"id":"7093433d-ce35-4…
+12:40:38 AM [express] GET /api/users/me/permissions 200 in 109ms :: {"user":{"id":"cca94cb5-5de9-4780…
+     [GET]app.essayonschange.com/api/versionclientIP="69.140.149.160" requestID="4205b850-c228-4403" responseTimeMS=1 responseBytes=315 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/notificationsclientIP="69.140.149.160" requestID="87773c5a-ad4c-41a2" responseTimeMS=446 responseBytes=1875 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+     [GET]app.essayonschange.com/api/notifications/unread-countclientIP="69.140.149.160" requestID="25f26191-e3eb-4493" responseTimeMS=630 responseBytes=285 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:41:09 AM [express] GET /api/notifications 200 in 429ms :: {"notifications":[{"id":"7093433d-ce35-4…
+12:41:09 AM [express] GET /api/notifications/unread-count 200 in 498ms :: {"count":0}

@@ -1,0 +1,318 @@
+SendGrid API key detected with prefix: SG....
+SendGrid email service initialized successfully
+✅ Node.js v20.19.6 - base64url encoding support confirmed
+📦 RATE LIMIT: Creating memory-backed store for 'rate-limit'
+📦 RATE LIMIT: Creating memory-backed store for 'login-attempts'
+📦 RATE LIMIT: Creating memory-backed store for 'suspicious-ips'
+🏭 Production environment detected - skipping seedDatabase()
+DATABASE_URL: postgresql://esaons_change_server_user:Slv5urGCk5quHCtbXAIRZkwsdAc5LsVb@dpg-d3mgr3p5pdvs73b8qemg-a/esaons_change_server
+Startup: Top-level script loaded.
+Startup: All imports completed.
+Startup: Express initialized.
+Startup: Postgres pool created.
+Startup: Drizzle DB initialized.
+Startup: Health endpoints registered.
+Startup: Session and middleware registered.
+[STATIC] Production mode - serving static files from: /opt/render/project/src/dist/public
+[STATIC] Production static middleware registered
+Startup: Static exports registered.
+Startup: Request logging middleware registered.
+Startup: Entered async wrapper.
+Startup: Before app.listen (outside async)
+Database seeding completed.
+[License Checker] Starting license expiration checker...
+[License Checker] Running license expiration check...
+[License Checker] Scheduled to run every 24 hours
+Startup: registerRoutes complete.
+Startup: serveStatic complete.
+Startup: Production environment detected - skipping database seeding
+Startup: Initializing vector store...
+Initializing vector store...
+🚀 Server listening on port 10000
+Startup: After app.listen (outside async)
+Loading 4 files from knowledge base...
+[License Checker] Check complete. Processed 0 nearing expiration, 0 expired.
+Added 2 chunks from communications.md to vector store
+Added 3 chunks from framework.md to vector store
+Added 2 chunks from scoring.md to vector store
+Added 2 chunks from surveys.md to vector store
+Successfully loaded 9 document chunks into vector store
+Vector store initialized: {
+  totalDocuments: 9,
+  filesCounts: {
+    'communications.md': 2,
+    'framework.md': 3,
+    'scoring.md': 2,
+    'surveys.md': 2
+  },
+  sources: { knowledge_base: 9 }
+}
+Startup: ✅ Vector store initialization complete
+Startup: ✅ Server initialization complete
+==> Your service is live 🎉
+==> 
+==> ///////////////////////////////////////////////////////////
+==> 
+==> Available at your primary URL https://app.essayonschange.com + 1 more domain
+==> 
+==> ///////////////////////////////////////////////////////////
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:55:32 AM [express] GET /api/notifications 304 in 38ms :: {"notifications":[{"id":"7093433d-ce35-48…
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:56:03 AM [express] GET /api/notifications/unread-count 304 in 104ms :: {"count":0}
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:56:03 AM [express] GET /api/notifications 304 in 22ms :: {"notifications":[{"id":"7093433d-ce35-48…
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:56:30 AM [express] GET /api/users/me/permissions 304 in 56ms :: {"user":{"id":"cca94cb5-5de9-4780-…
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:56:33 AM [express] GET /api/notifications/unread-count 304 in 9ms :: {"count":0}
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:56:34 AM [express] GET /api/notifications 304 in 22ms :: {"notifications":[{"id":"7093433d-ce35-48…
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:57:05 AM [express] GET /api/notifications/unread-count 304 in 125ms :: {"count":0}
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:57:05 AM [express] GET /api/notifications 304 in 25ms :: {"notifications":[{"id":"7093433d-ce35-48…
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:57:35 AM [express] GET /api/notifications/unread-count 304 in 46ms :: {"count":0}
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:57:36 AM [express] GET /api/notifications 304 in 33ms :: {"notifications":[{"id":"7093433d-ce35-48…
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:58:07 AM [express] GET /api/notifications/unread-count 304 in 65ms :: {"count":0}
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:58:07 AM [express] GET /api/notifications 304 in 39ms :: {"notifications":[{"id":"7093433d-ce35-48…
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:58:31 AM [express] GET /api/users/me/permissions 304 in 119ms :: {"user":{"id":"cca94cb5-5de9-4780…
+[auth-debug] method=GET path=/api/projects
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/auth/status
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:58:37 AM [express] GET /api/auth/status 200 in 188ms :: {"user":{"id":"cca94cb5-5de9-4780-85b3-a24…
+[auth-debug] method=GET path=/api/organization/features
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:58:38 AM [express] GET /api/projects 200 in 1296ms :: [{"id":"c142dbd8-98ee-4883-be8a-d15aab3d4ce8…
+12:58:38 AM [express] GET /api/notifications 200 in 583ms :: {"notifications":[{"id":"7093433d-ce35-4…
+12:58:38 AM [express] GET /api/organization/features 200 in 998ms :: {"reports":true,"gptCoach":true,…
+12:58:38 AM [express] GET /api/users/me/permissions 200 in 996ms :: {"user":{"id":"cca94cb5-5de9-4780…
+12:58:38 AM [express] GET /api/notifications/unread-count 200 in 799ms :: {"count":0}
+[auth-debug] method=GET path=/api/my/dashboard-metrics
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/my/initiatives
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:58:38 AM [express] GET /api/my/initiatives 200 in 144ms :: [{"project":{"id":"c142dbd8-98ee-4883-b…
+12:58:39 AM [express] GET /api/my/dashboard-metrics 200 in 353ms :: {"activeInitiatives":3,"pendingSu…
+[auth-debug] method=GET path=/api/projects/cb57ee2c-3b91-4a4d-8a30-8a474638a72b/change-artifacts
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+Error getting change artifacts: error: column "object_key" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getChangeArtifactsByProject (file:///opt/render/project/src/dist/index.js:6285:16)
+    at async file:///opt/render/project/src/dist/index.js:16921:25 {
+  length: 111,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '137',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+12:58:42 AM [express] GET /api/projects/cb57ee2c-3b91-4a4d-8a30-8a474638a72b/change-artifacts 500 in …
+[auth-debug] method=GET path=/api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifacts
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+Error getting change artifacts: error: column "object_key" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.getChangeArtifactsByProject (file:///opt/render/project/src/dist/index.js:6285:16)
+    at async file:///opt/render/project/src/dist/index.js:16921:25 {
+  length: 111,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '137',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3716',
+  routine: 'errorMissingColumn'
+}
+12:58:45 AM [express] GET /api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifacts 500 in …
+[auth-debug] method=POST path=/api/objects/upload
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[Storage] Auto-detected Cloudflare R2 credentials, using R2 provider
+12:58:58 AM [express] POST /api/objects/upload 200 in 81ms :: {"uploadURL":"https://aa90abd528996d604…
+[auth-debug] method=POST path=/api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifacts
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[Storage] ACL not supported by Cloudflare R2, skipping ACL policy set
+Error creating change artifact: error: column "object_key" of relation "change_artifacts" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async DatabaseStorage.createChangeArtifact (file:///opt/render/project/src/dist/index.js:6314:27)
+    at async file:///opt/render/project/src/dist/index.js:16905:24 {
+  length: 140,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '162',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_target.c',
+  line: '1065',
+  routine: 'checkInsertTargets'
+}
+12:58:58 AM [express] POST /api/projects/0c2710a4-f4ca-44cf-8e8e-9778a19b82a4/change-artifacts 500 in…
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:59:08 AM [express] GET /api/users/me/permissions 200 in 102ms :: {"user":{"id":"cca94cb5-5de9-4780…
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:59:08 AM [express] GET /api/notifications 200 in 250ms :: {"notifications":[{"id":"7093433d-ce35-4…
+12:59:08 AM [express] GET /api/notifications/unread-count 200 in 10ms :: {"count":0}
+[auth-debug] method=GET path=/api/users/me/permissions
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+[auth-debug] method=GET path=/api/notifications/unread-count
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:59:38 AM [express] GET /api/users/me/permissions 200 in 207ms :: {"user":{"id":"cca94cb5-5de9-4780…
+[auth-debug] method=GET path=/api/notifications
+[auth-debug] cookie header present=true
+[auth-debug] sessionID=EZMRO-_Y43IwFUr7QSqcSaZTXhsqSSoP
+[auth-debug] sessionKeys=cookie,userId,user
+[auth-debug] req.user present: { id: 'cca94cb5-5de9-4780-85b3-a24e5b77f38f', email: undefined }
+12:59:39 AM [express] GET /api/notifications/unread-count 200 in 239ms :: {"count":0}
+12:59:39 AM [express] GET /api/notifications 200 in 95ms :: {"notifications":[{"id":"7093433d-ce35-48…
