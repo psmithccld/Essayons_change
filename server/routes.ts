@@ -795,7 +795,9 @@ const enforceOrganizationLicense = async (req: AuthenticatedRequest, res: Respon
     }
 
     // Check if organization is in read-only mode
+    console.log(`[License Check] Org: ${organization.name}, isReadOnly: ${organization.isReadOnly}, method: ${req.method}, path: ${req.path}`);
     if (organization.isReadOnly) {
+      console.log(`[License Check] BLOCKING write operation for read-only org: ${organization.name}`);
       return res.status(403).json({ 
         error: "Organization is in read-only mode. Please contact your administrator to renew your license.",
         code: "READ_ONLY_MODE"
@@ -5106,6 +5108,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error copying project:", error);
       res.status(400).json({ error: "Failed to copy project" });
+    }
+  });
+
+  // Checklist Templates (stub - feature not fully implemented)
+  // Returns empty array to prevent 404 errors on Tasks page
+  app.get("/api/checklist-templates/active", requireAuthAndOrg, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      // TODO: Implement checklist templates feature
+      // For now, return empty array to prevent frontend 404 errors
+      res.json([]);
+    } catch (error) {
+      console.error("Error fetching checklist templates:", error);
+      res.status(500).json({ error: "Failed to fetch checklist templates" });
     }
   });
 
