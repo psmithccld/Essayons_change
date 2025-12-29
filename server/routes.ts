@@ -853,9 +853,9 @@ const requirePermission = (permission: keyof Permissions) => {
 
 // (requireEitherFeatureOrPermission is defined earlier in the file)
 
-// Combined middleware for auth + organization context + permission
+// Combined middleware for auth + organization context + permission + license enforcement
 const requireAuthAndPermission = (permission: keyof Permissions) => {
-  return [requireAuth, requireOrgContext, requirePermission(permission)];
+  return [requireAuth, requireOrgContext, enforceOrganizationLicense, requirePermission(permission)];
 };
 
 // Combined middleware for auth + organization context (for routes that need org context but no special permissions)
