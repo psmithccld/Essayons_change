@@ -2447,8 +2447,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { insertOrganizationSchema } = await import("@shared/schema");
       
+      // DEBUG: Log incoming request body for isReadOnly troubleshooting
+      console.log(`[Org Update] Request body isReadOnly: ${req.body.isReadOnly}, type: ${typeof req.body.isReadOnly}`);
+      
       // Extract and validate tierId separately for security
       const { tierId, tierName, ...orgData } = req.body;
+      
+      // DEBUG: Log orgData after extraction
+      console.log(`[Org Update] orgData.isReadOnly: ${orgData.isReadOnly}, type: ${typeof orgData.isReadOnly}`);
       
       // Convert date strings to Date objects before validation
       const dateFields = ['licenseExpiresAt', 'contractStartDate', 'contractEndDate'] as const;
@@ -2482,19 +2488,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Partial validation since this is an update (ignoring tierName from client)
       const validation = insertOrganizationSchema.partial().safeParse(orgData);
       if (!validation.success) {
+        console.log(`[Org Update] Validation failed:`, validation.error.errors);
         return res.status(400).json({ 
           error: "Invalid organization data", 
           details: validation.error.errors 
         });
       }
+      
+      // DEBUG: Log validated data
+      console.log(`[Org Update] Validated data isReadOnly: ${validation.data.isReadOnly}, type: ${typeof validation.data.isReadOnly}`);
 
       // Include validated tierId in update data (including explicit null for tier removal)
       const updateData = {
         ...validation.data,
         ...(tierIdProvided && { tierId: validatedTierId })
       };
+      
+      // DEBUG: Log final update data
+      console.log(`[Org Update] Final updateData isReadOnly: ${updateData.isReadOnly}, type: ${typeof updateData.isReadOnly}`);
 
       const organization = await storage.updateOrganization(id, updateData);
+      
+      // DEBUG: Log result from database
+      console.log(`[Org Update] Result isReadOnly: ${organization?.isReadOnly}, type: ${typeof organization?.isReadOnly}`);
       if (!organization) {
         return res.status(404).json({ error: "Organization not found" });
       }
