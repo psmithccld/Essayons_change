@@ -3316,7 +3316,9 @@ export class DatabaseStorage implements IStorage {
     }
     
     relevantProjects.forEach(project => {
-      const phase = project.currentPhase || 'identify_need';
+      // Use status field which is what the UI updates when changing initiative phase
+      // Fall back to currentPhase for backwards compatibility, then default to identify_need
+      const phase = project.status || project.currentPhase || 'identify_need';
       if (phaseCount.hasOwnProperty(phase)) {
         phaseCount[phase]++;
       }
